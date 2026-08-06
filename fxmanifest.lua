@@ -13,6 +13,7 @@ dependencies {
     'ox_lib',
     'ox_inventory',
     'ox_target',
+    'oxmysql',
 }
 
 shared_scripts {
@@ -30,7 +31,12 @@ shared_scripts {
 }
 
 server_scripts {
+    '@oxmysql/lib/MySQL.lua',
     'server/modules/logger/logger.lua',
+    'server/modules/database/database.lua',
+    'server/modules/state/growth.lua',
+    'server/modules/state/state.lua',
+    'server/modules/debug/commands.lua',
     'server/main.lua',
 }
 

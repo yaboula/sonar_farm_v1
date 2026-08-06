@@ -35,6 +35,15 @@ Config.Debug = true
 -- Interval, in seconds, for the async batch save of dirty state to the DB.
 Config.SaveInterval = 60
 
+Config.Database = {
+    -- When true, the resource runs database/install.sql at boot (idempotent,
+    -- CREATE TABLE IF NOT EXISTS). Set false if you import the SQL manually.
+    AutoCreateSchema = true,
+    -- Max rows per upsert/delete transaction chunk. Keeps transactions small
+    -- and well under max_allowed_packet under heavy load.
+    BatchChunkSize = 100,
+}
+
 -- ---------------------------------------------------------------------------
 -- Locale
 -- ---------------------------------------------------------------------------
