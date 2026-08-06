@@ -11,6 +11,10 @@ local Constants = {}
 -- Resource identity.
 Constants.RESOURCE = GetCurrentResourceName()
 
+-- Spatial-hash cell size in meters. Used to compute a crop's "gx:gy" cell key
+-- for the streaming/culling grid (Stage 4). Default matches config zone cells.
+Constants.SPATIAL_CELL_SIZE = 100
+
 -- Log severity levels. Ordered for threshold comparisons (see logger).
 Constants.LOG_LEVELS = {
     INFO = 1,
