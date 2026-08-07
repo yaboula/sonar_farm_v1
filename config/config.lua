@@ -23,11 +23,20 @@ Config.FrameworkResources = {
     ['qbox'] = 'qbx_core',
 }
 
+-- Deterministic auto-detection order. Only QB-Core is implemented in the MVP;
+-- the remaining entries exist so forced/accidental selection fails clearly.
+Config.FrameworkPriority = { 'qb-core', 'qbox', 'esx' }
+
 -- ---------------------------------------------------------------------------
 -- Debug & diagnostics
 -- ---------------------------------------------------------------------------
--- When true, prints verbose logs and enables developer helpers.
-Config.Debug = true
+-- When true, prints verbose logs and exposes developer helpers to authorized
+-- administrators. It never grants permission on its own.
+Config.Debug = false
+
+Config.Admin = {
+    Ace = 'sonar_farm.admin',
+}
 
 -- ---------------------------------------------------------------------------
 -- Persistence (used from Stage 2 onwards)
@@ -55,10 +64,10 @@ Config.Locale = 'en'
 -- Toggle whole subsystems without touching code. Useful for staged rollout.
 -- ---------------------------------------------------------------------------
 Config.Features = {
-    Minigames = true,      -- Stage 5: active skill-based minigames
-    Machinery = true,      -- Stage 9+: mechanized farming (quality cap + risk)
-    Progression = true,    -- Stage 7: XP + tech-tree
-    Economy = true,        -- Stage 8: sell to NPC, quality-based pricing
+    Minigames = false,     -- Stage 5: intentionally disabled until approved
+    Machinery = false,     -- Stage 9+: not implemented
+    Progression = false,   -- Stage 7: not implemented
+    Economy = false,       -- Stage 8: not implemented
     Discord = false,       -- Stage 3: Discord webhook logging connector
     DatabaseLogs = false,  -- Stage 3: database logging connector
 }
@@ -73,6 +82,15 @@ Config.Security = {
         capacity = 8,
         refillPerSecond = 2,
     },
+    -- Independent budget for spatial snapshot requests.
+    SubscriptionBucket = {
+        capacity = 3,
+        refillPerSecond = 1,
+    },
+    -- Avoid one console/webhook entry per packet during a flood.
+    RateLimitLogInterval = 5000,
+    -- Public farming exists only in the world bucket for the MVP.
+    AllowedRoutingBuckets = { 0 },
     -- Max distance (meters) between the player and the crop for any action.
     MaxInteractDistance = 3.0,
     -- Implied speed (m/s) above which movement is considered suspicious.

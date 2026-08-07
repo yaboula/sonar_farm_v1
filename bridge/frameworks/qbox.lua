@@ -7,6 +7,7 @@
 local FRAMEWORK = Sonar.Constants.FRAMEWORKS.QBOX
 
 local adapter = {}
+adapter.Implemented = false
 
 local function notImplemented(method)
     Bridge.Log('error', ('Qbox adapter method "%s" is not implemented yet.'):format(method))

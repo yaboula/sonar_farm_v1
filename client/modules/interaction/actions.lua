@@ -26,6 +26,9 @@ local PLACEHOLDER_DURATION = {
 
 local MESSAGES = {
     [REJECT.RATE_LIMITED] = 'Slow down.',
+    [REJECT.SERVICE_UNAVAILABLE] = 'Farming is still starting. Try again shortly.',
+    [REJECT.PLAYER_NOT_READY] = 'Your character is still loading.',
+    [REJECT.WRONG_INSTANCE] = 'Farming is not available in this instance.',
     [REJECT.COOLDOWN] = 'Please wait a moment.',
     [REJECT.TOO_FAR] = 'You are too far away.',
     [REJECT.SUSPICIOUS_MOVEMENT] = 'Movement validation failed.',

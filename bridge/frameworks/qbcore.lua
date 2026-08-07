@@ -10,6 +10,7 @@ local NOTIFY = Sonar.Constants.NOTIFY
 local QBCore
 
 local adapter = {}
+adapter.Implemented = true
 
 --- Acquire the QB-Core object. Supports the modern export entrypoint.
 function adapter.Init()

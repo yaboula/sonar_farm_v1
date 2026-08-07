@@ -67,7 +67,8 @@ function Bridge.Detect()
         return configured
     end
 
-    for name, resName in pairs(Config.FrameworkResources) do
+    for _, name in ipairs(Config.FrameworkPriority or {}) do
+        local resName = Config.FrameworkResources[name]
         if GetResourceState(resName) == 'started' then
             return name
         end
@@ -105,6 +106,10 @@ function Bridge.Init()
     local adapter = Bridge._adapters[name]
     if not adapter then
         Bridge.Log('error', ('Framework "%s" detected but no adapter is registered.'):format(name))
+        return false
+    end
+    if adapter.Implemented == false then
+        Bridge.Log('error', ('Framework "%s" was detected but its adapter is not implemented in this release.'):format(name))
         return false
     end
 

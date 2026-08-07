@@ -57,7 +57,7 @@ local function createSphereZone(slot, key)
                     Actions.OpenPlantMenu(zoneKey, index)
                 end,
                 canInteract = function()
-                    return not Crops.IsSlotOccupied(zoneKey, index)
+                    return Sync.IsAvailable() and not Crops.IsSlotOccupied(zoneKey, index)
                 end,
             },
             {
@@ -72,7 +72,7 @@ local function createSphereZone(slot, key)
                     end
                 end,
                 canInteract = function()
-                    return Crops.IsSlotOccupied(zoneKey, index)
+                    return Sync.IsAvailable() and Crops.IsSlotOccupied(zoneKey, index)
                 end,
             },
             {
@@ -87,6 +87,7 @@ local function createSphereZone(slot, key)
                     end
                 end,
                 canInteract = function()
+                    if not Sync.IsAvailable() then return false end
                     local cropId = Crops.SlotOccupant(zoneKey, index)
                     if not cropId then return false end
                     local cond = Crops.Condition(cropId)
@@ -107,6 +108,7 @@ local function createSphereZone(slot, key)
                     end
                 end,
                 canInteract = function()
+                    if not Sync.IsAvailable() then return false end
                     local cropId = Crops.SlotOccupant(zoneKey, index)
                     if not cropId then return false end
                     local cond = Crops.Condition(cropId)

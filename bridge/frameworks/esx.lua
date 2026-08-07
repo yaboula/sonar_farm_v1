@@ -7,6 +7,7 @@
 local FRAMEWORK = Sonar.Constants.FRAMEWORKS.ESX
 
 local adapter = {}
+adapter.Implemented = false
 
 local function notImplemented(method)
     Bridge.Log('error', ('ESX adapter method "%s" is not implemented yet.'):format(method))

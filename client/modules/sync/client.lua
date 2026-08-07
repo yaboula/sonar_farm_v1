@@ -17,6 +17,7 @@ local CELL_SIZE = Sonar.Constants.SPATIAL_CELL_SIZE
 
 local currentCell = nil
 local subscribing = false
+local available = false
 
 -- Deltas that arrive while a subscription is in flight. The snapshot replaces the
 -- whole cache, so without this buffer a crop planted during the round-trip would
@@ -67,9 +68,18 @@ local function requestSubscription()
     -- Align our clock with the server before predicting anything from it.
     Sonar.Time.Sync(response.serverTime)
 
-    if not response.ok then return false end
+    if not response.ok then
+        if response.reason == Sonar.Constants.REJECT.WRONG_INSTANCE
+            or response.reason == Sonar.Constants.REJECT.SERVICE_UNAVAILABLE
+            or response.reason == Sonar.Constants.REJECT.PLAYER_NOT_READY then
+            available = false
+            Crops.Reset()
+        end
+        return false
+    end
 
     Crops.ReplaceAll(response.crops)
+    available = true
 
     -- Re-apply anything that happened during the round-trip.
     for _, delta in ipairs(pendingDeltas) do
@@ -93,6 +103,10 @@ function Sync.RefreshNow()
     end
 end
 
+function Sync.IsAvailable()
+    return available
+end
+
 -- ---------------------------------------------------------------------------
 -- Inbound deltas
 -- ---------------------------------------------------------------------------
@@ -106,6 +120,7 @@ RegisterNetEvent(EVENTS.CROP_SYNC, function(payload, serverTime)
     end
 
     Crops.Upsert(payload)
+    available = true
     -- Force an immediate render pass so the prop appears without waiting for the
     -- next loop tick (which could be up to TickFar = 2000ms away).
     Crops.Refresh(GetEntityCoords(PlayerPedId()))
@@ -120,6 +135,18 @@ RegisterNetEvent(EVENTS.CROP_REMOVE, function(cropId)
     Crops.Remove(cropId)
     -- Refresh immediately so the despawned prop disappears without delay.
     Crops.Refresh(GetEntityCoords(PlayerPedId()))
+end)
+
+-- Hot restarts can leave connected clients alive while the server reloads its
+-- database. The READY signal forces a fresh authoritative snapshot.
+RegisterNetEvent(EVENTS.RUNTIME_READY, function()
+    Sync.RefreshNow()
+end)
+
+RegisterNetEvent(EVENTS.SYNC_RESET, function()
+    currentCell = nil
+    available = false
+    Crops.Reset()
 end)
 
 -- ---------------------------------------------------------------------------
@@ -152,7 +179,7 @@ CreateThread(function()
                 -- Only tighten the loop when there is actually something around.
                 interval = (Crops.Count() > 0) and Config.Sync.TickNear or Config.Sync.TickFar
             end
-        elseif Pool.Count() > 0 then
+        elseif Pool.Count('crop') > 0 then
             -- Entered an interior with props still up: drop them, keep the cache.
             Crops.DespawnAll()
         end

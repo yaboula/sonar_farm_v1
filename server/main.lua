@@ -31,14 +31,37 @@ local function validateDependencies()
 end
 
 CreateThread(function()
+    Runtime.SetStatus(Runtime.STATUS.BOOTING)
     Logger.Info(('Booting sonar_farm v%s ...'):format(GetResourceMetadata(Sonar.Constants.RESOURCE, 'version', 0) or '?'), 'boot')
 
+    local validationOk, configErrors, configWarnings = pcall(Sonar.ConfigValidation.Validate)
+    if not validationOk then
+        Runtime.SetStatus(Runtime.STATUS.FAILED, 'invalid_config')
+        Logger.Warn(('Configuration validation crashed: %s'):format(tostring(configErrors)), 'boot')
+        return
+    end
+    for _, warning in ipairs(configWarnings) do
+        Logger.Warn(warning, 'config')
+    end
+    if #configErrors > 0 then
+        for _, message in ipairs(configErrors) do
+            Logger.Warn(message, 'config')
+        end
+        Runtime.SetStatus(Runtime.STATUS.FAILED, 'invalid_config')
+        Logger.Warn(('Configuration validation failed with %d error(s).'):format(#configErrors), 'boot')
+        return
+    end
+
+    Sonar.Utils.SeedRandom(os.time(), GetGameTimer())
+
     if not validateDependencies() then
+        Runtime.SetStatus(Runtime.STATUS.FAILED, 'dependencies')
         Logger.Warn('Dependency check failed. Aborting initialization.', 'boot')
         return
     end
 
     if not Bridge.Init() then
+        Runtime.SetStatus(Runtime.STATUS.FAILED, 'bridge')
         Logger.Warn('Bridge failed to initialize. Aborting.', 'boot')
         return
     end
@@ -49,13 +72,23 @@ CreateThread(function()
 
     -- Stage 2: state engine + persistence.
     if not Database.Init() then
-        Logger.Warn('Database init failed. State engine disabled (running without persistence).', 'boot')
+        Runtime.SetStatus(Runtime.STATUS.FAILED, 'database')
+        Logger.Warn('Database init failed. Gameplay remains disabled to protect persistent state.', 'boot')
         return
     end
 
-    local loaded = State.LoadAll()
+    local loadedOk, loadedOrError = State.LoadAll()
+    if not loadedOk then
+        Runtime.SetStatus(Runtime.STATUS.FAILED, 'state_load')
+        Logger.Warn(('State load failed: %s. Gameplay remains disabled.'):format(tostring(loadedOrError)), 'boot')
+        return
+    end
+
+    local loaded = loadedOrError
     engineReady = true
+    Runtime.SetStatus(Runtime.STATUS.READY)
     Logger.Info(('State engine ready (%d crops loaded). Server online.'):format(loaded), 'boot')
+    TriggerClientEvent(Sonar.Constants.EVENTS.RUNTIME_READY, -1)
 
     -- Periodic async batch save of dirty state.
     CreateThread(function()
@@ -70,6 +103,7 @@ end)
 -- Emergency flush on resource stop / server shutdown (txAdmin hot updates).
 AddEventHandler('onResourceStop', function(resourceName)
     if resourceName ~= Sonar.Constants.RESOURCE then return end
+    Runtime.SetStatus(Runtime.STATUS.STOPPING)
     if not engineReady then return end
     Logger.Info('Resource stopping: flushing state to database.', 'boot')
     State.FlushSync()

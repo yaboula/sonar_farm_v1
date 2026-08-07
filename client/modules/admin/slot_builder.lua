@@ -398,6 +398,7 @@ end
 -- ─── Command Entry-point ──────────────────────────────────────────────────────
 
 RegisterCommand('farm_slots', function()
+    if not Admin.RequireAuthorization() then return end
     if sbState ~= SB_IDLE then
         Bridge.Notify("Slot Builder is already active. Press BACKSPACE to cancel.", "error")
         return

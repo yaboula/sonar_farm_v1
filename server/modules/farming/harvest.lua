@@ -21,6 +21,9 @@ end
 lib.callback.register(CALLBACKS.HARVEST, function(source, payload)
     payload = payload or {}
 
+    local runtime = Runtime.GuardPlayer(source)
+    if not runtime.ok then return reject(runtime.reason) end
+
     if not Security.Consume(source) then
         return reject(REJECT.RATE_LIMITED)
     end
@@ -78,7 +81,7 @@ lib.callback.register(CALLBACKS.HARVEST, function(source, payload)
         Logger.Info(('Harvested %s x%d (quality %.1f, %s).')
             :format(record.crop_type, units, quality, metadata.tier), 'farming', {
             source = source,
-            identifier = Bridge.GetIdentifier(source),
+            identifier = runtime.identifier,
             cropId = record.id,
             theft = permission.theft,
         })

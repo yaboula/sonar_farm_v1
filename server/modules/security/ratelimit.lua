@@ -9,14 +9,29 @@
 
 Security = Security or {}
 
--- [source] = { tokens = number, last = ms }
+-- [source] = { [scope] = { tokens = number, last = ms } }
 local buckets = {}
+-- [source] = { [scope] = lastLogMs }
+local violationLogs = {}
 
-local function bucketFor(source, now)
-    local bucket = buckets[source]
+local function configFor(scope)
+    if scope == 'subscribe' then
+        return Config.Security.SubscriptionBucket
+    end
+    return Config.Security.TokenBucket
+end
+
+local function bucketFor(source, scope, now, cfg)
+    local playerBuckets = buckets[source]
+    if not playerBuckets then
+        playerBuckets = {}
+        buckets[source] = playerBuckets
+    end
+
+    local bucket = playerBuckets[scope]
     if not bucket then
-        bucket = { tokens = Config.Security.TokenBucket.capacity, last = now }
-        buckets[source] = bucket
+        bucket = { tokens = cfg.capacity, last = now }
+        playerBuckets[scope] = bucket
     end
     return bucket
 end
@@ -25,13 +40,15 @@ end
 --- flooding, in which case the caller must reject the action.
 ---@param source number
 ---@param cost? number defaults to 1
+---@param scope? string defaults to action
 ---@return boolean allowed
-function Security.Consume(source, cost)
+function Security.Consume(source, cost, scope)
     cost = cost or 1
+    scope = scope or 'action'
 
-    local cfg = Config.Security.TokenBucket
+    local cfg = configFor(scope)
     local now = GetGameTimer()
-    local bucket = bucketFor(source, now)
+    local bucket = bucketFor(source, scope, now, cfg)
 
     -- Lazy refill based on elapsed time since the last consume.
     local elapsed = (now - bucket.last) / 1000
@@ -41,11 +58,18 @@ function Security.Consume(source, cost)
     end
 
     if bucket.tokens < cost then
-        Logger.Exploit(('Rate limit exceeded by %s.'):format(Bridge.GetPlayerName(source) or source), 'security', {
-            source = source,
-            identifier = Bridge.GetIdentifier(source),
-            tokens = Sonar.Utils.Round(bucket.tokens, 2),
-        })
+        local playerLogs = violationLogs[source] or {}
+        violationLogs[source] = playerLogs
+        local interval = Config.Security.RateLimitLogInterval or 5000
+        if not playerLogs[scope] or (now - playerLogs[scope]) >= interval then
+            playerLogs[scope] = now
+            Logger.Exploit(('Rate limit exceeded by %s.'):format(Bridge.GetPlayerName(source) or source), 'security', {
+                source = source,
+                identifier = Bridge.GetIdentifier(source),
+                scope = scope,
+                tokens = Sonar.Utils.Round(bucket.tokens, 2),
+            })
+        end
         return false
     end
 
@@ -56,15 +80,18 @@ end
 --- Current token count, for diagnostics.
 ---@param source number
 ---@return number
-function Security.Tokens(source)
-    local bucket = buckets[source]
-    return bucket and bucket.tokens or Config.Security.TokenBucket.capacity
+function Security.Tokens(source, scope)
+    scope = scope or 'action'
+    local playerBuckets = buckets[source]
+    local bucket = playerBuckets and playerBuckets[scope]
+    return bucket and bucket.tokens or configFor(scope).capacity
 end
 
 --- Release a player's bucket. Called on disconnect to avoid memory growth.
 ---@param source number
 function Security.Release(source)
     buckets[source] = nil
+    violationLogs[source] = nil
 end
 
 AddEventHandler('playerDropped', function()

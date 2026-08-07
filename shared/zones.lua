@@ -13,9 +13,8 @@
     reads the position from here, never from the client, so planting position is
     not something a modified client can influence at all.
 
-    Slot indices are 1-based. That is not only Lua convention: index 0 would break
-    the NULLIF(?, '') trick used for nullable SQL columns, because '' casts to 0
-    and a real slot 0 would be stored as NULL. See docs/RUNBOOK.md.
+    Slot indices are 1-based. Index 0 is reserved as the dense-array sentinel
+    converted to SQL NULL by NULLIF(?, 0). See docs/RUNBOOK.md.
 ]]
 
 Sonar = Sonar or {}

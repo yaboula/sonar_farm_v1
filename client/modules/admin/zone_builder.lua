@@ -312,6 +312,7 @@ local function startEditLoop()
 end
 
 RegisterCommand('farm_builder', function()
+    if not Admin.RequireAuthorization() then return end
     if state ~= STATE_IDLE then return end
 
     grid = {

@@ -32,6 +32,7 @@ shared_scripts {
     'shared/physiology.lua',
     -- Zone/slot resolver: same list on client (targets) and server (validation).
     'shared/zones.lua',
+    'shared/config_validation.lua',
     -- Bridge Layer (framework abstraction). Order matters:
     -- core first, then adapters register themselves into the registry.
     'bridge/bridge.lua',
@@ -45,6 +46,8 @@ shared_scripts {
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/modules/logger/logger.lua',
+    'server/modules/runtime/runtime.lua',
+    'server/modules/admin/permissions.lua',
     'server/modules/database/database.lua',
     'server/modules/state/state.lua',
     -- Security before farming: actions depend on these guards.
@@ -60,7 +63,6 @@ server_scripts {
     'server/modules/farming/plant.lua',
     'server/modules/farming/care.lua',
     'server/modules/farming/harvest.lua',
-    'server/modules/farming/query.lua',
     'server/modules/debug/commands.lua',
     'server/main.lua',
 }
@@ -76,6 +78,7 @@ client_scripts {
     'client/modules/zones/slots.lua',
     'client/modules/sync/client.lua',
     'client/modules/zones/blips.lua',
+    'client/modules/admin/permissions.lua',
     'client/modules/admin/zone_builder.lua',
     'client/modules/admin/slot_builder.lua',
     'client/modules/debug/commands.lua',

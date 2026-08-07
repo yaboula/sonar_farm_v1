@@ -24,6 +24,23 @@ local CELL_SIZE = Sonar.Constants.SPATIAL_CELL_SIZE
 local Uuid = Sonar.Utils.Uuid
 local DeepMerge = Sonar.Utils.DeepMerge
 
+local function finite(value)
+    return type(value) == 'number'
+        and value == value
+        and value > -math.huge
+        and value < math.huge
+end
+
+local function nextUuid()
+    for _ = 1, 16 do
+        local candidate = Uuid()
+        if not State.crops[candidate] then
+            return candidate
+        end
+    end
+    error('Unable to generate a unique crop UUID after 16 attempts.')
+end
+
 -- ---------------------------------------------------------------------------
 -- Spatial index helpers
 -- ---------------------------------------------------------------------------
@@ -176,7 +193,10 @@ end
 ---@return string id
 ---@return table record
 function State.Add(partial)
-    local id = partial.id or Uuid()
+    local id = partial.id or nextUuid()
+    if State.crops[id] then
+        error(('Crop id collision: %s'):format(tostring(id)))
+    end
     local def = Config.Crops and Config.Crops[partial.crop_type]
 
     local record = {
@@ -357,9 +377,14 @@ end
 
 --- Load all crops from the DB into hot state. Safe JSON decode: a corrupt
 --- `data` blob falls back to {} and is logged, without aborting the load.
----@return number loaded
+---@return boolean ok
+---@return number|string loadedOrError
 function State.LoadAll()
-    local rows = Database.LoadAllCrops()
+    local rows, dbError = Database.LoadAllCrops()
+    if not rows then
+        State.loaded = false
+        return false, dbError or 'database read failed'
+    end
 
     State.crops = {}
     State.cells = {}
@@ -367,11 +392,30 @@ function State.LoadAll()
     State.slots = {}
     State.dirty = {}
     State.deleted = {}
+    State.loaded = false
 
     local corrupt = 0
     local orphans = 0
     local legacy = 0
+    local unknown = 0
+    local repairedCells = 0
     for _, row in ipairs(rows) do
+        local posX = tonumber(row.pos_x)
+        local posY = tonumber(row.pos_y)
+        local posZ = tonumber(row.pos_z)
+        local plantedAt = tonumber(row.planted_at)
+        local growthTime = tonumber(row.growth_time)
+        local heading = tonumber(row.heading) or 0.0
+        local slot = row.slot ~= nil and tonumber(row.slot) or nil
+        if type(row.id) ~= 'string' or row.id == ''
+            or type(row.crop_type) ~= 'string' or row.crop_type == ''
+            or not finite(posX) or not finite(posY) or not finite(posZ)
+            or not finite(plantedAt) or not finite(growthTime) or growthTime <= 0
+            or not finite(heading)
+            or (row.slot ~= nil and (not finite(slot) or slot < 1 or slot % 1 ~= 0)) then
+            return false, ('invalid required fields in crop row %s'):format(tostring(row.id))
+        end
+
         local data = {}
         if row.data and row.data ~= '' then
             local ok, decoded = pcall(json.decode, row.data)
@@ -388,17 +432,30 @@ function State.LoadAll()
             crop_type = row.crop_type,
             owner = row.owner,
             zone = row.zone,
-            slot = tonumber(row.slot),
+            slot = slot,
             cell = row.cell,
-            pos_x = row.pos_x,
-            pos_y = row.pos_y,
-            pos_z = row.pos_z,
-            heading = row.heading or 0.0,
-            planted_at = row.planted_at,
-            growth_time = row.growth_time or 0,
+            pos_x = posX,
+            pos_y = posY,
+            pos_z = posZ,
+            heading = heading,
+            planted_at = plantedAt,
+            growth_time = growthTime,
             state = row.state or Sonar.Constants.CROP_STATE.PLANTED,
             data = data,
         }
+
+        local expectedCell = State.CellKey(record.pos_x, record.pos_y)
+        if record.cell ~= expectedCell then
+            record.cell = expectedCell
+            repairedCells = repairedCells + 1
+            State.dirty[record.id] = true
+        end
+
+        local slotKey = State.SlotKey(record.zone, record.slot)
+        if slotKey and State.slots[slotKey] then
+            return false, ('duplicate slot %s held by crops %s and %s')
+                :format(slotKey, State.slots[slotKey], record.id)
+        end
 
         State.crops[record.id] = record
         indexAdd(record)
@@ -414,6 +471,9 @@ function State.LoadAll()
             -- renumbered or removed). The crop is unreachable in-world.
             orphans = orphans + 1
         end
+        if not Config.Crops[record.crop_type] then
+            unknown = unknown + 1
+        end
     end
 
     State.loaded = true
@@ -426,7 +486,13 @@ function State.LoadAll()
     if orphans > 0 then
         Logger.Warn(('%d crop(s) point at slots missing from config. Their zone was resized or renumbered; see docs/RUNBOOK.md.'):format(orphans), 'state')
     end
-    return State.Count()
+    if unknown > 0 then
+        Logger.Warn(('%d crop(s) reference crop types missing from config. They remain loaded for administrative recovery.'):format(unknown), 'state')
+    end
+    if repairedCells > 0 then
+        Logger.Warn(('Repaired stale spatial cells for %d crop(s); changes queued for persistence.'):format(repairedCells), 'state')
+    end
+    return true, State.Count()
 end
 
 -- ---------------------------------------------------------------------------

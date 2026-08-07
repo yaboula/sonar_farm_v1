@@ -42,9 +42,11 @@ function Database.Init()
 
     -- Always run, even with AutoCreateSchema off: an existing table created by an
     -- earlier version needs the new columns regardless of that flag.
-    Database.Migrate()
+    if not Database.Migrate() then
+        return false
+    end
 
-    return true
+    return Database.ValidateSchema()
 end
 
 -- ---------------------------------------------------------------------------
@@ -97,6 +99,70 @@ function Database.Migrate()
 
             Logger.Info(('Migration applied: %s'):format(migration.name), 'db')
         end
+    end
+
+    return true
+end
+
+--- Verify the complete storage contract after migrations. Checking only rows is
+--- insufficient: an empty but incompatible table would otherwise reach READY.
+---@return boolean ok
+function Database.ValidateSchema()
+    local okColumns, rows = pcall(function()
+        return MySQL.query.await(
+            [[SELECT COLUMN_NAME FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?]],
+            { CROPS_TABLE }
+        )
+    end)
+    if not okColumns then
+        Logger.Warn(('Schema validation query failed: %s'):format(tostring(rows)), 'db')
+        return false
+    end
+
+    local present = {}
+    for _, row in ipairs(rows or {}) do
+        local name = row.COLUMN_NAME or row.column_name
+        if name then present[name] = true end
+    end
+
+    local missing = {}
+    for _, column in ipairs(UPSERT_COLUMNS) do
+        if not present[column] then missing[#missing + 1] = column end
+    end
+    if #missing > 0 then
+        Logger.Warn(('Table %s is incompatible; missing columns: %s')
+            :format(CROPS_TABLE, table.concat(missing, ', ')), 'db')
+        return false
+    end
+
+    local okIndex, indexRows = pcall(function()
+        return MySQL.query.await(
+            [[SELECT COLUMN_NAME, NON_UNIQUE, SEQ_IN_INDEX
+              FROM information_schema.STATISTICS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+                AND INDEX_NAME = 'uniq_zone_slot'
+              ORDER BY SEQ_IN_INDEX]],
+            { CROPS_TABLE }
+        )
+    end)
+    if not okIndex then
+        Logger.Warn(('Schema index validation query failed: %s'):format(tostring(indexRows)), 'db')
+        return false
+    end
+
+    local first = indexRows and indexRows[1]
+    local second = indexRows and indexRows[2]
+    local firstName = first and (first.COLUMN_NAME or first.column_name)
+    local secondName = second and (second.COLUMN_NAME or second.column_name)
+    local nonUnique = first and (first.NON_UNIQUE or first.non_unique)
+    if not indexRows
+        or #indexRows ~= 2
+        or firstName ~= 'zone'
+        or secondName ~= 'slot'
+        or tonumber(nonUnique) ~= 0 then
+        Logger.Warn(('Table %s requires UNIQUE KEY uniq_zone_slot (zone, slot).'):format(CROPS_TABLE), 'db')
+        return false
     end
 
     return true
@@ -173,9 +239,9 @@ end
 -- the parameter array never contains nil (a nil hole breaks array binding).
 local NULLABLE_STR_COLUMNS = { owner = true, zone = true, data = true }
 
--- Nullable INT columns: sent as Lua nil directly (oxmysql maps nil → NULL).
--- NULLIF(?, '') does NOT work for numeric columns: MySQL can't compare 2 = ''
--- on a DECIMAL/INT column and throws "Truncated incorrect DECIMAL value".
+-- NULLIF(?, '') is invalid for numeric columns and Lua nil would create a hole
+-- in the parameter array. Slot therefore uses the dense 0 sentinel below.
+-- Slot indices are 1-based, so 0 is a safe dense-array sentinel for SQL NULL.
 local NULLABLE_INT_COLUMNS = { slot = true }
 
 -- Prebuilt upsert statement (placeholders only, never string concatenation).
@@ -183,7 +249,13 @@ local UPSERT_SQL do
     local cols, placeholders, updates = {}, {}, {}
     for _, col in ipairs(UPSERT_COLUMNS) do
         cols[#cols + 1] = ('`%s`'):format(col)
-        placeholders[#placeholders + 1] = NULLABLE_STR_COLUMNS[col] and "NULLIF(?, '')" or '?'
+        if NULLABLE_STR_COLUMNS[col] then
+            placeholders[#placeholders + 1] = "NULLIF(?, '')"
+        elseif NULLABLE_INT_COLUMNS[col] then
+            placeholders[#placeholders + 1] = 'NULLIF(?, 0)'
+        else
+            placeholders[#placeholders + 1] = '?'
+        end
         if col ~= 'id' then
             updates[#updates + 1] = ('`%s`=VALUES(`%s`)'):format(col, col)
         end
@@ -198,7 +270,7 @@ end
 
 --- Serialize a state record into an ordered parameter array for UPSERT_SQL.
 --- `data` is JSON-encoded here so callers pass a plain Lua table. Nullable
---- values become '' (see NULLABLE_COLUMNS) to keep the array dense.
+--- values use dense sentinels so the parameter array never contains nil holes.
 ---@param row table
 ---@return any[]
 local function serializeRow(row)
@@ -207,7 +279,7 @@ local function serializeRow(row)
         row.crop_type,
         row.owner or '',
         row.zone or '',
-        row.slot or nil,   -- INT column: nil → SQL NULL (NULLIF not used for numerics)
+        row.slot or 0,
         row.cell,
         row.pos_x,
         row.pos_y,
@@ -226,16 +298,17 @@ end
 
 --- Load every crop row. `data` is returned raw (string); the caller decodes it
 --- safely (see State.LoadAll).
----@return table[] rows
+---@return table[]|nil rows
+---@return string|nil error
 function Database.LoadAllCrops()
     local ok, rows = pcall(function()
         return MySQL.query.await(('SELECT * FROM `%s`'):format(CROPS_TABLE))
     end)
     if not ok then
         Logger.Warn(('LoadAllCrops failed: %s'):format(tostring(rows)), 'db')
-        return {}
+        return nil, tostring(rows)
     end
-    return rows or {}
+    return rows or {}, nil
 end
 
 --- Upsert a batch of crop records. Chunked transactions with parameters.

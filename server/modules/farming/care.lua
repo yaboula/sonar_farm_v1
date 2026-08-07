@@ -24,6 +24,9 @@ end
 lib.callback.register(CALLBACKS.WATER, function(source, payload)
     payload = payload or {}
 
+    local runtime = Runtime.GuardPlayer(source)
+    if not runtime.ok then return reject(runtime.reason) end
+
     if not Security.Consume(source) then
         return reject(REJECT.RATE_LIMITED)
     end

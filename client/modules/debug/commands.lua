@@ -23,6 +23,7 @@ end
 
 -- /farm_plant [cropType]  — plants into the nearest empty slot (never free-plant).
 RegisterCommand('farm_plant', function(_, args)
+    if not Admin.RequireAuthorization() then return end
     local cropType = args[1] or 'carrot'
     local slot = Slots.NearestEmpty(GetEntityCoords(PlayerPedId()), 5.0)
 
@@ -34,6 +35,7 @@ RegisterCommand('farm_plant', function(_, args)
 end, false)
 
 RegisterCommand('farm_water', function(_, args)
+    if not Admin.RequireAuthorization() then return end
     local cropId = resolveCropId(args[1])
     if not cropId then
         return Bridge.Notify('No crop nearby.', NOTIFY.ERROR)
@@ -42,6 +44,7 @@ RegisterCommand('farm_water', function(_, args)
 end, false)
 
 RegisterCommand('farm_harvest', function(_, args)
+    if not Admin.RequireAuthorization() then return end
     local cropId = resolveCropId(args[1])
     if not cropId then
         return Bridge.Notify('No crop nearby.', NOTIFY.ERROR)
@@ -53,6 +56,7 @@ end, false)
 -- reach for when something looks wrong on screen: it separates "the server never
 -- told me" from "I know about it but did not draw it".
 RegisterCommand('farm_render', function()
+    if not Admin.RequireAuthorization() then return end
     local coords = GetEntityCoords(PlayerPedId())
 
     Bridge.Notify(('Cached %d crop(s), %d prop(s), %d slots. See F8.')
@@ -62,7 +66,7 @@ RegisterCommand('farm_render', function()
         :format(Crops.Count(), Pool.Count(), Sonar.Zones.TotalSlots(),
             Sonar.Time.Offset(), tostring(GetInteriorFromEntity(PlayerPedId()) ~= 0)))
 
-    for _, cropId in ipairs(Pool.Keys()) do
+    for _, cropId in ipairs(Pool.Keys('crop')) do
         local record = Crops.Get(cropId)
         local condition = Crops.Condition(cropId)
         if record and condition then
@@ -78,6 +82,7 @@ end, false)
 
 -- Force a resubscription. Useful after editing zones or crops on a live server.
 RegisterCommand('farm_resync', function()
+    if not Admin.RequireAuthorization() then return end
     Sync.RefreshNow()
     Bridge.Notify(('Resynced. %d crop(s) cached.'):format(Crops.Count()), NOTIFY.INFO)
 end, false)

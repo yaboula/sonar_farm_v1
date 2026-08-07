@@ -116,7 +116,7 @@ function Crops.ReplaceAll(payloads)
     end
 
     -- Drop props whose crop is no longer in the cache.
-    for _, key in ipairs(Pool.Keys()) do
+    for _, key in ipairs(Pool.Keys(POOL_TAG)) do
         if not cache[key] then
             Crops.Despawn(key)
         end
@@ -325,7 +325,7 @@ function Crops.Refresh(coords)
     end
 
     -- Anything rendered but no longer wanted (out of range, over budget, gone).
-    for _, key in ipairs(Pool.Keys()) do
+    for _, key in ipairs(Pool.Keys(POOL_TAG)) do
         if not wanted[key] then
             Crops.Despawn(key)
         end
@@ -336,7 +336,7 @@ end
 
 --- Destroy every crop prop, keeping the cache.
 function Crops.DespawnAll()
-    for _, key in ipairs(Pool.Keys()) do
+    for _, key in ipairs(Pool.Keys(POOL_TAG)) do
         Crops.Despawn(key)
     end
 end

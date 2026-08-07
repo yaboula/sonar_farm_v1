@@ -59,8 +59,8 @@ Constants.CALLBACKS = {
     PLANT = 'sonar_farm:plant',
     WATER = 'sonar_farm:water',
     HARVEST = 'sonar_farm:harvest',
-    NEARBY = 'sonar_farm:nearby',
     SUBSCRIBE = 'sonar_farm:subscribe',
+    ADMIN_AUTHORIZED = 'sonar_farm:adminAuthorized',
 }
 
 -- Networked event names. Prefixed to avoid collisions with other resources.
@@ -70,6 +70,8 @@ Constants.EVENTS = {
     -- subscribed to the affected spatial cell.
     CROP_SYNC = 'sonar_farm:cropSync',
     CROP_REMOVE = 'sonar_farm:cropRemove',
+    SYNC_RESET = 'sonar_farm:syncReset',
+    RUNTIME_READY = 'sonar_farm:runtimeReady',
 }
 
 -- Public server events other resources can listen to (platform API).
@@ -83,6 +85,9 @@ Constants.PUBLIC_EVENTS = {
 -- maps these to user-facing text; never build player messages on the server.
 Constants.REJECT = {
     RATE_LIMITED = 'rate_limited',
+    SERVICE_UNAVAILABLE = 'service_unavailable',
+    PLAYER_NOT_READY = 'player_not_ready',
+    WRONG_INSTANCE = 'wrong_instance',
     COOLDOWN = 'cooldown',
     TOO_FAR = 'too_far',
     SUSPICIOUS_MOVEMENT = 'suspicious_movement',

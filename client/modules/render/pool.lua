@@ -65,10 +65,17 @@ function Pool.ModelOf(key)
     return entry and entry.model or nil
 end
 
---- Number of live entities in the pool.
+--- Number of live entities in the pool, optionally filtered by tag.
+---@param tag? string
 ---@return number
-function Pool.Count()
-    return count
+function Pool.Count(tag)
+    if not tag then return count end
+
+    local tagged = 0
+    for _, entry in pairs(entities) do
+        if entry.tag == tag then tagged = tagged + 1 end
+    end
+    return tagged
 end
 
 --- Create a non-networked object for `key`.
@@ -145,13 +152,16 @@ function Pool.Clear(tag)
     return removed
 end
 
---- Iterate live keys. Returns a snapshot array so callers may destroy while
+--- Iterate live keys, optionally filtered by tag. Returns a snapshot array so callers may destroy while
 --- looping without invalidating the iteration.
+---@param tag? string
 ---@return string[]
-function Pool.Keys()
+function Pool.Keys(tag)
     local keys = {}
-    for key in pairs(entities) do
-        keys[#keys + 1] = key
+    for key, entry in pairs(entities) do
+        if not tag or entry.tag == tag then
+            keys[#keys + 1] = key
+        end
     end
     return keys
 end

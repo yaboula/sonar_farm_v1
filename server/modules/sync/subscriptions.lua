@@ -128,8 +128,18 @@ function Sync.OnCropChanged(record)
     if not bucket then return end
 
     local now = Sonar.Time.Now()
+    local invalid = {}
     for source in pairs(bucket) do
-        TriggerClientEvent(EVENTS.CROP_SYNC, source, renderPayload(record, Bridge.GetIdentifier(source)), now)
+        local runtime = Runtime.GuardPlayer(source)
+        if runtime.ok then
+            TriggerClientEvent(EVENTS.CROP_SYNC, source, renderPayload(record, runtime.identifier), now)
+        else
+            invalid[#invalid + 1] = source
+        end
+    end
+    for _, source in ipairs(invalid) do
+        Sync.Release(source)
+        TriggerClientEvent(EVENTS.SYNC_RESET, source)
     end
 end
 
@@ -144,8 +154,17 @@ function Sync.OnCropRemoved(cropId, cellKey)
     local bucket = subscribers[cellKey]
     if not bucket then return end
 
+    local invalid = {}
     for source in pairs(bucket) do
-        TriggerClientEvent(EVENTS.CROP_REMOVE, source, cropId)
+        if Runtime.GuardPlayer(source).ok then
+            TriggerClientEvent(EVENTS.CROP_REMOVE, source, cropId)
+        else
+            invalid[#invalid + 1] = source
+        end
+    end
+    for _, source in ipairs(invalid) do
+        Sync.Release(source)
+        TriggerClientEvent(EVENTS.SYNC_RESET, source)
     end
 end
 
@@ -175,6 +194,25 @@ AddEventHandler('playerDropped', function()
     Sync.Release(source)
 end)
 
+-- Routing bucket changes do not have a reliable client event. Check only
+-- players with active subscriptions and clear their cache as soon as they leave
+-- an allowed world instance.
+CreateThread(function()
+    while true do
+        Wait(2000)
+        local invalid = {}
+        for source in pairs(playerCells) do
+            if not Runtime.GuardPlayer(source).ok then
+                invalid[#invalid + 1] = source
+            end
+        end
+        for _, source in ipairs(invalid) do
+            Sync.Release(source)
+            TriggerClientEvent(EVENTS.SYNC_RESET, source)
+        end
+    end
+end)
+
 -- ---------------------------------------------------------------------------
 -- Subscription callback
 -- ---------------------------------------------------------------------------
@@ -182,16 +220,41 @@ end)
 -- Takes no arguments on purpose: the server decides which cells the player is
 -- entitled to based on where the player actually is.
 lib.callback.register(CALLBACKS.SUBSCRIBE, function(source)
+    local runtime = Runtime.GuardPlayer(source)
+    if not runtime.ok then
+        Sync.Release(source)
+        return {
+            ok = false,
+            reason = runtime.reason,
+            crops = {},
+            serverTime = Sonar.Time.Now(),
+        }
+    end
+
+    if not Security.Consume(source, 1, 'subscribe') then
+        return {
+            ok = false,
+            reason = Sonar.Constants.REJECT.RATE_LIMITED,
+            crops = {},
+            serverTime = Sonar.Time.Now(),
+        }
+    end
+
     local coords = Validation.GetPlayerCoords(source)
     if not coords then
         -- Ped not streamed in yet. The client retries on its next tick.
-        return { ok = false, crops = {}, serverTime = Sonar.Time.Now() }
+        return {
+            ok = false,
+            reason = Sonar.Constants.REJECT.PLAYER_NOT_READY,
+            crops = {},
+            serverTime = Sonar.Time.Now(),
+        }
     end
 
     local cellKeys = cellsAround(coords.x, coords.y, Config.Sync.CellRadius)
     resubscribe(source, cellKeys)
 
-    local identifier = Bridge.GetIdentifier(source)
+    local identifier = runtime.identifier
     local crops = {}
     for _, record in ipairs(State.GetByCells(cellKeys)) do
         crops[#crops + 1] = renderPayload(record, identifier)

@@ -7,6 +7,18 @@
 Sonar = Sonar or {}
 
 local Utils = {}
+local randomSeeded = false
+
+--- Seed this resource's PRNG once. The server calls it with wall-clock and
+--- monotonic entropy before generating identifiers.
+---@param seedA number
+---@param seedB? number
+function Utils.SeedRandom(seedA, seedB)
+    if randomSeeded then return end
+    math.randomseed(math.floor(seedA or 0), math.floor(seedB or 0))
+    for _ = 1, 4 do math.random() end
+    randomSeeded = true
+end
 
 --- Clamp a number to the [min, max] range.
 ---@param value number

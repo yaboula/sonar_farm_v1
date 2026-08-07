@@ -29,6 +29,9 @@ end
 lib.callback.register(CALLBACKS.PLANT, function(source, payload)
     payload = payload or {}
 
+    local runtime = Runtime.GuardPlayer(source)
+    if not runtime.ok then return reject(runtime.reason) end
+
     if not Security.Consume(source) then
         return reject(REJECT.RATE_LIMITED)
     end
@@ -74,7 +77,7 @@ lib.callback.register(CALLBACKS.PLANT, function(source, payload)
         -- Position and heading come from the slot definition, never the player.
         local cropId, record = State.Add({
             crop_type = cropType,
-            owner = Bridge.GetIdentifier(source),
+            owner = runtime.identifier,
             zone = slot.zone,
             slot = slot.index,
             pos_x = slot.x,
@@ -97,7 +100,7 @@ lib.callback.register(CALLBACKS.PLANT, function(source, payload)
 
         Logger.Info(('Planted %s (%s) in %s slot %d.'):format(cropType, cropId, slot.zone, slot.index), 'farming', {
             source = source,
-            identifier = Bridge.GetIdentifier(source),
+            identifier = runtime.identifier,
         })
 
         TriggerEvent(PUBLIC.CROP_PLANTED, {
@@ -105,7 +108,7 @@ lib.callback.register(CALLBACKS.PLANT, function(source, payload)
             cropType = cropType,
             zone = slot.zone,
             slot = slot.index,
-            owner = Bridge.GetIdentifier(source),
+            owner = runtime.identifier,
             source = source,
         })
 

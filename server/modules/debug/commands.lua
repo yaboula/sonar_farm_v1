@@ -13,6 +13,22 @@ local function reply(src, msg)
     Logger.Info(msg, 'debug')
 end
 
+local function canRun(src)
+    if Admin.IsAuthorized(src) then
+        return true
+    end
+    reply(src, 'Permission denied. Required ACE: ' .. Config.Admin.Ace)
+    return false
+end
+
+local function runtimeReady(src)
+    if Runtime.IsReady() then
+        return true
+    end
+    reply(src, ('Runtime is %s; command rejected.'):format(Runtime.status))
+    return false
+end
+
 --- Resolve spawn coordinates for a command caller (player ped or a default).
 local function resolveCoords(src)
     if src and src > 0 then
@@ -28,8 +44,17 @@ end
 
 -- /farm_debug_plant [cropType] [growthTime]
 RegisterCommand('farm_debug_plant', function(src, args)
-    local cropType = args[1] or 'debug_crop'
+    if not canRun(src) or not runtimeReady(src) then return end
+    local cropType = args[1] or 'carrot'
     local growthTime = tonumber(args[2]) or 300
+    if not Config.Crops[cropType] then
+        reply(src, ('Unknown crop type: %s'):format(tostring(cropType)))
+        return
+    end
+    if growthTime <= 0 then
+        reply(src, 'growthTime must be a positive number.')
+        return
+    end
     local x, y, z, h = resolveCoords(src)
 
     local id, record = State.Add({
@@ -51,6 +76,7 @@ end, false)
 
 -- /farm_debug_dump
 RegisterCommand('farm_debug_dump', function(src)
+    if not canRun(src) or not runtimeReady(src) then return end
     local dirty, deleted, cells = 0, 0, 0
     for _ in pairs(State.dirty) do dirty = dirty + 1 end
     for _ in pairs(State.deleted) do deleted = deleted + 1 end
@@ -61,6 +87,7 @@ end, false)
 
 -- /farm_debug_grow [id]
 RegisterCommand('farm_debug_grow', function(src, args)
+    if not canRun(src) or not runtimeReady(src) then return end
     local id = args[1]
     local record = id and State.Get(id)
     if not record then
@@ -74,6 +101,7 @@ end, false)
 
 -- /farm_debug_save
 RegisterCommand('farm_debug_save', function(src)
+    if not canRun(src) or not runtimeReady(src) then return end
     CreateThread(function()
         local ok = State.Flush()
         reply(src, ('Flush %s'):format(ok and 'OK' or 'FAILED'))
@@ -82,6 +110,7 @@ end, false)
 
 -- /farm_debug_clear
 RegisterCommand('farm_debug_clear', function(src)
+    if not canRun(src) or not runtimeReady(src) then return end
     local targets = {}
     for id, record in pairs(State.crops) do
         targets[#targets + 1] = { id = id, cell = record.cell }
