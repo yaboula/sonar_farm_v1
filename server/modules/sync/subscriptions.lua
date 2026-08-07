@@ -99,6 +99,8 @@ local function renderPayload(record, identifier)
     return {
         id = record.id,
         cropType = record.crop_type,
+        zone = record.zone,
+        slot = record.slot,
         cell = record.cell,
         x = record.pos_x,
         y = record.pos_y,

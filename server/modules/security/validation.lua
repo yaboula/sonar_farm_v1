@@ -152,47 +152,44 @@ function Validation.AntiTeleport(source)
 end
 
 -- ---------------------------------------------------------------------------
--- Zones
+-- Planting slots
 -- ---------------------------------------------------------------------------
 
---- Resolve which configured zone contains `coords`.
----@param coords vector3|table
----@return string|nil zoneKey
----@return table|nil zone
-function Validation.ResolveZone(coords)
-    for key, zone in pairs(Config.Zones) do
-        if Utils.IsWithin(coords, zone.center, zone.radius) then
-            return key, zone
-        end
-    end
-    return nil, nil
-end
-
---- Reject if `coords` is outside every zone, or the crop is not allowed there.
----@param coords vector3|table
+--- Validate a planting request against a configured slot.
+--- Checks, in order: the slot exists, the crop is allowed in that zone, the slot
+--- is free, and the player is standing next to it.
+---
+--- The client sends only the zone key and slot index. The position comes from
+--- config on success, so a modified client cannot influence where a crop lands.
+---@param source number
+---@param zoneKey any client-supplied, untrusted
+---@param slotIndex any client-supplied, untrusted
 ---@param cropType string
----@return table result with `zoneKey` on success
-function Validation.Zone(coords, cropType)
-    local zoneKey, zone = Validation.ResolveZone(coords)
-    if not zoneKey then
-        return fail(REJECT.NOT_IN_ZONE)
+---@return table result with `slot` (resolved slot table) on success
+function Validation.Slot(source, zoneKey, slotIndex, cropType)
+    if type(zoneKey) ~= 'string' then
+        return fail(REJECT.SLOT_NOT_FOUND)
     end
 
-    local allowed = zone.allowedCrops
-    if allowed and #allowed > 0 then
-        local permitted = false
-        for _, key in ipairs(allowed) do
-            if key == cropType then
-                permitted = true
-                break
-            end
-        end
-        if not permitted then
-            return fail(REJECT.CROP_NOT_ALLOWED_HERE)
-        end
+    local slot = Sonar.Zones.Slot(zoneKey, slotIndex)
+    if not slot then
+        return fail(REJECT.SLOT_NOT_FOUND)
     end
 
-    return { ok = true, zoneKey = zoneKey }
+    if not Sonar.Zones.AllowsCrop(zoneKey, cropType) then
+        return fail(REJECT.CROP_NOT_ALLOWED_HERE)
+    end
+
+    if State.SlotOccupant(zoneKey, slot.index) then
+        return fail(REJECT.SLOT_OCCUPIED)
+    end
+
+    local distance = Validation.Distance(source, slot)
+    if not distance.ok then
+        return distance
+    end
+
+    return { ok = true, slot = slot }
 end
 
 -- ---------------------------------------------------------------------------

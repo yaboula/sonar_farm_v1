@@ -15,6 +15,8 @@
     entity handle. Props are destroyed and re-created on every stage change, so
     the closure is always bound to the right crop, and canInteract (which runs
     while the player looks at a prop) stays free of any lookup.
+
+    Empty planting plots are handled separately in client/modules/zones/slots.lua.
 ]]
 
 Target = Target or {}
@@ -106,46 +108,9 @@ function Target.Detach(entity)
     })
 end
 
---- Register one sphere zone per farming zone, so planting is discoverable
---- without an existing crop to aim at. The option distance spans the whole zone:
---- a player anywhere in the field can plant.
-function Target.RegisterZones()
-    for key, zone in pairs(Config.Zones or {}) do
-        Bridge.Target.AddSphereZone({
-            name = ('sonar_farm:zone:%s'):format(key),
-            coords = zone.center,
-            radius = zone.radius,
-            debug = false,
-            options = {
-                {
-                    name = ('sonar_farm:plant:%s'):format(key),
-                    label = 'Plant seeds',
-                    icon = 'fa-solid fa-seedling',
-                    distance = zone.radius,
-                    onSelect = function()
-                        Actions.OpenPlantMenu(key)
-                    end,
-                },
-            },
-        })
-    end
-end
-
 --- Crop keys plantable in a zone, for the plant menu.
 ---@param zoneKey string
 ---@return string[]
 function Target.AllowedCrops(zoneKey)
-    local zone = Config.Zones and Config.Zones[zoneKey]
-    local allowed = zone and zone.allowedCrops
-
-    if allowed and #allowed > 0 then
-        return allowed
-    end
-
-    local all = {}
-    for cropType in pairs(Config.Crops or {}) do
-        all[#all + 1] = cropType
-    end
-    table.sort(all)
-    return all
+    return Sonar.Zones.AllowedCrops(zoneKey)
 end

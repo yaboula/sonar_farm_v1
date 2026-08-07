@@ -88,6 +88,10 @@ Constants.REJECT = {
     SUSPICIOUS_MOVEMENT = 'suspicious_movement',
     NOT_IN_ZONE = 'not_in_zone',
     CROP_NOT_ALLOWED_HERE = 'crop_not_allowed_here',
+    -- Slot system: the requested plot does not exist in config, or something is
+    -- already growing in it (the client's view was stale).
+    SLOT_NOT_FOUND = 'slot_not_found',
+    SLOT_OCCUPIED = 'slot_occupied',
     UNKNOWN_CROP = 'unknown_crop',
     MISSING_SEED = 'missing_seed',
     MISSING_TOOL = 'missing_tool',

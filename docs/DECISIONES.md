@@ -205,6 +205,17 @@ Nada de PTFX, sonidos ni animaciones: eso es la Etapa 6. La barra de progreso es
 
 `Validation.CropLimit` ya no recorre todo el estado: `State` mantiene un índice por propietario. Se pagó aprovechando que esta etapa ya tocaba el indexado espacial.
 
+### Slots fijos (post Etapa 4)
+
+El plantado libre dentro de un radio se sustituyó por surcos configurados:
+
+- Capacidad dura por zona (`rows * cols`), economía predecible.
+- Posición siempre desde config en el servidor: el cliente solo manda `zone` + `slot`.
+- Interacción: ox_target sobre el surco vacío; la semilla usable planta en el slot vacío más cercano (nunca en coordenadas libres).
+- Lock por `zone:slot` al plantar para que dos jugadores no ocupen el mismo surco a la vez.
+- Índices 1-based: el `NULLIF(?, '')` de oxmysql trataría el slot `0` como NULL.
+- `SlotProp` opcional y apagado por defecto: los targets existen sin prop extra.
+
 ---
 
 ## Principios de ingeniería (no negociables)

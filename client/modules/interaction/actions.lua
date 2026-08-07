@@ -4,9 +4,9 @@
     else (target options, item use, debug commands) routes through here, so the
     rejection handling and resync logic exist once.
 
-    Rejection codes are turned into text here rather than on the server: the
-    server stays language-agnostic and player-facing wording lives in the
-    presentation layer.
+    Planting always targets a configured slot. The client never invents
+    coordinates: it only sends zone + slot index, and the server places the crop
+    at the slot defined in config.
 ]]
 
 Actions = Actions or {}
@@ -31,6 +31,8 @@ local MESSAGES = {
     [REJECT.SUSPICIOUS_MOVEMENT] = 'Movement validation failed.',
     [REJECT.NOT_IN_ZONE] = 'You are not inside a farming zone.',
     [REJECT.CROP_NOT_ALLOWED_HERE] = 'That crop cannot be planted in this zone.',
+    [REJECT.SLOT_NOT_FOUND] = 'That planting plot does not exist.',
+    [REJECT.SLOT_OCCUPIED] = 'Something is already growing there.',
     [REJECT.UNKNOWN_CROP] = 'Unknown crop type.',
     [REJECT.MISSING_SEED] = 'You do not have the required seeds.',
     [REJECT.MISSING_TOOL] = 'You need a watering can.',
@@ -40,7 +42,7 @@ local MESSAGES = {
     [REJECT.NOT_OWNER] = 'This crop belongs to someone else.',
     [REJECT.CROP_LIMIT_REACHED] = 'You have reached your active crop limit.',
     [REJECT.INVENTORY_FULL] = 'Your inventory is full.',
-    [REJECT.ALREADY_IN_PROGRESS] = 'Someone is already working on this crop.',
+    [REJECT.ALREADY_IN_PROGRESS] = 'Someone is already working on this plot.',
     [REJECT.ALREADY_WATERED] = 'This crop does not need water yet.',
     [REJECT.INTERNAL_ERROR] = 'Something went wrong.',
 }
@@ -52,6 +54,7 @@ local STALE_CACHE_REASONS = {
     [REJECT.CROP_NOT_MATURE] = true,
     [REJECT.CROP_DEAD] = true,
     [REJECT.ALREADY_WATERED] = true,
+    [REJECT.SLOT_OCCUPIED] = true,
 }
 
 -- Seed item -> crop type, built once from the crop definitions.
@@ -98,28 +101,40 @@ end
 -- Actions
 -- ---------------------------------------------------------------------------
 
---- Plant a crop at the player's current position.
+--- Plant a crop into a configured slot.
 ---@param cropType string
-function Actions.Plant(cropType)
+---@param zoneKey string
+---@param slotIndex number
+function Actions.Plant(cropType, zoneKey, slotIndex)
     local def = Config.Crops and Config.Crops[cropType]
     if not def then
         return Bridge.Notify(MESSAGES[REJECT.UNKNOWN_CROP], NOTIFY.ERROR)
+    end
+
+    if type(zoneKey) ~= 'string' or not tonumber(slotIndex) then
+        return Bridge.Notify(MESSAGES[REJECT.SLOT_NOT_FOUND], NOTIFY.ERROR)
     end
 
     if not placeholderProgress(('Planting %s...'):format(def.label), 'plant') then
         return
     end
 
-    local response = lib.callback.await(CALLBACKS.PLANT, false, { cropType = cropType })
+    local response = lib.callback.await(CALLBACKS.PLANT, false, {
+        cropType = cropType,
+        zone = zoneKey,
+        slot = tonumber(slotIndex),
+    })
+
     if not response or not response.ok then
         return handleRejection(response)
     end
 
     Bridge.Notify(('Planted %s.'):format(response.data.label), NOTIFY.SUCCESS)
 
-    -- The server already pushed the delta to our cell; refresh so the prop shows
-    -- up immediately instead of on the next tick.
+    -- The server already pushed the delta; refresh so the prop shows up and the
+    -- empty-slot option disappears immediately.
     Crops.Refresh(GetEntityCoords(PlayerPedId()))
+    Slots.RefreshProps()
 end
 
 --- Water a crop.
@@ -157,16 +172,22 @@ function Actions.Harvest(cropId)
     local data = response.data
     Bridge.Notify(('Harvested %d x %s (%s, quality %s).')
         :format(data.units, data.cropType, data.tierLabel, data.quality), NOTIFY.SUCCESS)
+
+    Slots.RefreshProps()
 end
 
 -- ---------------------------------------------------------------------------
 -- Entry points
 -- ---------------------------------------------------------------------------
 
---- Context menu listing what can be planted in a zone, with the seeds the player
---- is actually carrying.
+--- Context menu of seeds plantable in a specific empty slot.
 ---@param zoneKey string
-function Actions.OpenPlantMenu(zoneKey)
+---@param slotIndex number
+function Actions.OpenPlantMenu(zoneKey, slotIndex)
+    if Crops.IsSlotOccupied(zoneKey, slotIndex) then
+        return Bridge.Notify(MESSAGES[REJECT.SLOT_OCCUPIED], NOTIFY.ERROR)
+    end
+
     local options = {}
 
     for _, cropType in ipairs(Target.AllowedCrops(zoneKey)) do
@@ -179,14 +200,14 @@ function Actions.OpenPlantMenu(zoneKey)
                 icon = 'seedling',
                 disabled = held < 1,
                 onSelect = function()
-                    Actions.Plant(cropType)
+                    Actions.Plant(cropType, zoneKey, slotIndex)
                 end,
             }
         end
     end
 
     if #options == 0 then
-        return Bridge.Notify('Nothing can be planted here.', NOTIFY.ERROR)
+        return Bridge.Notify('Nothing can be planted in this plot.', NOTIFY.ERROR)
     end
 
     lib.registerContext({
@@ -197,15 +218,26 @@ function Actions.OpenPlantMenu(zoneKey)
     lib.showContext('sonar_farm_plant')
 end
 
---- ox_inventory item use: planting by using the seed, which is what players try
---- first. Wired through `client.export` in data/ox_inventory_items.lua.
+--- ox_inventory item use. Does not free-plant: it finds the nearest empty slot
+--- and plants that seed into it. No empty plot nearby = clear feedback, not a
+--- crop growing wherever the player happened to stand.
 ---@param data table ox_inventory item data (needs `name`)
 function Actions.UseSeed(data)
     local cropType = data and seedToCrop[data.name]
     if not cropType then
         return Bridge.Notify(MESSAGES[REJECT.UNKNOWN_CROP], NOTIFY.ERROR)
     end
-    Actions.Plant(cropType)
+
+    local slot = Slots.NearestEmpty(GetEntityCoords(PlayerPedId()))
+    if not slot then
+        return Bridge.Notify('Stand next to an empty planting plot.', NOTIFY.ERROR)
+    end
+
+    if not Sonar.Zones.AllowsCrop(slot.zone, cropType) then
+        return Bridge.Notify(MESSAGES[REJECT.CROP_NOT_ALLOWED_HERE], NOTIFY.ERROR)
+    end
+
+    Actions.Plant(cropType, slot.zone, slot.index)
 end
 
 exports('useSeed', function(data)

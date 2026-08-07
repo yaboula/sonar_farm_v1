@@ -21,8 +21,16 @@ local function resolveCropId(provided)
     return cropId
 end
 
+-- /farm_plant [cropType]  — plants into the nearest empty slot (never free-plant).
 RegisterCommand('farm_plant', function(_, args)
-    Actions.Plant(args[1] or 'carrot')
+    local cropType = args[1] or 'carrot'
+    local slot = Slots.NearestEmpty(GetEntityCoords(PlayerPedId()), 5.0)
+
+    if not slot then
+        return Bridge.Notify('No empty planting plot nearby.', NOTIFY.ERROR)
+    end
+
+    Actions.Plant(cropType, slot.zone, slot.index)
 end, false)
 
 RegisterCommand('farm_water', function(_, args)
@@ -47,18 +55,19 @@ end, false)
 RegisterCommand('farm_render', function()
     local coords = GetEntityCoords(PlayerPedId())
 
-    Bridge.Notify(('Cached %d crop(s), %d prop(s) rendered. See F8.')
-        :format(Crops.Count(), Pool.Count()), NOTIFY.INFO)
+    Bridge.Notify(('Cached %d crop(s), %d prop(s), %d slots. See F8.')
+        :format(Crops.Count(), Pool.Count(), Sonar.Zones.TotalSlots()), NOTIFY.INFO)
 
-    print(('[sonar_farm] cache=%d props=%d clockOffset=%ds interior=%s')
-        :format(Crops.Count(), Pool.Count(), Sonar.Time.Offset(), tostring(GetInteriorFromEntity(PlayerPedId()) ~= 0)))
+    print(('[sonar_farm] cache=%d props=%d slots=%d clockOffset=%ds interior=%s')
+        :format(Crops.Count(), Pool.Count(), Sonar.Zones.TotalSlots(),
+            Sonar.Time.Offset(), tostring(GetInteriorFromEntity(PlayerPedId()) ~= 0)))
 
     for _, cropId in ipairs(Pool.Keys()) do
         local record = Crops.Get(cropId)
         local condition = Crops.Condition(cropId)
         if record and condition then
-            print(('[sonar_farm] %s | %s | %.1fm | %s | growth %d%% | water %d%% | health %d%% | mine=%s | model=%s')
-                :format(cropId, record.crop_type,
+            print(('[sonar_farm] %s | %s | zone=%s slot=%s | %.1fm | %s | growth %d%% | water %d%% | health %d%% | mine=%s | model=%s')
+                :format(cropId, record.crop_type, tostring(record.zone), tostring(record.slot),
                     Sonar.Utils.Distance(coords, { x = record.pos_x, y = record.pos_y, z = record.pos_z }),
                     condition.state, math.floor(condition.progress * 100),
                     math.floor(condition.water), math.floor(condition.health),

@@ -122,7 +122,7 @@ end)
 -- ---------------------------------------------------------------------------
 
 CreateThread(function()
-    Target.RegisterZones()
+    Slots.Register()
 
     while true do
         local interval = Config.Sync.TickFar
@@ -142,6 +142,7 @@ CreateThread(function()
                 end
 
                 Crops.Refresh(coords)
+                Slots.RefreshProps()
 
                 -- Only tighten the loop when there is actually something around.
                 interval = (Crops.Count() > 0) and Config.Sync.TickNear or Config.Sync.TickFar

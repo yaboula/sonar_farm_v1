@@ -5,7 +5,7 @@
     deleted sets and flushed in batches (snapshot swap, see State.Flush).
 
     Record shape (mirrors farming_crops columns; data is a Lua table):
-      id, crop_type, owner, zone, cell,
+      id, crop_type, owner, zone, slot, cell,
       pos_x, pos_y, pos_z, heading,
       planted_at, growth_time, state, data
 ]]
@@ -15,6 +15,7 @@ State = State or {}
 State.crops = State.crops or {}     -- [id] = record
 State.cells = State.cells or {}     -- [cellKey] = { [id] = true }  (spatial index)
 State.owners = State.owners or {}   -- [identifier] = { [id] = true }  (owner index)
+State.slots = State.slots or {}     -- ["zone:slot"] = id  (occupancy index)
 State.dirty = State.dirty or {}     -- [id] = true  (pending upsert)
 State.deleted = State.deleted or {} -- [id] = true  (pending delete)
 State.loaded = false
@@ -100,6 +101,67 @@ local function ownerRemove(record)
     end
 end
 
+-- ---------------------------------------------------------------------------
+-- Slot occupancy index
+-- The authoritative answer to "is this plot free?", as an O(1) lookup. Kept in
+-- lockstep with the records so planting never has to scan a zone.
+-- ---------------------------------------------------------------------------
+
+--- Occupancy key for a zone slot.
+---@param zone string
+---@param slot number
+---@return string|nil key
+function State.SlotKey(zone, slot)
+    if not zone or not slot then return nil end
+    return ('%s:%d'):format(zone, slot)
+end
+
+local function slotAdd(record)
+    local key = State.SlotKey(record.zone, record.slot)
+    if not key then return end
+
+    local occupant = State.slots[key]
+    if occupant and occupant ~= record.id then
+        -- The unique DB key should make this unreachable; if it ever fires, the
+        -- in-memory index diverged and we want to know which crops collided.
+        Logger.Warn(('Slot %s claimed by %s while held by %s.'):format(key, record.id, occupant), 'state')
+    end
+
+    State.slots[key] = record.id
+end
+
+local function slotRemove(record)
+    local key = State.SlotKey(record.zone, record.slot)
+    if key and State.slots[key] == record.id then
+        State.slots[key] = nil
+    end
+end
+
+--- Id of the crop occupying a slot, if any.
+---@param zone string
+---@param slot number
+---@return string|nil cropId
+function State.SlotOccupant(zone, slot)
+    local key = State.SlotKey(zone, slot)
+    return key and State.slots[key] or nil
+end
+
+--- Occupied and total slot counts for a zone (total comes from config, so it is
+--- the zone's hard capacity).
+---@param zone string
+---@return number used
+---@return number total
+function State.SlotUsage(zone)
+    local total = Sonar.Zones.Count(zone)
+    local used = 0
+    for index = 1, total do
+        if State.SlotOccupant(zone, index) then
+            used = used + 1
+        end
+    end
+    return used, total
+end
+
 local function markDirty(id)
     State.dirty[id] = true
     State.deleted[id] = nil
@@ -122,6 +184,7 @@ function State.Add(partial)
         crop_type = partial.crop_type,
         owner = partial.owner,
         zone = partial.zone,
+        slot = tonumber(partial.slot),
         pos_x = partial.pos_x,
         pos_y = partial.pos_y,
         pos_z = partial.pos_z,
@@ -136,6 +199,7 @@ function State.Add(partial)
     State.crops[id] = record
     indexAdd(record)
     ownerAdd(record)
+    slotAdd(record)
     markDirty(id)
 
     return id, record
@@ -158,6 +222,7 @@ function State.Update(id, patch)
 
     local posChanged = false
     local ownerChanged = false
+    local slotChanged = false
 
     for k, v in pairs(patch) do
         if k == 'data' and type(v) == 'table' then
@@ -168,6 +233,10 @@ function State.Update(id, patch)
             if k == 'owner' and v ~= record.owner then
                 ownerRemove(record)
                 ownerChanged = true
+            end
+            if (k == 'zone' or k == 'slot') and v ~= record[k] then
+                if not slotChanged then slotRemove(record) end
+                slotChanged = true
             end
             record[k] = v
         end
@@ -183,6 +252,10 @@ function State.Update(id, patch)
         ownerAdd(record)
     end
 
+    if slotChanged then
+        slotAdd(record)
+    end
+
     markDirty(id)
     return true
 end
@@ -196,6 +269,7 @@ function State.Remove(id)
 
     indexRemove(record)
     ownerRemove(record)
+    slotRemove(record)
     State.crops[id] = nil
     State.dirty[id] = nil
     State.deleted[id] = true
@@ -290,10 +364,13 @@ function State.LoadAll()
     State.crops = {}
     State.cells = {}
     State.owners = {}
+    State.slots = {}
     State.dirty = {}
     State.deleted = {}
 
     local corrupt = 0
+    local orphans = 0
+    local legacy = 0
     for _, row in ipairs(rows) do
         local data = {}
         if row.data and row.data ~= '' then
@@ -311,6 +388,7 @@ function State.LoadAll()
             crop_type = row.crop_type,
             owner = row.owner,
             zone = row.zone,
+            slot = tonumber(row.slot),
             cell = row.cell,
             pos_x = row.pos_x,
             pos_y = row.pos_y,
@@ -325,11 +403,28 @@ function State.LoadAll()
         State.crops[record.id] = record
         indexAdd(record)
         ownerAdd(record)
+        slotAdd(record)
+
+        if not record.slot then
+            -- Planted before the slot migration, or by a debug command. It still
+            -- grows and can be harvested; it just holds no slot.
+            legacy = legacy + 1
+        elseif not Sonar.Zones.Slot(record.zone, record.slot) then
+            -- The slot it was planted in is gone from config (zone resized,
+            -- renumbered or removed). The crop is unreachable in-world.
+            orphans = orphans + 1
+        end
     end
 
     State.loaded = true
     if corrupt > 0 then
         Logger.Warn(('Loaded with %d corrupt data blob(s).'):format(corrupt), 'state')
+    end
+    if legacy > 0 then
+        Logger.Info(('%d crop(s) hold no slot (planted before the slot system).'):format(legacy), 'state')
+    end
+    if orphans > 0 then
+        Logger.Warn(('%d crop(s) point at slots missing from config. Their zone was resized or renumbered; see docs/RUNBOOK.md.'):format(orphans), 'state')
     end
     return State.Count()
 end

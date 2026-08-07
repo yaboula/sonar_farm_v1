@@ -30,6 +30,8 @@ shared_scripts {
     -- with the exact same formula the server validates with.
     'shared/growth.lua',
     'shared/physiology.lua',
+    -- Zone/slot resolver: same list on client (targets) and server (validation).
+    'shared/zones.lua',
     -- Bridge Layer (framework abstraction). Order matters:
     -- core first, then adapters register themselves into the registry.
     'bridge/bridge.lua',
@@ -69,9 +71,9 @@ client_scripts {
     'client/modules/render/pool.lua',
     'client/modules/render/crops.lua',
     'client/modules/render/target.lua',
-    -- Actions before sync: the sync thread registers target zones that bind to
-    -- Actions on select.
+    -- Actions before sync/slots: those bind to Actions on select.
     'client/modules/interaction/actions.lua',
+    'client/modules/zones/slots.lua',
     'client/modules/sync/client.lua',
     'client/modules/zones/blips.lua',
     'client/modules/debug/commands.lua',

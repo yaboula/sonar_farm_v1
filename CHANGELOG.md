@@ -8,8 +8,14 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
 
 ### Changed
 
+- **Plantado por slots fijos** en lugar de plantado libre dentro de un radio. Cada zona define surcos (`grid` y/o `slots` en `config/zones.lua`); el cliente mira un surco vacio con ox_target (o usa la semilla sobre el slot mas cercano). Las coordenadas del cultivo salen siempre de config en el servidor.
 - `Growth.Evaluate` y la evaluacion pura de `Physiology` se mueven a `shared/` (`shared/growth.lua`, `shared/physiology.lua`). El cliente predice el crecimiento para renderizar, y con dos copias de la formula la divergencia seria cuestion de tiempo. Los mutadores (`Physiology.Apply`, `Physiology.Water`) siguen siendo exclusivos del servidor.
 - `Validation.CropLimit` ya no recorre todo el estado: `State` mantiene un indice por propietario (`State.owners`, `State.CountByOwner`) actualizado en `Add`, `Remove`, `Update` y `LoadAll`. Era la deuda declarada al cerrar la Etapa 3.
+
+### Added
+
+- Resolver compartido de zonas/slots (`shared/zones.lua`), indice de ocupacion en `State`, columna `slot` + UNIQUE `(zone, slot)` en DB (con migraciones idempotentes), targets por surco vacio (`client/modules/zones/slots.lua`) y lock por slot al plantar.
+- Grapeseed East: 40 slots (5x8). Grapeseed South: 24 slots (4x6), solo carrot/potato.
 
 ### Fixed
 

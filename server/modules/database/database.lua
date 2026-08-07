@@ -11,7 +11,7 @@ local CROPS_TABLE = 'farming_crops'
 
 -- Column order shared by the upsert builder and the row serializer.
 local UPSERT_COLUMNS = {
-    'id', 'crop_type', 'owner', 'zone', 'cell',
+    'id', 'crop_type', 'owner', 'zone', 'slot', 'cell',
     'pos_x', 'pos_y', 'pos_z', 'heading',
     'planted_at', 'growth_time', 'state', 'data',
 }
@@ -40,6 +40,65 @@ function Database.Init()
         end
     end
 
+    -- Always run, even with AutoCreateSchema off: an existing table created by an
+    -- earlier version needs the new columns regardless of that flag.
+    Database.Migrate()
+
+    return true
+end
+
+-- ---------------------------------------------------------------------------
+-- Migrations
+-- CREATE TABLE IF NOT EXISTS never touches an existing table, so schema changes
+-- need explicit, idempotent steps. Each one checks information_schema first
+-- rather than relying on `ADD COLUMN IF NOT EXISTS`, which MariaDB supports and
+-- MySQL does not.
+-- ---------------------------------------------------------------------------
+
+local MIGRATIONS = {
+    {
+        name = 'add slot column',
+        exists = [[SELECT COUNT(*) FROM information_schema.COLUMNS
+                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'slot']],
+        apply = ('ALTER TABLE `%s` ADD COLUMN `slot` INT DEFAULT NULL AFTER `zone`'):format(CROPS_TABLE),
+    },
+    {
+        name = 'add unique zone/slot key',
+        exists = [[SELECT COUNT(*) FROM information_schema.STATISTICS
+                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = 'uniq_zone_slot']],
+        -- Safe on existing data: pre-slot rows have slot NULL, and repeated NULLs
+        -- do not collide in a unique index.
+        apply = ('ALTER TABLE `%s` ADD UNIQUE KEY `uniq_zone_slot` (`zone`, `slot`)'):format(CROPS_TABLE),
+    },
+}
+
+--- Apply pending schema migrations. Must run in a thread.
+---@return boolean ok
+function Database.Migrate()
+    for _, migration in ipairs(MIGRATIONS) do
+        local ok, present = pcall(function()
+            return MySQL.scalar.await(migration.exists, { CROPS_TABLE })
+        end)
+
+        if not ok then
+            Logger.Warn(('Migration check "%s" failed: %s'):format(migration.name, tostring(present)), 'db')
+            return false
+        end
+
+        if tonumber(present) == 0 then
+            local applied, err = pcall(function()
+                MySQL.query.await(migration.apply)
+            end)
+
+            if not applied then
+                Logger.Warn(('Migration "%s" failed: %s'):format(migration.name, tostring(err)), 'db')
+                return false
+            end
+
+            Logger.Info(('Migration applied: %s'):format(migration.name), 'db')
+        end
+    end
+
     return true
 end
 
@@ -56,6 +115,7 @@ function Database.EnsureSchema()
             `crop_type` VARCHAR(64) NOT NULL,
             `owner` VARCHAR(64) DEFAULT NULL,
             `zone` VARCHAR(64) DEFAULT NULL,
+            `slot` INT DEFAULT NULL,
             `cell` VARCHAR(32) NOT NULL,
             `pos_x` DOUBLE NOT NULL,
             `pos_y` DOUBLE NOT NULL,
@@ -68,6 +128,7 @@ function Database.EnsureSchema()
             `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
+            UNIQUE KEY `uniq_zone_slot` (`zone`, `slot`),
             KEY `idx_cell` (`cell`),
             KEY `idx_zone` (`zone`),
             KEY `idx_owner` (`owner`)
@@ -110,7 +171,9 @@ end
 
 -- Nullable columns. Sent as '' and converted to SQL NULL via NULLIF so the
 -- parameter array never contains nil (a nil hole breaks array binding).
-local NULLABLE_COLUMNS = { owner = true, zone = true, data = true }
+-- `slot` relies on slot indices being 1-based: NULLIF(0, '') would store a real
+-- slot 0 as NULL, because '' casts to 0 in the comparison.
+local NULLABLE_COLUMNS = { owner = true, zone = true, slot = true, data = true }
 
 -- Prebuilt upsert statement (placeholders only, never string concatenation).
 local UPSERT_SQL do
@@ -141,6 +204,7 @@ local function serializeRow(row)
         row.crop_type,
         row.owner or '',
         row.zone or '',
+        row.slot or '',
         row.cell,
         row.pos_x,
         row.pos_y,

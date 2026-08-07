@@ -173,6 +173,14 @@ Config.Render = {
     -- Fallback model used when a configured crop model is missing (bad name, or
     -- the prop pack resource is not running). Keeps the crop interactable.
     FallbackModel = 'prop_plant_01a',
+    -- Optional prop marking an empty planting slot (tilled soil, a stake...).
+    -- Set to a model name from your prop pack to make free plots visible, or
+    -- false to leave them clean. Interaction works either way: every slot has
+    -- its own ox_target point regardless of whether a prop is drawn.
+    SlotProp = false,
+    -- Interaction radius (meters) of an empty slot's target point. Slightly
+    -- larger than a crop's, since there may be nothing visible to aim at.
+    SlotTargetRadius = 1.2,
 }
 
 -- ---------------------------------------------------------------------------

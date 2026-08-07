@@ -1,8 +1,12 @@
 --[[
     sonar_farm - Plant action (server)
-    Authoritative handler for planting. The client sends only the crop type; the
-    server decides where the player actually is, whether they may plant there,
-    and consumes the seed. Nothing is trusted from the client.
+    Authoritative planting into a configured slot. The client sends only the crop
+    type, zone key and slot index. Coordinates come from config on the server, so
+    a modified client cannot choose where a crop lands or plant outside a plot.
+
+    Free-planting (anywhere inside a radius) was dropped: it produced overlapping
+    props, messy fields and no hard capacity. A zone with 40 slots holds 40 crops,
+    never 41.
 ]]
 
 local ACTIONS = Sonar.Constants.ACTIONS
@@ -39,72 +43,88 @@ lib.callback.register(CALLBACKS.PLANT, function(source, payload)
     local def = Config.Crops and Config.Crops[cropType]
     if not def then return reject(REJECT.UNKNOWN_CROP) end
 
-    -- Server-side position: never the coordinates the client claims.
-    local coords = Validation.GetPlayerCoords(source)
-    if not coords then return reject(REJECT.TOO_FAR) end
+    local zoneKey = payload.zone
+    local slotIndex = payload.slot
 
-    local zone = Validation.Zone(coords, cropType)
-    if not zone.ok then return reject(zone.reason) end
+    -- Lock the slot for the whole check-and-commit window. Without this, two
+    -- players planting the same empty plot at once can both pass the occupancy
+    -- check and create two crops before either indexes the slot.
+    local lockKey = ('slot:%s:%s'):format(tostring(zoneKey), tostring(slotIndex))
 
-    local limit = Validation.CropLimit(source)
-    if not limit.ok then return reject(limit.reason) end
+    local acquired, result = Lock.With(lockKey, function()
+        local slotCheck = Validation.Slot(source, zoneKey, slotIndex, cropType)
+        if not slotCheck.ok then return reject(slotCheck.reason) end
+        local slot = slotCheck.slot
 
-    local seed = Validation.HasItem(source, def.seedItem, REJECT.MISSING_SEED)
-    if not seed.ok then return reject(seed.reason) end
+        local limit = Validation.CropLimit(source)
+        if not limit.ok then return reject(limit.reason) end
 
-    local score = Quality.Request(source, ACTIONS.PLANT, { crop_type = cropType })
+        local seed = Validation.HasItem(source, def.seedItem, REJECT.MISSING_SEED)
+        if not seed.ok then return reject(seed.reason) end
 
-    -- Consume the seed only once every check has passed.
-    if not Bridge.Inventory.RemoveItem(source, def.seedItem, 1) then
-        return reject(REJECT.MISSING_SEED)
-    end
+        local score = Quality.Request(source, ACTIONS.PLANT, { crop_type = cropType })
 
-    local now = os.time()
-    local ped = GetPlayerPed(source)
+        -- Consume the seed only once every check has passed.
+        if not Bridge.Inventory.RemoveItem(source, def.seedItem, 1) then
+            return reject(REJECT.MISSING_SEED)
+        end
 
-    local cropId, record = State.Add({
-        crop_type = cropType,
-        owner = Bridge.GetIdentifier(source),
-        zone = zone.zoneKey,
-        pos_x = coords.x,
-        pos_y = coords.y,
-        pos_z = coords.z,
-        heading = ped and GetEntityHeading(ped) or 0.0,
-        planted_at = now,
-        growth_time = def.growthTime,
-        data = {
-            water = 100,
-            health = initialHealth(score),
-            spoilage = 0,
-            lastCare = now,
-            careCount = 0,
-            plantScore = score,
-        },
-    })
+        local now = Sonar.Time.Now()
 
-    Sync.OnCropChanged(record)
+        -- Position and heading come from the slot definition, never the player.
+        local cropId, record = State.Add({
+            crop_type = cropType,
+            owner = Bridge.GetIdentifier(source),
+            zone = slot.zone,
+            slot = slot.index,
+            pos_x = slot.x,
+            pos_y = slot.y,
+            pos_z = slot.z,
+            heading = slot.heading,
+            planted_at = now,
+            growth_time = def.growthTime,
+            data = {
+                water = 100,
+                health = initialHealth(score),
+                spoilage = 0,
+                lastCare = now,
+                careCount = 0,
+                plantScore = score,
+            },
+        })
 
-    Logger.Info(('Planted %s (%s) in zone %s.'):format(cropType, cropId, zone.zoneKey), 'farming', {
-        source = source,
-        identifier = Bridge.GetIdentifier(source),
-    })
+        Sync.OnCropChanged(record)
 
-    TriggerEvent(PUBLIC.CROP_PLANTED, {
-        cropId = cropId,
-        cropType = cropType,
-        zone = zone.zoneKey,
-        owner = Bridge.GetIdentifier(source),
-        source = source,
-    })
+        Logger.Info(('Planted %s (%s) in %s slot %d.'):format(cropType, cropId, slot.zone, slot.index), 'farming', {
+            source = source,
+            identifier = Bridge.GetIdentifier(source),
+        })
 
-    return {
-        ok = true,
-        data = {
+        TriggerEvent(PUBLIC.CROP_PLANTED, {
             cropId = cropId,
             cropType = cropType,
-            label = def.label,
-            zone = zone.zoneKey,
-            growthTime = def.growthTime,
-        },
-    }
+            zone = slot.zone,
+            slot = slot.index,
+            owner = Bridge.GetIdentifier(source),
+            source = source,
+        })
+
+        return {
+            ok = true,
+            data = {
+                cropId = cropId,
+                cropType = cropType,
+                label = def.label,
+                zone = slot.zone,
+                slot = slot.index,
+                growthTime = def.growthTime,
+            },
+        }
+    end)
+
+    if not acquired then
+        return reject(REJECT.ALREADY_IN_PROGRESS)
+    end
+
+    return result
 end)

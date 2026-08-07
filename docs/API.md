@@ -48,19 +48,27 @@ triviales.
 
 ### `sonar_farm:plant`
 
-Planta un cultivo en la posición actual del jugador.
+Planta un cultivo en un **slot** configurado. El cliente no elige coordenadas:
+envía `zone` + `slot`, y el servidor coloca el cultivo en la posición definida
+en `config/zones.lua`. El plantado libre (cualquier punto dentro de un radio)
+fue eliminado: producía solapamientos, campos desordenados y capacidad
+impredecible.
 
 **Petición**
 
 ```lua
 local response = lib.callback.await('sonar_farm:plant', false, {
     cropType = 'carrot',
+    zone = 'grapeseed_east',
+    slot = 12,              -- índice 1-based del slot en esa zona
 })
 ```
 
-| Campo      | Tipo   | Descripción                       |
-| ---------- | ------ | --------------------------------- |
-| `cropType` | string | Clave en `Config.Crops`           |
+| Campo      | Tipo   | Descripción                                      |
+| ---------- | ------ | ------------------------------------------------ |
+| `cropType` | string | Clave en `Config.Crops`                          |
+| `zone`     | string | Clave en `Config.Zones`                          |
+| `slot`     | number | Índice del surco (1-based). Nunca 0: rompe SQL.  |
 
 **Respuesta (éxito)**
 
@@ -72,6 +80,7 @@ local response = lib.callback.await('sonar_farm:plant', false, {
         cropType = 'carrot',
         label = 'Carrot',
         zone = 'grapeseed_east',
+        slot = 12,
         growthTime = 900,
     },
 }
@@ -83,16 +92,18 @@ local response = lib.callback.await('sonar_farm:plant', false, {
 2. Cooldown de la acción
 3. Anti-teleport
 4. El cultivo existe en `Config.Crops`
-5. Posición del servidor disponible
-6. Dentro de una zona y el cultivo permitido en ella
-7. Límite de cultivos activos del jugador
-8. Posee la semilla
+5. Lock del slot (anti-duplicación entre dos jugadores)
+6. El slot existe, acepta ese cultivo y está libre
+7. El jugador está a distancia real del slot
+8. Límite de cultivos activos del jugador
+9. Posee la semilla
 
-La semilla **solo se consume tras pasar todas las validaciones**.
+La semilla **solo se consume tras pasar todas las validaciones**. Las coordenadas
+del cultivo salen del slot en config, nunca del cliente.
 
 **Rechazos posibles:** `rate_limited`, `cooldown`, `suspicious_movement`,
-`unknown_crop`, `too_far`, `not_in_zone`, `crop_not_allowed_here`,
-`crop_limit_reached`, `missing_seed`
+`unknown_crop`, `slot_not_found`, `slot_occupied`, `crop_not_allowed_here`,
+`too_far`, `crop_limit_reached`, `missing_seed`, `already_in_progress`
 
 ---
 
@@ -283,6 +294,8 @@ Definidos en `Sonar.Constants.REJECT`. El cliente los traduce a texto.
 | `suspicious_movement`   | Velocidad implícita imposible                |
 | `not_in_zone`           | Fuera de toda zona de cultivo                |
 | `crop_not_allowed_here` | La zona no admite ese cultivo                |
+| `slot_not_found`        | El surco no existe en config                 |
+| `slot_occupied`         | Ya hay un cultivo en ese surco               |
 | `unknown_crop`          | `cropType` inexistente                       |
 | `missing_seed`          | Sin semillas                                 |
 | `missing_tool`          | Sin herramienta (regadera)                   |
@@ -312,7 +325,7 @@ end)
 
 | Evento                      | Cuándo             | Payload principal                                |
 | --------------------------- | ------------------ | ------------------------------------------------ |
-| `sonar_farm:cropPlanted`    | Cultivo plantado   | `cropId`, `cropType`, `zone`, `owner`, `source`  |
+| `sonar_farm:cropPlanted`    | Cultivo plantado   | `cropId`, `cropType`, `zone`, `slot`, `owner`, `source` |
 | `sonar_farm:cropWatered`    | Cultivo regado     | `cropId`, `cropType`, `owner`, `source`          |
 | `sonar_farm:cropHarvested`  | Cultivo cosechado  | `+ quality`, `units`, `theft`, `xp`              |
 

@@ -18,12 +18,18 @@ local Utils = Sonar.Utils
 -- [cropId] = record (shaped like a server state record so the shared evaluators
 -- can consume it unchanged)
 local cache = {}
+-- [ "zone:slot" ] = cropId  — occupancy for empty-slot targeting
+local occupancy = {}
 -- Models already reported as missing, so the warning is logged once each.
 local reportedModels = {}
 
--- ---------------------------------------------------------------------------
--- Cache
--- ---------------------------------------------------------------------------
+---@param zone string|nil
+---@param slot number|nil
+---@return string|nil
+local function occupancyKey(zone, slot)
+    if not zone or not slot then return nil end
+    return ('%s:%d'):format(zone, slot)
+end
 
 --- Convert a sync payload into the record shape the shared evaluators expect.
 ---@param payload table
@@ -32,6 +38,8 @@ local function toRecord(payload)
     return {
         id = payload.id,
         crop_type = payload.cropType,
+        zone = payload.zone,
+        slot = payload.slot and tonumber(payload.slot) or nil,
         cell = payload.cell,
         pos_x = payload.x,
         pos_y = payload.y,
@@ -48,17 +56,45 @@ local function toRecord(payload)
     }
 end
 
+local function indexOccupancy(record)
+    local key = occupancyKey(record.zone, record.slot)
+    if key then
+        occupancy[key] = record.id
+    end
+end
+
+local function clearOccupancy(record)
+    local key = occupancyKey(record.zone, record.slot)
+    if key and occupancy[key] == record.id then
+        occupancy[key] = nil
+    end
+end
+
 --- Insert or update one crop.
 ---@param payload table
 function Crops.Upsert(payload)
     if not payload or not payload.id then return end
-    cache[payload.id] = toRecord(payload)
+
+    local previous = cache[payload.id]
+    if previous then
+        clearOccupancy(previous)
+    end
+
+    local record = toRecord(payload)
+    cache[payload.id] = record
+    indexOccupancy(record)
 end
 
 --- Drop one crop and its prop.
 ---@param cropId string
 function Crops.Remove(cropId)
     if not cropId then return end
+
+    local record = cache[cropId]
+    if record then
+        clearOccupancy(record)
+    end
+
     cache[cropId] = nil
     Crops.Despawn(cropId)
 end
@@ -69,9 +105,13 @@ end
 ---@param payloads table[]
 function Crops.ReplaceAll(payloads)
     cache = {}
+    occupancy = {}
+
     for _, payload in ipairs(payloads or {}) do
         if payload.id then
-            cache[payload.id] = toRecord(payload)
+            local record = toRecord(payload)
+            cache[payload.id] = record
+            indexOccupancy(record)
         end
     end
 
@@ -81,6 +121,24 @@ function Crops.ReplaceAll(payloads)
             Crops.Despawn(key)
         end
     end
+end
+
+--- Whether a configured slot is occupied (from the local cache).
+---@param zoneKey string
+---@param slotIndex number
+---@return boolean
+function Crops.IsSlotOccupied(zoneKey, slotIndex)
+    local key = occupancyKey(zoneKey, slotIndex)
+    return key ~= nil and occupancy[key] ~= nil
+end
+
+--- Crop id occupying a slot, if any.
+---@param zoneKey string
+---@param slotIndex number
+---@return string|nil
+function Crops.SlotOccupant(zoneKey, slotIndex)
+    local key = occupancyKey(zoneKey, slotIndex)
+    return key and occupancy[key] or nil
 end
 
 --- One cached crop record.
@@ -287,6 +345,7 @@ end
 function Crops.Reset()
     Crops.DespawnAll()
     cache = {}
+    occupancy = {}
 end
 
 -- ---------------------------------------------------------------------------

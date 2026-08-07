@@ -85,7 +85,54 @@ modelo cambiar. Solo se toca config, nunca codigo.
 
 ---
 
-## 5. Items de ox_inventory (Etapa 3)
+## 5. Slots de plantacion (surcos fijos)
+
+El plantado libre (cualquier coordenada dentro de un radio) fue reemplazado por
+**slots**: puntos exactos definidos en [`config/zones.lua`](../config/zones.lua).
+
+### Por que
+
+- Sin solapamiento de props.
+- Campos con hileras simetricas (estilo granja real).
+- Capacidad dura por zona: 40 slots = 40 cultivos, nunca 41. Economia predecible.
+
+### Como se configuran
+
+Preferible `grid` (genera la malla) y, si hace falta, `slots` explicitos para
+rincones raros:
+
+```lua
+grid = {
+    origin = vec3(2236.0, 5031.0, 44.2),
+    rows = 5,
+    cols = 8,                 -- 40 slots
+    spacing = { x = 2.2, y = 2.8 },
+    heading = 0.0,            -- rota el bloque entero con el surco del mapa
+},
+```
+
+Los indices son **1-based**. Reordenar o cambiar el tamano del grid **renumera**
+los slots y huerfana los cultivos ya plantados. Anade slots al final, o limpia
+la zona primero (`/farm_debug_clear`).
+
+### Como planta el jugador
+
+1. Mira un surco vacio con ox_target -> **Plant seeds** -> elige semilla.
+2. O usa la semilla desde el inventario: planta en el **slot vacio mas cercano**
+   (nunca en coordenadas libres). Si no hay surco cerca, avisa y no planta.
+
+`Config.Render.SlotProp` (opcional) dibuja un prop en cada surco vacio. Por
+defecto esta en `false`: 64 entidades extra son una eleccion del servidor.
+
+### Migracion de DB
+
+Al arrancar, el recurso aplica migraciones idempotentes: columna `slot` y clave
+unica `(zone, slot)`. Los cultivos plantados antes del sistema de slots quedan
+con `slot = NULL` (siguen creciendo y se pueden cosechar; no ocupan surco).
+
+---
+
+## 6. Items de ox_inventory (Etapa 3)
 
 `ox_inventory` **no permite registrar items en runtime**, asi que hay que copiarlos a mano una vez.
 
@@ -111,7 +158,7 @@ Para darte material de prueba:
 
 ---
 
-## 6. Comandos de debug (solo con `Config.Debug = true`)
+## 7. Comandos de debug (solo con `Config.Debug = true`)
 
 Se registran solo si el debug esta activo.
 
@@ -161,17 +208,19 @@ pero no lo dibujas (problema de modelo, radio, tope o interior).
 5. En consola deberia verse `State engine ready (1 crops loaded)`.
 6. `/farm_debug_grow <id>` -> el progreso aumenta con el tiempo.
 
-### Prueba del bucle completo (Etapa 3)
+### Prueba del bucle completo (Etapa 3 / slots)
 
-Requiere estar dentro de una zona de `config/zones.lua` (por defecto, campos de Grapeseed) y tener los items.
+Requiere estar junto a un surco vacio de `config/zones.lua` y tener los items.
 
 1. `/giveitem <id> carrot_seed 5` y `/giveitem <id> watering_can 1`.
-2. Colocate en la zona -> `/farm_plant carrot`. Debe notificar `Planted Carrot in grapeseed_east`.
-3. `/farm_near` -> aparece el cultivo con `growth`, `water` y `health`.
-4. `/farm_water` -> `Watered. Water 100%, health ...%`.
-5. Riega otra vez de inmediato -> debe rechazar con "does not need water yet" (comprueba `WaterRefillThreshold`).
-6. `/farm_harvest` antes de madurar -> "not ready to harvest".
-7. Espera `growthTime` (900s para carrot; baja `growthTime` en `config/crops.lua` para probar rapido) -> `/farm_harvest` entrega producto con calidad y tier.
+2. Mira el suelo del campo -> ox_target **Plant seeds** -> elige Carrot.
+   Alternativa: `/farm_plant carrot` (planta en el slot vacio mas cercano).
+3. El prop aparece en la posicion del slot, no a tus pies.
+4. Intenta plantar otra vez en el mismo surco -> `Something is already growing there.`
+5. `/farm_water` / `/farm_harvest` como antes.
+
+Usar la semilla desde el inventario planta en el slot vacio mas cercano; fuera de
+alcance de cualquier surco, avisa y no planta.
 
 ### Prueba del motor visual (Etapa 4)
 
@@ -198,8 +247,9 @@ de `0.05 ms`.
 
 | Prueba | Resultado esperado |
 | --- | --- |
-| `/farm_plant carrot` fuera de toda zona | `You are not inside a farming zone.` |
-| `/farm_plant tomato` en `grapeseed_south` | `That crop cannot be planted in this zone.` |
+| `/farm_plant carrot` lejos de cualquier surco | `No empty planting plot nearby.` |
+| `/farm_plant tomato` en un surco de `grapeseed_south` | `That crop cannot be planted in this zone.` |
+| Plantar dos veces el mismo surco | `Something is already growing there.` |
 | `/farm_plant carrot` sin semillas | `You do not have the required seeds.` |
 | `/farm_water` sin regadera | `You need a watering can.` |
 | Repetir `/farm_plant` muy rapido | `Slow down.` (token bucket) |
@@ -209,7 +259,7 @@ de `0.05 ms`.
 
 ---
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 | Sintoma | Causa probable | Solucion |
 | --- | --- | --- |
@@ -220,7 +270,7 @@ de `0.05 ms`.
 | No aparecen los comandos `/farm_debug_*` o `/farm_*` | `Config.Debug = false` | Activa debug en `config/config.lua`. |
 | Cambios no persisten tras crash | Ventana `SaveInterval` | Es esperado en crash duro; baja `SaveInterval`. |
 | `You do not have the required seeds` teniendolas | Items no instalados en ox_inventory | Copia `data/ox_inventory_items.lua` (seccion 4) y reinicia ox_inventory. |
-| `You are not inside a farming zone` en pleno campo | Las coordenadas de `config/zones.lua` no coinciden con tu mapa | Ajusta `center`/`radius`; usa `/farm_near` para ver donde estas respecto a los cultivos. |
+| `You are not inside a farming zone` en pleno campo | (obsoleto: el plantado ya no usa radio) | Usa surcos: mira el suelo con ox_target o `/farm_plant` junto a un slot. |
 | `Movement validation failed` justo al conectar | Falso positivo del anti-teleport | No deberia ocurrir: hay grace period al conectar, TTL de muestra y descarte de coords invalidas. Si pasa, sube `ConnectGracePeriod` y reporta el caso. |
 | Cultivos que mueren demasiado rapido | `water.decayPerHour` alto para el ritmo del servidor | Ajusta por cultivo en `config/crops.lua`; `droughtTolerance` amortigua la perdida de salud. |
 | Calidad siempre 75 | Es lo esperado en Etapa 3 | El proveedor stub devuelve `Config.Quality.DefaultScore`; los minijuegos llegan en la Etapa 5. |
@@ -233,11 +283,14 @@ de `0.05 ms`.
 | Las plantas se ven en fase equivocada | Reloj del sistema del jugador desfasado | Se corrige solo: el servidor manda `serverTime` y el cliente ajusta el offset. Comprueba `clockOffset` en `/farm_render`. |
 | Props huerfanos tras varios `restart` | Version antigua sin limpieza | Ya se destruyen en `onResourceStop`. Los huerfanos previos desaparecen al reconectar. |
 | `Plant seeds` no aparece en el campo | Fuera de la zona, o `Config.Zones` mal ubicado | La opcion cubre todo el radio de la zona; si no sale, no estas dentro. |
-| Usar la semilla no hace nada | Falta `client.export` en ox_inventory | Ver seccion 5. |
+| `Usar la semilla no hace nada` | Falta `client.export` en ox_inventory | Ver seccion 6. |
+| `Stand next to an empty planting plot` usando semilla | No hay surco vacio cerca | Acercate a un slot; comprueba `grid` en `config/zones.lua`. |
+| `Something is already growing there` en surco vacio | Cache desfasada | Se auto-resynca; si persiste, `/farm_resync`. |
+| Cultivos huerfanos tras cambiar el grid | Indices renumerados | No reordenar grids en caliente; limpia la zona o anade slots al final. |
 
 ---
 
-## 8. Lecciones aprendidas
+## 9. Lecciones aprendidas
 
 - `luac -p` es un smoke test rapido de sintaxis Lua antes de commitear: valida sintaxis, pero **no** detecta ficheros que faltan en `fxmanifest.lua`. Tras anadir un fichero nuevo, verifica siempre que esta declarado en el manifiesto.
 - El snapshot swap en `Flush` es imprescindible para no perder escrituras concurrentes durante el `await` de la DB.
@@ -259,3 +312,6 @@ de `0.05 ms`.
 - Sin `onResourceStop` que destruya los props, cada `restart` en desarrollo deja objetos huerfanos que nadie puede borrar. Se sufre veinte veces al dia.
 - No existe un native fiable para escalar props, asi que la variacion visual es solo rotacion. Derivarla del `cropId` (y no de `math.random`) es lo que garantiza que dos jugadores vean la misma planta igual.
 - La validacion de modelos al arrancar no es un lujo: sin ella, un nombre de prop equivocado no da ningun error, simplemente no aparece nada, y se pierde una tarde depurando el streaming.
+- El plantado libre (radio) se veia flexible y resulto ser el enemigo de la estetica y de la economia: sin slots, no hay tope real por zona y las plantas se solapan. Con slots, la capacidad es una decision de diseno (`rows * cols`).
+- Los indices de slot son 1-based a proposito: el truco `NULLIF(?, '')` de oxmysql trata el `0` como vacio, asi que un slot `0` se guardaria como NULL.
+- Plantar dos jugadores el mismo surco a la vez requiere lock por `zone:slot`, no solo por `cropId`: el occupancy check no es atomico sin el.
