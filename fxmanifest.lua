@@ -76,6 +76,8 @@ client_scripts {
     'client/modules/zones/slots.lua',
     'client/modules/sync/client.lua',
     'client/modules/zones/blips.lua',
+    'client/modules/admin/zone_builder.lua',
+    'client/modules/admin/slot_builder.lua',
     'client/modules/debug/commands.lua',
 }
 

@@ -6,7 +6,36 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
 
 ## [Unreleased]
 
-### Changed
+### Added
+
+- **Zone Builder premium (`/farm_builder`):** Herramienta de administración in-game para diseñar zonas de cuadrícula en tiempo real.
+  - Ground snapping por raycast individual por slot: los marcadores se adaptan al relieve del terreno durante la previsualización.
+  - Modo `Nudge` / `Walk` intercambiable con `TAB`: en Nudge el personaje se congela y `WASD` desplaza el grid relativo a su propia rotación (0.02m normal, 0.1m con `SHIFT`); en Walk se libera el movimiento para evaluar el campo.
+  - Reposicionamiento rápido del origen con `LEFT CLICK` sin perder la configuración de filas/columnas.
+  - Input manual exacto con `G`: dialog `lib.inputDialog` con filas, columnas, spacing X, spacing Y y heading tecleables directamente.
+  - Spacing independiente por eje: rueda del ratón = spacing X; `ALT` + rueda = spacing Y.
+  - Multiplicador `SHIFT` x5 en todos los controles (flechas, espaciado y rotación).
+  - Finalización con diálogo de tres campos (Zone Key, Label, Allowed Crops) y selector múltiple generado dinámicamente desde `Config.Crops`.
+  - Output copiado al portapapeles con `lib.setClipboard` en formato listo para pegar en `config/zones.lua`.
+  - UI con `lib.showTextUI` actualizada en tiempo real con los valores actuales.
+  - `BACKSPACE`/`ESC` cancelan limpiamente en cualquier estado (`lib.hideTextUI` garantizado).
+
+- **Slot Builder (`/farm_slots`):** Herramienta de administración para zonas punto a punto, complementaria al Zone Builder para campos irregulares que un grid no puede capturar.
+  - `LEFT CLICK` coloca un slot en el suelo (ground snap + heading de cámara bakeado).
+  - Preview hover verde en tiempo real; rojo si el punto está a menos de 0.5m de otro existente (protección anti-solapamiento).
+  - `RIGHT CLICK` elimina el slot más cercano al cursor (dentro de 5m) con feedback de índice exacto.
+  - `H` bloquea el heading actual de la cámara para los siguientes slots (útil para campos en diagonal).
+  - `G` permite teclear coordenadas exactas (X, Y, Z, Heading) con el `lib.inputDialog`, pre-rellenado con la posición del jugador.
+  - `C` limpia todos los slots con `lib.alertDialog` de confirmación (evita borrados accidentales).
+  - `TAB` alterna Walk / Place exactamente como en el Zone Builder.
+  - Visualización premium: cilindro ámbar + espiga vertical por slot, número flotante de índice (`World3dToScreen2d`), y línea naranja conectando los slots en orden de colocación.
+  - Centroide calculado automáticamente para el campo `center` del output.
+  - Output en formato `slots = { {x, y, z, heading}, ... }`, 100% compatible con `shared/zones.lua`.
+  - Registrado en `fxmanifest.lua` tras `zone_builder.lua`.
+
+- **`zone1` (local test):** Primera zona de slots explícitos añadida a `config/zones.lua`. 24 slots dispuestos en dos filas diagonales, restringida a `tomato`, con headings individuales por slot y centroide calculado exacto.
+
+
 
 - **Plantado por slots fijos** en lugar de plantado libre dentro de un radio. Cada zona define surcos (`grid` y/o `slots` en `config/zones.lua`); el cliente mira un surco vacio con ox_target (o usa la semilla sobre el slot mas cercano). Las coordenadas del cultivo salen siempre de config en el servidor.
 - `Growth.Evaluate` y la evaluacion pura de `Physiology` se mueven a `shared/` (`shared/growth.lua`, `shared/physiology.lua`). El cliente predice el crecimiento para renderizar, y con dos copias de la formula la divergencia seria cuestion de tiempo. Los mutadores (`Physiology.Apply`, `Physiology.Water`) siguen siendo exclusivos del servidor.
