@@ -108,12 +108,16 @@ local function chunk(arr, size)
     return chunks
 end
 
+-- Nullable columns. Sent as '' and converted to SQL NULL via NULLIF so the
+-- parameter array never contains nil (a nil hole breaks array binding).
+local NULLABLE_COLUMNS = { owner = true, zone = true, data = true }
+
 -- Prebuilt upsert statement (placeholders only, never string concatenation).
 local UPSERT_SQL do
     local cols, placeholders, updates = {}, {}, {}
     for _, col in ipairs(UPSERT_COLUMNS) do
         cols[#cols + 1] = ('`%s`'):format(col)
-        placeholders[#placeholders + 1] = '?'
+        placeholders[#placeholders + 1] = NULLABLE_COLUMNS[col] and "NULLIF(?, '')" or '?'
         if col ~= 'id' then
             updates[#updates + 1] = ('`%s`=VALUES(`%s`)'):format(col, col)
         end
@@ -127,15 +131,16 @@ local UPSERT_SQL do
 end
 
 --- Serialize a state record into an ordered parameter array for UPSERT_SQL.
---- `data` is JSON-encoded here so callers pass a plain Lua table.
+--- `data` is JSON-encoded here so callers pass a plain Lua table. Nullable
+--- values become '' (see NULLABLE_COLUMNS) to keep the array dense.
 ---@param row table
 ---@return any[]
 local function serializeRow(row)
     return {
         row.id,
         row.crop_type,
-        row.owner,
-        row.zone,
+        row.owner or '',
+        row.zone or '',
         row.cell,
         row.pos_x,
         row.pos_y,
@@ -144,7 +149,7 @@ local function serializeRow(row)
         row.planted_at,
         row.growth_time or 0,
         row.state or 'planted',
-        row.data and json.encode(row.data) or nil,
+        row.data and json.encode(row.data) or '',
     }
 end
 

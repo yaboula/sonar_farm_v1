@@ -85,6 +85,7 @@ Sirven para verificar el motor de estado sin gameplay real. Se registran solo si
 
 | Sintoma | Causa probable | Solucion |
 | --- | --- | --- |
+| `attempt to index a nil value (field 'Crops')` | Los ficheros de `config/` no estan declarados en `fxmanifest.lua` | Asegurate de que `config/config.lua`, `config/crops.lua`, `config/zones.lua` y `config/minigames.lua` estan en `shared_scripts`, y **antes** del resto. |
 | `oxmysql is not started. Persistence is unavailable.` | oxmysql no arranco antes | Revisa orden en `server.cfg` y connection string. |
 | `Schema creation failed: ...` | Permisos DB o connection string | Verifica credenciales/permisos `CREATE`. |
 | `Corrupt data JSON for crop <id>` | Edicion manual del campo `data` | El registro se carga con `data={}`; corrige el JSON en DB si procede. |
@@ -95,5 +96,6 @@ Sirven para verificar el motor de estado sin gameplay real. Se registran solo si
 
 ## 6. Lecciones aprendidas
 
-- `luac -p` es un smoke test rapido de sintaxis Lua antes de commitear.
+- `luac -p` es un smoke test rapido de sintaxis Lua antes de commitear: valida sintaxis, pero **no** detecta ficheros que faltan en `fxmanifest.lua`. Tras anadir un fichero nuevo, verifica siempre que esta declarado en el manifiesto.
 - El snapshot swap en `Flush` es imprescindible para no perder escrituras concurrentes durante el `await` de la DB.
+- En oxmysql, un array de parametros con un `nil` en medio rompe el binding (Lua no distingue hueco de fin de array). Para columnas nullable, enviar `''` y usar `NULLIF(?, '')` en el SQL.

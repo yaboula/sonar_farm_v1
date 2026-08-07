@@ -18,6 +18,11 @@ dependencies {
 
 shared_scripts {
     '@ox_lib/init.lua',
+    -- Configuration must load first: everything else reads from `Config`.
+    'config/config.lua',
+    'config/crops.lua',
+    'config/zones.lua',
+    'config/minigames.lua',
     'shared/constants.lua',
     'shared/utils.lua',
     -- Bridge Layer (framework abstraction). Order matters:

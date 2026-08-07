@@ -20,7 +20,7 @@ local function resolveStages(record)
     if record.data and type(record.data.stages) == 'table' then
         return record.data.stages
     end
-    local def = Config.Crops[record.crop_type]
+    local def = Config.Crops and Config.Crops[record.crop_type]
     if def and type(def.stages) == 'table' then
         return def.stages
     end

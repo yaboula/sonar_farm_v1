@@ -6,6 +6,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
 
 ## [Unreleased]
 
+### Fixed
+
+- Los ficheros de `config/` no estaban declarados en `fxmanifest.lua`, por lo que `Config.Crops`, `Config.Zones` y `Config.Minigames` nunca se cargaban. Provocaba `attempt to index a nil value (field 'Crops')` al plantar. Ahora `config/` se carga primero en `shared_scripts`.
+- Accesos a `Config.Crops` blindados en `state.lua` y `growth.lua` (no asumen que la tabla exista).
+- `serializeRow` ya no puede generar huecos `nil` en el array de parametros (rompia el binding de oxmysql cuando `owner`/`zone`/`data` eran nulos). Las columnas nullable se envian como `''` y se convierten a `NULL` con `NULLIF(?, '')`.
+
 ### Added
 
 - **Etapa 2 — Motor de Estado en Memoria y Persistencia Asincrona:**

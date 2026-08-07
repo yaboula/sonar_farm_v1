@@ -68,7 +68,7 @@ end
 ---@return table record
 function State.Add(partial)
     local id = partial.id or Uuid()
-    local def = Config.Crops[partial.crop_type]
+    local def = Config.Crops and Config.Crops[partial.crop_type]
 
     local record = {
         id = id,
