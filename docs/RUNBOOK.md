@@ -58,9 +58,34 @@ El guardado periodico es la **red de seguridad principal**. En un reinicio orden
 
 ---
 
-## 4. Comandos de debug (solo con `Config.Debug = true`)
+## 4. Items de ox_inventory (Etapa 3)
 
-Sirven para verificar el motor de estado sin gameplay real. Se registran solo si el debug esta activo.
+`ox_inventory` **no permite registrar items en runtime**, asi que hay que copiarlos a mano una vez.
+
+1. Abre [`data/ox_inventory_items.lua`](../data/ox_inventory_items.lua).
+2. Copia las entradas de dentro de la tabla a `ox_inventory/data/items.lua`, dentro de la tabla que ese fichero retorna.
+3. `restart ox_inventory`.
+
+Items necesarios: `carrot_seed`, `potato_seed`, `lettuce_seed`, `tomato_seed`, `carrot`, `potato`, `lettuce`, `tomato`, `watering_can`.
+
+Sin imagenes en `ox_inventory/web/images/` los items salen con un placeholder: es suficiente para probar.
+
+Para darte material de prueba:
+
+```
+/giveitem <id> carrot_seed 10
+/giveitem <id> watering_can 1
+```
+
+---
+
+## 5. Comandos de debug (solo con `Config.Debug = true`)
+
+Se registran solo si el debug esta activo.
+
+### Estado y persistencia (servidor, Etapa 2)
+
+Verifican el motor de estado **sin pasar por validaciones** de gameplay.
 
 | Comando | Descripcion |
 | --- | --- |
@@ -69,6 +94,19 @@ Sirven para verificar el motor de estado sin gameplay real. Se registran solo si
 | `/farm_debug_grow [id]` | Evalua el crecimiento por timestamp de un cultivo. |
 | `/farm_debug_save` | Fuerza un `State.Flush()` inmediato. |
 | `/farm_debug_clear` | Elimina todos los cultivos (los encola para borrado). |
+
+### Bucle de gameplay (cliente, Etapa 3)
+
+Pasan por **toda** la cadena autoritativa: rate limit, cooldown, anti-teleport, zona, inventario y permisos. Es lo que hay que usar para validar la Etapa 3.
+
+| Comando | Descripcion |
+| --- | --- |
+| `/farm_plant [cropType]` | Planta en tu posicion real (default `carrot`). |
+| `/farm_water [cropId]` | Riega. Sin id, coge el cultivo mas cercano. |
+| `/farm_harvest [cropId]` | Cosecha. Sin id, coge el cultivo mas cercano. |
+| `/farm_near [radio]` | Lista cultivos cercanos con estado, agua y salud (imprime en F8). |
+
+`/farm_water` y `/farm_harvest` resuelven el cultivo mas cercano si no pasas id, para no tener que copiar UUIDs a mano.
 
 ### Prueba de round-trip de persistencia
 
@@ -79,9 +117,34 @@ Sirven para verificar el motor de estado sin gameplay real. Se registran solo si
 5. En consola deberia verse `State engine ready (1 crops loaded)`.
 6. `/farm_debug_grow <id>` -> el progreso aumenta con el tiempo.
 
+### Prueba del bucle completo (Etapa 3)
+
+Requiere estar dentro de una zona de `config/zones.lua` (por defecto, campos de Grapeseed) y tener los items.
+
+1. `/giveitem <id> carrot_seed 5` y `/giveitem <id> watering_can 1`.
+2. Colocate en la zona -> `/farm_plant carrot`. Debe notificar `Planted Carrot in grapeseed_east`.
+3. `/farm_near` -> aparece el cultivo con `growth`, `water` y `health`.
+4. `/farm_water` -> `Watered. Water 100%, health ...%`.
+5. Riega otra vez de inmediato -> debe rechazar con "does not need water yet" (comprueba `WaterRefillThreshold`).
+6. `/farm_harvest` antes de madurar -> "not ready to harvest".
+7. Espera `growthTime` (900s para carrot; baja `growthTime` en `config/crops.lua` para probar rapido) -> `/farm_harvest` entrega producto con calidad y tier.
+
+### Pruebas de seguridad que deberian fallar
+
+| Prueba | Resultado esperado |
+| --- | --- |
+| `/farm_plant carrot` fuera de toda zona | `You are not inside a farming zone.` |
+| `/farm_plant tomato` en `grapeseed_south` | `That crop cannot be planted in this zone.` |
+| `/farm_plant carrot` sin semillas | `You do not have the required seeds.` |
+| `/farm_water` sin regadera | `You need a watering can.` |
+| Repetir `/farm_plant` muy rapido | `Slow down.` (token bucket) |
+| Alejarse y `/farm_harvest <id>` | `You are too far away.` |
+| Cosechar cultivo ajeno con `OwnerOnlyHarvest = true` | `This crop belongs to someone else.` |
+| Plantar mas de `MaxCropsPerPlayer` | `You have reached your active crop limit.` |
+
 ---
 
-## 5. Troubleshooting
+## 6. Troubleshooting
 
 | Sintoma | Causa probable | Solucion |
 | --- | --- | --- |
@@ -89,13 +152,26 @@ Sirven para verificar el motor de estado sin gameplay real. Se registran solo si
 | `oxmysql is not started. Persistence is unavailable.` | oxmysql no arranco antes | Revisa orden en `server.cfg` y connection string. |
 | `Schema creation failed: ...` | Permisos DB o connection string | Verifica credenciales/permisos `CREATE`. |
 | `Corrupt data JSON for crop <id>` | Edicion manual del campo `data` | El registro se carga con `data={}`; corrige el JSON en DB si procede. |
-| No aparecen los comandos `/farm_debug_*` | `Config.Debug = false` | Activa debug en `config/config.lua`. |
+| No aparecen los comandos `/farm_debug_*` o `/farm_*` | `Config.Debug = false` | Activa debug en `config/config.lua`. |
 | Cambios no persisten tras crash | Ventana `SaveInterval` | Es esperado en crash duro; baja `SaveInterval`. |
+| `You do not have the required seeds` teniendolas | Items no instalados en ox_inventory | Copia `data/ox_inventory_items.lua` (seccion 4) y reinicia ox_inventory. |
+| `You are not inside a farming zone` en pleno campo | Las coordenadas de `config/zones.lua` no coinciden con tu mapa | Ajusta `center`/`radius`; usa `/farm_near` para ver donde estas respecto a los cultivos. |
+| `Movement validation failed` justo al conectar | Falso positivo del anti-teleport | No deberia ocurrir: hay grace period al conectar, TTL de muestra y descarte de coords invalidas. Si pasa, sube `ConnectGracePeriod` y reporta el caso. |
+| Cultivos que mueren demasiado rapido | `water.decayPerHour` alto para el ritmo del servidor | Ajusta por cultivo en `config/crops.lua`; `droughtTolerance` amortigua la perdida de salud. |
+| Calidad siempre 75 | Es lo esperado en Etapa 3 | El proveedor stub devuelve `Config.Quality.DefaultScore`; los minijuegos llegan en la Etapa 5. |
+| `Someone is already working on this crop` sin nadie mas | Doble peticion del mismo cliente | Es el lock anti-duplicacion haciendo su trabajo; reintenta. |
 
 ---
 
-## 6. Lecciones aprendidas
+## 7. Lecciones aprendidas
 
 - `luac -p` es un smoke test rapido de sintaxis Lua antes de commitear: valida sintaxis, pero **no** detecta ficheros que faltan en `fxmanifest.lua`. Tras anadir un fichero nuevo, verifica siempre que esta declarado en el manifiesto.
 - El snapshot swap en `Flush` es imprescindible para no perder escrituras concurrentes durante el `await` de la DB.
 - En oxmysql, un array de parametros con un `nil` en medio rompe el binding (Lua no distingue hueco de fin de array). Para columnas nullable, enviar `''` y usar `NULLIF(?, '')` en el SQL.
+- Validar la posicion con `GetEntityCoords(GetPlayerPed(source))` en el servidor, no con el `vector3` que envia el cliente. Es la diferencia entre un anti-cheat real y uno decorativo.
+- El anti-teleport necesita tolerancia o castiga a jugadores legitimos: al conectar y al cambiar de routing bucket o interior, las coordenadas del servidor son poco fiables (a veces el origen del mapa). Tres guardas lo cubren: la primera muestra solo inicializa la cache, las muestras viejas se descartan y hay grace period al conectar.
+- Cada modulo libera en `playerDropped` lo que el mismo reserva (buckets en `ratelimit`, cache de posicion y cooldowns en `validation`). Centralizar la limpieza en un modulo ajeno acopla y se olvida una tabla; los cooldowns eran justo esa tercera tabla facil de olvidar.
+- En cosecha, el orden importa: comprobar `CanCarry`, entregar el item y **solo entonces** borrar el cultivo. Al reves, un inventario lleno destruye la cosecha.
+- Un lock por `cropId` durante la accion evita que dos cosechas simultaneas entreguen producto dos veces. Es barato y cubre el caso que no aparece en pruebas manuales pero si el dia que dos jugadores pulsan a la vez.
+- El servidor devuelve codigos (`too_far`), no frases. El cliente traduce. Asi el servidor queda agnostico al idioma y no hay textos duplicados.
+- `data/ox_inventory_items.lua` se envuelve en `return { ... }` para que sea Lua valido y pase `luac -p`, aunque su uso real sea copiar y pegar en ox_inventory.

@@ -29,7 +29,15 @@ sonar_farm/
   config/        Configuracion data-driven (config, crops, zones, minigames)
   shared/        Constantes y utilidades puras (cliente + servidor)
   bridge/        Capa de abstraccion (frameworks, inventory, target)
+  data/          Definiciones para copiar a otros recursos (items de ox_inventory)
+  database/      Esquema SQL
   server/        Logica autoritativa de servidor + modulos
+    modules/
+      database/  Acceso a datos (oxmysql)
+      state/     Hot-state en RAM + crecimiento por timestamp
+      security/  Rate limiting y validacion anti-exploit
+      farming/   Acciones autoritativas: plant, care, harvest, query
+      logger/    Logging por niveles con conectores
   client/        Motor visual, interaccion y minijuegos
   web/           SPA de NUI (React + Vite + Tailwind) — a partir de Etapa 9
   docs/          Documentacion tecnica (espanol)
@@ -38,16 +46,21 @@ sonar_farm/
 ## Instalacion (desarrollo)
 
 1. Clonar dentro de `resources/[local]/` de tu servidor FiveM.
-2. Asegurar que `qb-core`, `ox_lib`, `ox_inventory` y `ox_target` estan iniciados antes.
-3. Anadir `ensure sonar_farm` a tu `server.cfg`.
+2. Asegurar que `oxmysql`, `qb-core`, `ox_lib`, `ox_inventory` y `ox_target` estan iniciados antes.
+3. Copiar los items de [`data/ox_inventory_items.lua`](data/ox_inventory_items.lua) a `ox_inventory/data/items.lua` y reiniciar `ox_inventory`.
+4. Anadir `ensure sonar_farm` a tu `server.cfg`.
+
+El esquema de base de datos se crea solo al arrancar (`Config.Database.AutoCreateSchema`). Detalles y alternativa manual en [docs/RUNBOOK.md](docs/RUNBOOK.md).
 
 ## Estado del proyecto
 
-En construccion por etapas. Ver [docs/DECISIONES.md](docs/DECISIONES.md) para la vision completa y [CHANGELOG.md](CHANGELOG.md) para el historial.
+En construccion por etapas. Ver [docs/DECISIONES.md](docs/DECISIONES.md) para la vision completa, [docs/API.md](docs/API.md) para la superficie publica y [CHANGELOG.md](CHANGELOG.md) para el historial.
 
 - [x] Etapa 1 — Bootstrap del recurso + Bridge Layer
-- [ ] Etapa 2 — Motor de estado + persistencia
-- [ ] Etapa 3 — Logica de servidor autoritativa
+- [x] Etapa 2 — Motor de estado + persistencia
+- [x] Etapa 3 — Logica de servidor autoritativa (plantar / cuidar / cosechar)
 - [ ] Etapa 4 — Motor visual (streaming/culling)
 - [ ] Etapa 5 — Motor de minijuegos
 - [ ] ... (ver docs/DECISIONES.md)
+
+El bucle de la Etapa 3 se prueba con comandos de cliente (`/farm_plant`, `/farm_water`, `/farm_harvest`, `/farm_near`) mientras `Config.Debug = true`. La interaccion con `ox_target` y los props llegan en la Etapa 4.

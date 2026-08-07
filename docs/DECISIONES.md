@@ -113,6 +113,48 @@
 
 ---
 
+## Decisiones de la Etapa 3 (implementación)
+
+Tomadas al construir la lógica autoritativa. Se documentan porque condicionan las etapas siguientes.
+
+### Transporte y contrato
+
+- **Callbacks de `ox_lib`, no eventos fire-and-forget.** Toda acción devuelve `{ ok, reason, data }`. El cliente sabe si funcionó sin inventar timeouts y no existe estado a medias.
+- **El servidor devuelve códigos, no frases** (`too_far`, `missing_seed`). El cliente traduce. El servidor queda agnóstico al idioma y no se duplican textos.
+- **La posición se lee siempre en el servidor** con `GetEntityCoords(GetPlayerPed(source))`. Las coordenadas del cliente se ignoran por completo: es la diferencia entre anti-cheat real y decorativo.
+
+### Anti-teleport con tolerancia
+
+La detección de movimiento imposible **debe** tolerar los casos en que las coordenadas del servidor no son fiables, o castiga a jugadores legítimos justo al conectar. Tres guardas:
+
+1. La primera muestra solo inicializa la caché, sin comprobar velocidad.
+2. Las muestras más antiguas que `PositionSampleTtl` se descartan (cambio de routing bucket o interior).
+3. Los jugadores dentro de `ConnectGracePeriod` se omiten, porque el ped aún está haciendo streaming y puede reportar el origen del mapa.
+
+### Permisos separados: cuidar vs. cosechar
+
+- `AllowPublicCare = true`: cualquiera puede regar un cultivo ajeno. Deliberado, no un descuido: permite **salvar la cosecha de un vecino** y genera cooperación real sin abrir la puerta al robo.
+- `OwnerOnlyHarvest = true`: la cosecha es del propietario. Si se pone en `false`, el robo se permite pero penaliza la calidad (`TheftQualityPenalty = 0.3`) y se registra como evento de rol/ilegal.
+- Decisión de aplicar la penalización a la **calidad** y no al rendimiento: la calidad mueve el precio, así que el producto robado vale menos, que es más coherente que dar menos unidades.
+
+### Integridad y concurrencia
+
+- **Orden en cosecha:** comprobar `CanCarry` → entregar el item → borrar el cultivo. Al revés, un inventario lleno destruiría la cosecha.
+- **Lock por `cropId` durante la acción:** evita que dos cosechas simultáneas entreguen producto dos veces. Es el fallo que no aparece en pruebas manuales pero sí el día que dos jugadores pulsan a la vez.
+- **Cada módulo libera lo que reserva** en `playerDropped`: buckets en `ratelimit`, caché de posición y cooldowns en `validation`. Centralizar la limpieza en un módulo ajeno acopla y termina olvidando una tabla.
+
+### Límites y contenido
+
+- `MaxCropsPerPlayer = 25`: sin parcelas privadas todavía, evita que un jugador o un bot monopolice una zona pública.
+- Las 4 verduras tienen **fisiología deliberadamente distinta** para que cada una ejercite un camino de código: tubérculos (`carrot`, `potato`) resisten la sequía, la hoja (`lettuce`) es rápida y frágil, el fruto (`tomato`) es lento y exigente.
+- `tomato.multiHarvest` existe en el esquema pero está **inactivo**: documenta la intención sin implementar cosecha múltiple fuera de plan.
+
+### Calidad: el contrato que evita refactor en la Etapa 5
+
+`Quality.RegisterProvider` / `SetProvider` aísla "cuánto de bien lo hizo el jugador" del resto de la lógica. Hoy un stub devuelve `Config.Quality.DefaultScore`; cuando lleguen los minijuegos se registra un proveedor real y **no cambia ni una línea** de `plant.lua`, `care.lua` ni `harvest.lua`. Si un proveedor falla o no devuelve número, se registra y se cae al valor por defecto: un minijuego roto nunca bloquea la cosecha.
+
+---
+
 ## Principios de ingeniería (no negociables)
 
 - **Server-authoritative** en todo lo que da valor.
