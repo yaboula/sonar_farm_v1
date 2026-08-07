@@ -21,11 +21,11 @@ local offset = 0
 --- Returns current unix seconds. Uses os.time() on the server and
 --- GetNetworkTimeAccurate() on the client (FiveM client Lua has no os library).
 local function unixNow()
-    if IsDuplicityVersion then
-        -- Server-side: IsDuplicityVersion is true
+    if type(os) == 'table' then
+        -- Server-side: os library is available
         return os.time()
     else
-        -- Client-side: GetNetworkTimeAccurate returns milliseconds
+        -- Client-side: GetNetworkTimeAccurate returns milliseconds since epoch
         return math.floor(GetNetworkTimeAccurate() / 1000)
     end
 end
