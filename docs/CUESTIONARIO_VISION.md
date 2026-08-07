@@ -322,4 +322,3 @@
 ### Notas libres / visión adicional
 
 > Escribe aquí cualquier idea, referencia o requisito que no encaje en las preguntas anteriores:
-

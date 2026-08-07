@@ -81,7 +81,7 @@ Config.Zones = {
         },
     },
 
-    
+
     zone1 = {
         label        = 'local test',
         center       = vec3(2055.71, 4954.00, 40.08),

@@ -91,7 +91,7 @@ local function showInstructions()
             icon = 'crosshairs'
         })
     elseif state == STATE_EDIT_GRID then
-        local text = string.format('**Zone Builder**  \n[LEFT CLICK] Reposition  \n[TAB] Mode: %s  \n[WASD] %s  \n[G] Manual Input  \n[UP/DOWN] Rows: %d  \n[LEFT/RIGHT] Cols: %d  \n[SCROLL] Spacing X: %.1f  \n[ALT+SCROLL] Spacing Y: %.1f  \n[Q/E] Heading: %.1f  \n[SHIFT] x5 Speed  \n[ENTER] Save  \n[BACKSPACE] Cancel', 
+        local text = string.format('**Zone Builder**  \n[LEFT CLICK] Reposition  \n[TAB] Mode: %s  \n[WASD] %s  \n[G] Manual Input  \n[UP/DOWN] Rows: %d  \n[LEFT/RIGHT] Cols: %d  \n[SCROLL] Spacing X: %.1f  \n[ALT+SCROLL] Spacing Y: %.1f  \n[Q/E] Heading: %.1f  \n[SHIFT] x5 Speed  \n[ENTER] Save  \n[BACKSPACE] Cancel',
             gridMode and "Nudge" or "Walk", gridMode and "Nudge Origin" or "Move Player", grid.rows, grid.cols, grid.spacing.x, grid.spacing.y, grid.heading)
         lib.showTextUI(text, {
             position = 'top-center',
@@ -115,7 +115,7 @@ local function exportToClipboard(zoneKey, label, allowedCrops)
         label = '%s',
         center = vec3(%.2f, %.2f, %.2f),
         allowedCrops = { %s },
-        
+
         grid = {
             origin = vec3(%.2f, %.2f, %.2f),
             rows = %d,
@@ -123,7 +123,7 @@ local function exportToClipboard(zoneKey, label, allowedCrops)
             spacing = { x = %.2f, y = %.2f },
             heading = %.1f,
         },
-        
+
         blip = {
             enabled = true,
             sprite = 496,
@@ -132,7 +132,7 @@ local function exportToClipboard(zoneKey, label, allowedCrops)
         },
     },
 ]], zoneKey, label, grid.origin.x, grid.origin.y, grid.origin.z, cropsStr, grid.origin.x, grid.origin.y, grid.origin.z, grid.rows, grid.cols, grid.spacing.x, grid.spacing.y, grid.heading)
-    
+
     lib.setClipboard(output)
     print("\n^2[SONAR FARM] GENERATED ZONE CONFIGURATION:^0")
     print(output)
@@ -167,12 +167,12 @@ local function startEditLoop()
     CreateThread(function()
         while state ~= STATE_IDLE do
             Wait(0)
-            
+
             if state == STATE_SELECT_ORIGIN then
                 local hit, hitPos = RayCastGamePlayCamera(50.0)
                 if hit == 1 then
                     DrawMarker(28, hitPos.x, hitPos.y, hitPos.z, 0,0,0, 0,0,0, 0.3,0.3,0.3, 0,255,0,150, false, false, 2, false, nil, nil, false)
-                    
+
                     DisableControlAction(0, 24, true) -- Attack
                     if IsDisabledControlJustPressed(0, 24) then
                         grid.origin = hitPos
@@ -187,14 +187,14 @@ local function startEditLoop()
                 DisableControlAction(0, 15, true)
                 DisableControlAction(0, 24, true)
                 DisableControlAction(0, 257, true)
-                
+
                 if gridMode then
                     DisableControlAction(0, 32, true) -- W
                     DisableControlAction(0, 33, true) -- S
                     DisableControlAction(0, 34, true) -- A
                     DisableControlAction(0, 35, true) -- D
                 end
-                
+
                 local changed = false
                 local shiftPos = IsControlPressed(0, 21) -- LSHIFT
                 local altPos = IsControlPressed(0, 19)   -- LALT
@@ -247,7 +247,7 @@ local function startEditLoop()
                         { type = 'number', label = 'Spacing Y', default = grid.spacing.y, required = true, min = 0.5, step = 0.1 },
                         { type = 'number', label = 'Heading (degrees)', default = grid.heading, required = true, step = 0.1 }
                     })
-                    
+
                     if input then
                         grid.rows = math.max(1, math.floor(input[1]))
                         grid.cols = math.max(1, math.floor(input[2]))
@@ -259,30 +259,30 @@ local function startEditLoop()
                     end
                     showInstructions()
                 end
-                
+
                 -- 3. Arrow Keys
                 if IsControlJustPressed(0, 172) then grid.rows = grid.rows + rowColStep; changed = true end
                 if IsControlJustPressed(0, 173) then grid.rows = math.max(1, grid.rows - rowColStep); changed = true end
                 if IsControlJustPressed(0, 175) then grid.cols = grid.cols + rowColStep; changed = true end
                 if IsControlJustPressed(0, 174) then grid.cols = math.max(1, grid.cols - rowColStep); changed = true end
-                
+
                 -- 4. Scroll Wheel (with ALT for Y spacing)
                 if IsControlJustPressed(0, 241) or IsDisabledControlJustPressed(0, 241) then
                     if altPos then grid.spacing.y = grid.spacing.y + spacingStep
                     else grid.spacing.x = grid.spacing.x + spacingStep end
                     changed = true
                 end
-                
+
                 if IsControlJustPressed(0, 242) or IsDisabledControlJustPressed(0, 242) then
                     if altPos then grid.spacing.y = math.max(0.5, grid.spacing.y - spacingStep)
                     else grid.spacing.x = math.max(0.5, grid.spacing.x - spacingStep) end
                     changed = true
                 end
-                
+
                 -- 5. Heading (Q/E)
                 local pressQ = shiftPos and IsControlJustPressed(0, 44) or (not shiftPos and IsControlPressed(0, 44))
                 local pressE = shiftPos and IsControlJustPressed(0, 38) or (not shiftPos and IsControlPressed(0, 38))
-                
+
                 if pressQ then grid.heading = (grid.heading + headingStep) % 360.0; changed = true end
                 if pressE then grid.heading = (grid.heading - headingStep) % 360.0; changed = true end
 

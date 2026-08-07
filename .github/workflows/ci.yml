@@ -22,7 +22,9 @@ jobs:
       - name: Run regression suite
         run: lua5.4 tests/run.lua
       - name: Check whitespace
-        run: git show --check --format= HEAD
+        run: |
+          empty_tree=$(git hash-object -t tree /dev/null)
+          git diff --check "$empty_tree" HEAD
       - name: Scan tracked files for common secrets
         run: |
           if git grep -nE '(sk-[A-Za-z0-9_-]{20,}|discord(app)?\.com/api/webhooks/[0-9]+/|mysql://[^[:space:]]+:[^[:space:]]+@)' -- . ':!tests/run.lua' ':!.github/workflows/ci.yml'; then
