@@ -1,24 +1,21 @@
 --[[
-    sonar_farm - Empty planting slots (client)
-    One ox_target sphere per configured EMPTY plot. When a slot is occupied the
-    zone is REMOVED entirely so it never competes with the crop's entity target.
-    When the crop is removed (harvest/death), the sphere is re-created.
+    sonar_farm - Planting slots & target interactions (client)
+    One permanent ox_target sphere zone per configured plot. Handles the FULL
+    interaction lifecycle for a slot:
+      - Empty slot    → Shows "Plant seeds"
+      - Occupied slot → Shows "Inspect", "Water" (if thirsty), "Harvest" (if ready/dead)
 
-    This is critical: ox_target cannot cleanly layer a sphere zone and a local
-    entity target at the same position. The sphere must not exist while a crop
-    prop is present, otherwise ox_target fires both and the player sees "Plant
-    Seeds" even when looking at a fully grown plant.
-
-    Occupancy is derived from the local crop cache (Crops.IsSlotOccupied), kept
-    current by the sync layer. The reconcile step (called from the sync tick) is
-    the only place that adds or removes zones, keeping lifecycle changes in one spot.
+    This guarantees the blue ox_target indicator circle ALWAYS appears reliably
+    when looking at a plot (empty or planted), eliminating entity raycast hits/misses,
+    missing hitboxes on tiny prop models, or target conflicts.
 ]]
 
 Slots = Slots or {}
 
 local POOL_TAG = 'slot'
--- [ "zone:index" ] = { zoneId = number|string|nil, propKey = string }
--- zoneId is nil when the slot is currently occupied (zone removed).
+local CROP_STATE = Sonar.Constants.CROP_STATE
+
+-- [ "zone:index" ] = { zoneId = number|string, propKey = string }
 local registered = {}
 
 ---@param zoneKey string
@@ -35,14 +32,15 @@ local function propKeyOf(zoneKey, index)
     return ('slot:%s:%d'):format(zoneKey, index)
 end
 
---- Build and register an ox_target sphere for one empty slot.
+--- Build and register the permanent ox_target sphere for one plot.
 ---@param slot table
 ---@param key string
----@return number|string|nil zoneId
+---@return number|string zoneId
 local function createSphereZone(slot, key)
     local zoneKey = slot.zone
     local index   = slot.index
     local radius  = Config.Render.SlotTargetRadius or 1.2
+    local distance = Config.Render.TargetDistance or 2.2
 
     return Bridge.Target.AddSphereZone({
         name   = ('sonar_farm:slot:%s'):format(key),
@@ -54,13 +52,66 @@ local function createSphereZone(slot, key)
                 name     = ('sonar_farm:plant:%s'):format(key),
                 label    = 'Plant seeds',
                 icon     = 'fa-solid fa-seedling',
-                distance = Config.Render.TargetDistance,
+                distance = distance,
                 onSelect = function()
                     Actions.OpenPlantMenu(zoneKey, index)
                 end,
-                -- Secondary guard in case the zone fires during a fast occupy.
                 canInteract = function()
                     return not Crops.IsSlotOccupied(zoneKey, index)
+                end,
+            },
+            {
+                name     = ('sonar_farm:inspect:%s'):format(key),
+                label    = 'Inspect',
+                icon     = 'fa-solid fa-magnifying-glass',
+                distance = distance,
+                onSelect = function()
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    if cropId then
+                        Bridge.Notify(Target.Describe(cropId), Sonar.Constants.NOTIFY.INFO)
+                    end
+                end,
+                canInteract = function()
+                    return Crops.IsSlotOccupied(zoneKey, index)
+                end,
+            },
+            {
+                name     = ('sonar_farm:water:%s'):format(key),
+                label    = 'Water',
+                icon     = 'fa-solid fa-droplet',
+                distance = distance,
+                onSelect = function()
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    if cropId then
+                        Actions.Water(cropId)
+                    end
+                end,
+                canInteract = function()
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    if not cropId then return false end
+                    local cond = Crops.Condition(cropId)
+                    if not cond then return false end
+                    if cond.state == CROP_STATE.DEAD then return false end
+                    return cond.water < Config.Farming.WaterRefillThreshold
+                end,
+            },
+            {
+                name     = ('sonar_farm:harvest:%s'):format(key),
+                label    = 'Harvest',
+                icon     = 'fa-solid fa-wheat-awn',
+                distance = distance,
+                onSelect = function()
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    if cropId then
+                        Actions.Harvest(cropId)
+                    end
+                end,
+                canInteract = function()
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    if not cropId then return false end
+                    local cond = Crops.Condition(cropId)
+                    if not cond then return false end
+                    return cond.progress >= 1 or cond.state == CROP_STATE.DEAD
                 end,
             },
         },
@@ -119,42 +170,18 @@ function Slots.NearestEmpty(coords, radius)
     return best, bestDist
 end
 
---- Reconcile sphere zones and optional props with current occupancy.
---- Called from the sync tick on every render pass — cheap because it only
---- creates/destroys zones when the occupied state actually changes.
+--- Reconcile optional slot props (called from sync tick).
 function Slots.RefreshProps()
+    if not Config.Render.SlotProp or Config.Render.SlotProp == false then
+        return
+    end
+
     for _, slot in ipairs(Sonar.Zones.AllSlots()) do
-        local key      = keyOf(slot.zone, slot.index)
-        local entry    = registered[key]
-        local occupied = Crops.IsSlotOccupied(slot.zone, slot.index)
-
-        if not entry then
-            -- Should not happen after Register(), but guard defensively.
-            goto continue
-        end
-
-        if occupied and entry.zoneId then
-            -- Slot just got occupied: remove the "Plant seeds" sphere so it
-            -- does not fight with the crop entity target.
-            Bridge.Target.RemoveZone(entry.zoneId)
-            entry.zoneId = nil
-
-        elseif not occupied and not entry.zoneId then
-            -- Slot just became free: re-create the sphere so the player can
-            -- see the Plant Seeds option again.
-            entry.zoneId = createSphereZone(slot, key)
-        end
-
-        -- Optional visual prop.
         refreshProp(slot)
-
-        ::continue::
     end
 end
 
 --- Register one ox_target sphere per slot at resource start.
---- All slots start as empty (server state not loaded yet). RefreshProps() will
---- drop spheres for any that turn out to be occupied once deltas arrive.
 function Slots.Register()
     for _, slot in ipairs(Sonar.Zones.AllSlots()) do
         local key     = keyOf(slot.zone, slot.index)
@@ -166,7 +193,7 @@ function Slots.Register()
     end
 
     if Config.Debug then
-        Bridge.Log('info', ('Registered %d planting slots.'):format(Sonar.Zones.TotalSlots()))
+        Bridge.Log('info', ('Registered %d planting slots with unified target options.'):format(Sonar.Zones.TotalSlots()))
     end
 end
 
