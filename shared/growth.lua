@@ -1,11 +1,13 @@
 --[[
-    sonar_farm - Growth evaluator (server)
+    sonar_farm - Growth evaluator (shared)
     Pure, side-effect-free timestamp math. Given a crop record it derives the
     current progress and visual stage without mutating anything and without any
-    server tick. Callers evaluate lazily (on query / interaction).
+    tick. Callers evaluate lazily (on query / interaction / render).
 
-    Physiology (watering / health / withering) arrives in Stage 3; here we only
-    model deterministic time-based growth.
+    Shared on purpose: from Stage 4 the client predicts growth locally so an idle
+    field costs zero network traffic. Client and server must run the exact same
+    formula, so this lives in one file instead of being duplicated. The client can
+    only mispredict what it *draws*; every action is still decided by the server.
 ]]
 
 Growth = Growth or {}
@@ -44,10 +46,10 @@ end
 
 --- Evaluate a crop's growth at a point in time.
 ---@param record table state record (needs planted_at, growth_time, crop_type)
----@param now? number unix seconds (defaults to os.time())
+---@param now? number unix seconds (defaults to server-aligned now)
 ---@return table result { elapsed, progress, stageIndex, state }
 function Growth.Evaluate(record, now)
-    now = now or os.time()
+    now = now or Sonar.Time.Now()
 
     local elapsed = math.max(0, now - (record.planted_at or now))
     local growthTime = record.growth_time or 0
