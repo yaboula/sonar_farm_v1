@@ -36,7 +36,7 @@ Config.Crops = {
         label = 'Carrot',
         seedItem = 'carrot_seed',
         productItem = 'carrot',
-        growthTime = 900,
+        growthTime = 60,   -- TEST: 1 min (prod: 900 = 15min)
         stages = {
             { model = 'bzzz_plants_carrot_01', ratio = 0.0 },
             { model = 'bzzz_plants_carrot_02', ratio = 0.45 },
@@ -55,7 +55,7 @@ Config.Crops = {
         label = 'Potato',
         seedItem = 'potato_seed',
         productItem = 'potato',
-        growthTime = 1200,
+        growthTime = 90,   -- TEST: 1.5 min (prod: 1200 = 20min)
         stages = {
             { model = 'bzzz_plants_potato_01', ratio = 0.0 },
             { model = 'bzzz_plants_potato_02', ratio = 0.5 },
@@ -74,7 +74,7 @@ Config.Crops = {
         label = 'Lettuce',
         seedItem = 'lettuce_seed',
         productItem = 'lettuce',
-        growthTime = 600,
+        growthTime = 45,   -- TEST: 45s (prod: 600 = 10min)
         stages = {
             { model = 'bzzz_plants_lettuce_01', ratio = 0.0 },
             { model = 'bzzz_plants_lettuce_02', ratio = 0.5 },
@@ -93,7 +93,7 @@ Config.Crops = {
         label = 'Tomato',
         seedItem = 'tomato_seed',
         productItem = 'tomato',
-        growthTime = 1500,
+        growthTime = 120,  -- TEST: 2 min (prod: 1500 = 25min)
         stages = {
             { model = 'bzzz_plants_tomato_01', ratio = 0.0 },
             { model = 'bzzz_plants_tomato_02', ratio = 0.4 },
