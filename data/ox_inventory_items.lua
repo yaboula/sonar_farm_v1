@@ -14,6 +14,12 @@
 
     NOTE: ox_inventory looks for artwork in ox_inventory/web/images/<name>.png.
     Without artwork it falls back to a placeholder, which is fine for testing.
+
+    IMPORTANT: the `client.export` on every seed is what makes it plantable by
+    using the item, which is the gesture players try first. It calls the
+    `useSeed` export in sonar_farm, which resolves the crop from the item name.
+    Dropping those lines does not break anything, but planting is then only
+    reachable through the field menu.
 ]]
 
 return {
@@ -25,32 +31,44 @@ return {
         label = 'Carrot Seeds',
         weight = 10,
         stack = true,
-        close = false,
+        close = true,
         description = 'A handful of carrot seeds. Plant them in a farming zone.',
+        client = {
+            export = 'sonar_farm.useSeed',
+        },
     },
 
     ['potato_seed'] = {
         label = 'Potato Seeds',
         weight = 10,
         stack = true,
-        close = false,
+        close = true,
         description = 'Seed potatoes. Hardy and forgiving of dry soil.',
+        client = {
+            export = 'sonar_farm.useSeed',
+        },
     },
 
     ['lettuce_seed'] = {
         label = 'Lettuce Seeds',
         weight = 8,
         stack = true,
-        close = false,
+        close = true,
         description = 'Lettuce seeds. Fast growing but very thirsty.',
+        client = {
+            export = 'sonar_farm.useSeed',
+        },
     },
 
     ['tomato_seed'] = {
         label = 'Tomato Seeds',
         weight = 10,
         stack = true,
-        close = false,
+        close = true,
         description = 'Tomato seeds. Slow to ripen, worth the wait.',
+        client = {
+            export = 'sonar_farm.useSeed',
+        },
     },
 
     -- -----------------------------------------------------------------------

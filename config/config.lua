@@ -133,6 +133,49 @@ Config.Quality = {
 }
 
 -- ---------------------------------------------------------------------------
+-- Sync (Stage 4): what each client is told about, and how often
+-- ---------------------------------------------------------------------------
+Config.Sync = {
+    -- Spatial cells around the player that get subscribed. 1 = the player's cell
+    -- plus the 8 adjacent ones (300x300m with 100m cells), so data is always
+    -- available ahead of the player in every direction.
+    CellRadius = 1,
+    -- Cell-check interval (ms) when there is at least one crop nearby.
+    TickNear = 500,
+    -- Cell-check interval (ms) when the player is nowhere near a crop. Keeps the
+    -- idle cost effectively zero.
+    TickFar = 2000,
+}
+
+-- ---------------------------------------------------------------------------
+-- Render (Stage 4): client-side props, culling and interaction
+-- ---------------------------------------------------------------------------
+Config.Render = {
+    -- Props are created only within this distance (meters) of the player.
+    Radius = 30.0,
+    -- Hard ceiling on simultaneous crop props. Closest crops win. Protects the
+    -- pathological case of many players planting in one small area.
+    MaxProps = 50,
+    -- Snap props to the ground with a raycast instead of trusting the stored
+    -- pos_z (which is the planter's foot position and may be on a slope).
+    GroundSnap = true,
+    -- Deterministic per-crop rotation/scale variation so fields do not look
+    -- like a cloned grid. Derived from the crop id, so every client agrees.
+    Variation = true,
+    -- ox_target interaction distance. Deliberately below
+    -- Security.MaxInteractDistance so a legitimate player can never get a
+    -- `too_far` rejection from something ox_target let them click.
+    TargetDistance = 2.2,
+    -- Skip rendering while the player is inside an interior. Routing buckets are
+    -- not readable client-side, so the interior check is the practical proxy for
+    -- "the player is not out in the field".
+    SkipInInteriors = true,
+    -- Fallback model used when a configured crop model is missing (bad name, or
+    -- the prop pack resource is not running). Keeps the crop interactable.
+    FallbackModel = 'prop_plant_01a',
+}
+
+-- ---------------------------------------------------------------------------
 -- Logging
 -- ---------------------------------------------------------------------------
 Config.Logging = {

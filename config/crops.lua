@@ -10,6 +10,12 @@
       growthTime    number  Seconds from planting to fully grown.
       stages        table   Visual stages picked by elapsed ratio (Stage 4 props).
                             Each: { model = 'prop_name', ratio = 0.0 .. 1.0 }.
+                            Models come from the custom plant pack, which must be
+                            running as its own resource. Every model is checked
+                            with IsModelValid at boot: missing ones are reported
+                            by name in the console and fall back to
+                            Config.Render.FallbackModel, so a wrong name is
+                            obvious instead of silently rendering nothing.
       water         table   Physiology:
                               decayPerHour  water points lost per hour (0..100 scale)
                               droughtTolerance  0..1, dampens health loss when dry
@@ -32,9 +38,9 @@ Config.Crops = {
         productItem = 'carrot',
         growthTime = 900,
         stages = {
-            { model = 'prop_veg_crop_03', ratio = 0.0 },
-            { model = 'prop_veg_crop_03b', ratio = 0.45 },
-            { model = 'prop_veg_crop_orange', ratio = 1.0 },
+            { model = 'bzzz_plants_carrot_01', ratio = 0.0 },
+            { model = 'bzzz_plants_carrot_02', ratio = 0.45 },
+            { model = 'bzzz_plants_carrot_03', ratio = 1.0 },
         },
         -- Tuber: stores water underground, tolerates neglect.
         water = { decayPerHour = 12, droughtTolerance = 0.7 },
@@ -51,9 +57,9 @@ Config.Crops = {
         productItem = 'potato',
         growthTime = 1200,
         stages = {
-            { model = 'prop_veg_crop_03', ratio = 0.0 },
-            { model = 'prop_veg_crop_03b', ratio = 0.5 },
-            { model = 'prop_veg_crop_04', ratio = 1.0 },
+            { model = 'bzzz_plants_potato_01', ratio = 0.0 },
+            { model = 'bzzz_plants_potato_02', ratio = 0.5 },
+            { model = 'bzzz_plants_potato_03', ratio = 1.0 },
         },
         -- Hardiest of the four: slowest water decay, highest tolerance.
         water = { decayPerHour = 10, droughtTolerance = 0.8 },
@@ -70,9 +76,9 @@ Config.Crops = {
         productItem = 'lettuce',
         growthTime = 600,
         stages = {
-            { model = 'prop_veg_crop_03', ratio = 0.0 },
-            { model = 'prop_veg_crop_03b', ratio = 0.5 },
-            { model = 'prop_veg_crop_03c', ratio = 1.0 },
+            { model = 'bzzz_plants_lettuce_01', ratio = 0.0 },
+            { model = 'bzzz_plants_lettuce_02', ratio = 0.5 },
+            { model = 'bzzz_plants_lettuce_03', ratio = 1.0 },
         },
         -- Leafy: fast cycle but very thirsty and quick to wilt.
         water = { decayPerHour = 28, droughtTolerance = 0.2 },
@@ -89,9 +95,9 @@ Config.Crops = {
         productItem = 'tomato',
         growthTime = 1500,
         stages = {
-            { model = 'prop_veg_crop_03', ratio = 0.0 },
-            { model = 'prop_veg_crop_03b', ratio = 0.4 },
-            { model = 'prop_veg_crop_tr_01', ratio = 1.0 },
+            { model = 'bzzz_plants_tomato_01', ratio = 0.0 },
+            { model = 'bzzz_plants_tomato_02', ratio = 0.4 },
+            { model = 'bzzz_plants_tomato_03', ratio = 1.0 },
         },
         -- Fruit: slow and demanding, the most valuable of the four.
         water = { decayPerHour = 20, droughtTolerance = 0.4 },

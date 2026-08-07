@@ -18,6 +18,14 @@ function Bridge.Target.AddBoxZone(options)
     return target:addBoxZone(options)
 end
 
+--- Add a sphere zone interaction. Matches how farming zones are configured
+--- (center + radius), unlike a box zone which would need a size vector.
+---@param options table ox_target sphere zone options (coords, radius, options).
+---@return number|string id Zone handle for later removal.
+function Bridge.Target.AddSphereZone(options)
+    return target:addSphereZone(options)
+end
+
 --- Add interaction options to a specific local (client-side) entity.
 ---@param entity number Entity handle.
 ---@param options table Array of ox_target option tables.

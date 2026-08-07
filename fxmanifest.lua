@@ -25,6 +25,11 @@ shared_scripts {
     'config/minigames.lua',
     'shared/constants.lua',
     'shared/utils.lua',
+    'shared/time.lua',
+    -- Growth and physiology are shared so the client can predict what it renders
+    -- with the exact same formula the server validates with.
+    'shared/growth.lua',
+    'shared/physiology.lua',
     -- Bridge Layer (framework abstraction). Order matters:
     -- core first, then adapters register themselves into the registry.
     'bridge/bridge.lua',
@@ -39,11 +44,13 @@ server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'server/modules/logger/logger.lua',
     'server/modules/database/database.lua',
-    'server/modules/state/growth.lua',
     'server/modules/state/state.lua',
     -- Security before farming: actions depend on these guards.
     'server/modules/security/ratelimit.lua',
     'server/modules/security/validation.lua',
+    -- Sync after validation (it reads the authoritative player position) and
+    -- before farming (the action handlers emit deltas through it).
+    'server/modules/sync/subscriptions.lua',
     -- Farming: shared helpers first, then one file per action.
     'server/modules/farming/lock.lua',
     'server/modules/farming/physiology.lua',
@@ -58,6 +65,15 @@ server_scripts {
 
 client_scripts {
     'client/main.lua',
+    -- Render layer: generic pool first, then the crop logic that uses it.
+    'client/modules/render/pool.lua',
+    'client/modules/render/crops.lua',
+    'client/modules/render/target.lua',
+    -- Actions before sync: the sync thread registers target zones that bind to
+    -- Actions on select.
+    'client/modules/interaction/actions.lua',
+    'client/modules/sync/client.lua',
+    'client/modules/zones/blips.lua',
     'client/modules/debug/commands.lua',
 }
 
