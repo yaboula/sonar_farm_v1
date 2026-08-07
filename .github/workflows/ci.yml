@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua 5.4
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4
+      - name: Parse Lua
+        run: find . -name '*.lua' -not -path './.git/*' -print0 | xargs -0 -n1 luac5.4 -p
+      - name: Run regression suite
+        run: lua5.4 tests/run.lua
+      - name: Check whitespace
+        run: git show --check --format= HEAD
+      - name: Scan tracked files for common secrets
+        run: |
+          if git grep -nE '(sk-[A-Za-z0-9_-]{20,}|discord(app)?\.com/api/webhooks/[0-9]+/|mysql://[^[:space:]]+:[^[:space:]]+@)' -- . ':!tests/run.lua' ':!.github/workflows/ci.yml'; then
+            echo "Potential secret found in tracked files."
+            exit 1
+          fi
