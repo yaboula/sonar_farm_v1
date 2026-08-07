@@ -64,6 +64,75 @@ Config.Features = {
 }
 
 -- ---------------------------------------------------------------------------
+-- Security (Stage 3): server-authoritative validation and anti-exploit
+-- ---------------------------------------------------------------------------
+Config.Security = {
+    -- Token bucket per player against event flooding. `capacity` is the burst
+    -- allowance; `refillPerSecond` how fast it recovers.
+    TokenBucket = {
+        capacity = 8,
+        refillPerSecond = 2,
+    },
+    -- Max distance (meters) between the player and the crop for any action.
+    MaxInteractDistance = 3.0,
+    -- Implied speed (m/s) above which movement is considered suspicious.
+    -- ~60 m/s tolerates fast vehicles and planes without flagging them.
+    MaxSpeedMps = 60.0,
+    -- If the cached position sample is older than this (seconds), skip the
+    -- speed check: the player may have changed routing bucket or interior.
+    PositionSampleTtl = 30,
+    -- Grace period (seconds) after connecting during which the speed check is
+    -- skipped, since coords are unreliable while the ped streams in.
+    ConnectGracePeriod = 15,
+}
+
+-- Per-action cooldowns in milliseconds.
+Config.Cooldowns = {
+    plant = 1000,
+    water = 500,
+    harvest = 1000,
+}
+
+-- ---------------------------------------------------------------------------
+-- Farming rules (Stage 3)
+-- ---------------------------------------------------------------------------
+Config.Farming = {
+    -- Only the player who planted a crop may harvest it. When false, anyone
+    -- can harvest but stolen produce loses quality (TheftQualityPenalty).
+    OwnerOnlyHarvest = true,
+    -- Anyone may water/care for someone else's crop in public zones. Enables
+    -- cooperative play (saving a neighbour's withering crop) without allowing
+    -- theft of the produce.
+    AllowPublicCare = true,
+    -- Quality lost (0..1) when harvesting a crop you do not own.
+    TheftQualityPenalty = 0.3,
+    -- Max simultaneous active crops per player in public zones. Prevents a
+    -- single player from monopolizing a zone before private plots exist.
+    MaxCropsPerPlayer = 25,
+    -- Minimum water level (0..100) below which watering is allowed again.
+    -- Prevents spam-watering an already saturated crop.
+    WaterRefillThreshold = 95,
+    -- Tools required per action (ox_inventory item names).
+    Tools = {
+        water = 'watering_can',
+    },
+}
+
+-- ---------------------------------------------------------------------------
+-- Quality (Stage 3 contract, Stage 5 minigames)
+-- ---------------------------------------------------------------------------
+Config.Quality = {
+    -- Score returned by the default (stub) provider until minigames land.
+    DefaultScore = 75,
+    -- Quality ceiling for mechanized/automated work (Stage 9+). Manual work
+    -- with minigames can reach 100.
+    MechanizedCap = 80,
+    -- Weight of the action score vs. the crop's care state in final quality.
+    ScoreWeight = 0.6,
+    CareWeight = 0.4,
+}
+
+-- ---------------------------------------------------------------------------
 -- Logging
 -- ---------------------------------------------------------------------------
 Config.Logging = {

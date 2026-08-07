@@ -57,10 +57,10 @@ function Utils.IsWithin(a, b, radius)
     return Utils.DistanceSquared(a, b) <= (radius * radius)
 end
 
---- Generate a short unique id. Good enough for in-memory keys and logs.
+--- Generate a RFC 4122 version 4 UUID (36 characters).
 ---@return string
 function Utils.Uuid()
-    local template = 'xxxxxxxx-xxxx-4xxx-yxxx'
+    local template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
     return (template:gsub('[xy]', function(c)
         local r = math.random(0, 15)
         local v = (c == 'x') and r or ((r % 4) + 8)
