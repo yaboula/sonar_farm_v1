@@ -14,6 +14,7 @@ State = State or {}
 
 State.crops = State.crops or {}     -- [id] = record
 State.cells = State.cells or {}     -- [cellKey] = { [id] = true }  (spatial index)
+State.owners = State.owners or {}   -- [identifier] = { [id] = true }  (owner index)
 State.dirty = State.dirty or {}     -- [id] = true  (pending upsert)
 State.deleted = State.deleted or {} -- [id] = true  (pending delete)
 State.loaded = false
@@ -26,12 +27,29 @@ local DeepMerge = Sonar.Utils.DeepMerge
 -- Spatial index helpers
 -- ---------------------------------------------------------------------------
 
+--- Grid coordinates of the cell containing a world position.
+---@param x number
+---@param y number
+---@return number gx
+---@return number gy
+function State.CellCoords(x, y)
+    return math.floor(x / CELL_SIZE), math.floor(y / CELL_SIZE)
+end
+
+--- Cell key from grid coordinates.
+---@param gx number
+---@param gy number
+---@return string cellKey "gx:gy"
+function State.CellKeyAt(gx, gy)
+    return ('%d:%d'):format(gx, gy)
+end
+
 --- Compute the spatial-hash cell key for a world position.
 ---@param x number
 ---@param y number
 ---@return string cellKey "gx:gy"
 function State.CellKey(x, y)
-    return ('%d:%d'):format(math.floor(x / CELL_SIZE), math.floor(y / CELL_SIZE))
+    return State.CellKeyAt(State.CellCoords(x, y))
 end
 
 local function indexAdd(record)
@@ -49,6 +67,35 @@ local function indexRemove(record)
         bucket[record.id] = nil
         if next(bucket) == nil then
             State.cells[record.cell] = nil
+        end
+    end
+end
+
+-- ---------------------------------------------------------------------------
+-- Owner index
+-- Keeps the per-player crop count an O(1) lookup instead of a full scan of hot
+-- state on every plant (see Validation.CropLimit).
+-- ---------------------------------------------------------------------------
+
+local function ownerAdd(record)
+    if not record.owner then return end
+
+    local bucket = State.owners[record.owner]
+    if not bucket then
+        bucket = {}
+        State.owners[record.owner] = bucket
+    end
+    bucket[record.id] = true
+end
+
+local function ownerRemove(record)
+    if not record.owner then return end
+
+    local bucket = State.owners[record.owner]
+    if bucket then
+        bucket[record.id] = nil
+        if next(bucket) == nil then
+            State.owners[record.owner] = nil
         end
     end
 end
@@ -88,6 +135,7 @@ function State.Add(partial)
 
     State.crops[id] = record
     indexAdd(record)
+    ownerAdd(record)
     markDirty(id)
 
     return id, record
@@ -109,11 +157,18 @@ function State.Update(id, patch)
     if not record then return false end
 
     local posChanged = false
+    local ownerChanged = false
+
     for k, v in pairs(patch) do
         if k == 'data' and type(v) == 'table' then
             record.data = DeepMerge(record.data or {}, v)
         else
             if k == 'pos_x' or k == 'pos_y' then posChanged = true end
+            -- Ownership transfer (companies, plot sales) must reindex too.
+            if k == 'owner' and v ~= record.owner then
+                ownerRemove(record)
+                ownerChanged = true
+            end
             record[k] = v
         end
     end
@@ -122,6 +177,10 @@ function State.Update(id, patch)
         indexRemove(record)
         record.cell = State.CellKey(record.pos_x, record.pos_y)
         indexAdd(record)
+    end
+
+    if ownerChanged then
+        ownerAdd(record)
     end
 
     markDirty(id)
@@ -136,6 +195,7 @@ function State.Remove(id)
     if not record then return false end
 
     indexRemove(record)
+    ownerRemove(record)
     State.crops[id] = nil
     State.dirty[id] = nil
     State.deleted[id] = true
@@ -158,6 +218,36 @@ function State.GetByCell(cellKey)
         end
     end
     return out
+end
+
+--- All crop records across several spatial cells (used by the sync layer to
+--- build a subscription snapshot).
+---@param cellKeys string[]
+---@return table[]
+function State.GetByCells(cellKeys)
+    local out = {}
+    for _, cellKey in ipairs(cellKeys) do
+        local bucket = State.cells[cellKey]
+        if bucket then
+            for id in pairs(bucket) do
+                out[#out + 1] = State.crops[id]
+            end
+        end
+    end
+    return out
+end
+
+--- Number of active crops owned by an identifier. Scans only that owner's
+--- bucket (bounded by MaxCropsPerPlayer), never the whole hot state.
+---@param identifier string
+---@return number
+function State.CountByOwner(identifier)
+    local bucket = identifier and State.owners[identifier]
+    if not bucket then return 0 end
+
+    local n = 0
+    for _ in pairs(bucket) do n = n + 1 end
+    return n
 end
 
 --- All crop records in a named zone.
@@ -199,6 +289,7 @@ function State.LoadAll()
 
     State.crops = {}
     State.cells = {}
+    State.owners = {}
     State.dirty = {}
     State.deleted = {}
 
@@ -233,6 +324,7 @@ function State.LoadAll()
 
         State.crops[record.id] = record
         indexAdd(record)
+        ownerAdd(record)
     end
 
     State.loaded = true

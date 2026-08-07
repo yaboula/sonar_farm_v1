@@ -287,14 +287,8 @@ function Validation.CropLimit(source)
     local identifier = Bridge.GetIdentifier(source)
     if not identifier then return OK end
 
-    local owned = 0
-    for _, record in pairs(State.All()) do
-        if record.owner == identifier then
-            owned = owned + 1
-            if owned >= limit then
-                return fail(REJECT.CROP_LIMIT_REACHED)
-            end
-        end
+    if State.CountByOwner(identifier) >= limit then
+        return fail(REJECT.CROP_LIMIT_REACHED)
     end
 
     return OK
