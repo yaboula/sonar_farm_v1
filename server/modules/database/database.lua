@@ -169,18 +169,21 @@ local function chunk(arr, size)
     return chunks
 end
 
--- Nullable columns. Sent as '' and converted to SQL NULL via NULLIF so the
--- parameter array never contains nil (a nil hole breaks array binding).
--- `slot` relies on slot indices being 1-based: NULLIF(0, '') would store a real
--- slot 0 as NULL, because '' casts to 0 in the comparison.
-local NULLABLE_COLUMNS = { owner = true, zone = true, slot = true, data = true }
+-- Nullable STRING columns: sent as '' and converted to SQL NULL via NULLIF so
+-- the parameter array never contains nil (a nil hole breaks array binding).
+local NULLABLE_STR_COLUMNS = { owner = true, zone = true, data = true }
+
+-- Nullable INT columns: sent as Lua nil directly (oxmysql maps nil → NULL).
+-- NULLIF(?, '') does NOT work for numeric columns: MySQL can't compare 2 = ''
+-- on a DECIMAL/INT column and throws "Truncated incorrect DECIMAL value".
+local NULLABLE_INT_COLUMNS = { slot = true }
 
 -- Prebuilt upsert statement (placeholders only, never string concatenation).
 local UPSERT_SQL do
     local cols, placeholders, updates = {}, {}, {}
     for _, col in ipairs(UPSERT_COLUMNS) do
         cols[#cols + 1] = ('`%s`'):format(col)
-        placeholders[#placeholders + 1] = NULLABLE_COLUMNS[col] and "NULLIF(?, '')" or '?'
+        placeholders[#placeholders + 1] = NULLABLE_STR_COLUMNS[col] and "NULLIF(?, '')" or '?'
         if col ~= 'id' then
             updates[#updates + 1] = ('`%s`=VALUES(`%s`)'):format(col, col)
         end
@@ -204,7 +207,7 @@ local function serializeRow(row)
         row.crop_type,
         row.owner or '',
         row.zone or '',
-        row.slot or '',
+        row.slot or nil,   -- INT column: nil → SQL NULL (NULLIF not used for numerics)
         row.cell,
         row.pos_x,
         row.pos_y,

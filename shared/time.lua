@@ -18,10 +18,22 @@ local Time = {}
 
 local offset = 0
 
+--- Returns current unix seconds. Uses os.time() on the server and
+--- GetNetworkTimeAccurate() on the client (FiveM client Lua has no os library).
+local function unixNow()
+    if IsDuplicityVersion then
+        -- Server-side: IsDuplicityVersion is true
+        return os.time()
+    else
+        -- Client-side: GetNetworkTimeAccurate returns milliseconds
+        return math.floor(GetNetworkTimeAccurate() / 1000)
+    end
+end
+
 --- Current time in server-aligned unix seconds.
 ---@return number
 function Time.Now()
-    return os.time() + offset
+    return unixNow() + offset
 end
 
 --- Align the local clock with the server. Called by the client sync layer on
@@ -29,7 +41,7 @@ end
 ---@param serverNow number unix seconds as reported by the server
 function Time.Sync(serverNow)
     if type(serverNow) ~= 'number' then return end
-    offset = serverNow - os.time()
+    offset = serverNow - unixNow()
 end
 
 --- Current drift between the local clock and the server, in seconds.
