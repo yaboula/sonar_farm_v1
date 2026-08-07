@@ -21,10 +21,19 @@ ensure ox_target
 ensure sonar_farm
 ```
 
-`oxmysql` necesita su connection string (ejemplo):
+Las herramientas administrativas requieren las dos condiciones:
+`Config.Debug = true` y el ACE configurado. Activar debug por sí solo no da
+permisos.
 
 ```cfg
-set mysql_connection_string "mysql://user:password@localhost/database?charset=utf8mb4"
+add_ace group.admin sonar_farm.admin allow
+```
+
+`oxmysql` necesita su connection string. No guardes credenciales reales en este
+repositorio; configúrala en el entorno privado del servidor.
+
+```cfg
+set mysql_connection_string "<configured outside this repository>"
 ```
 
 ---
@@ -37,6 +46,11 @@ Hay dos formas de instalar el esquema (ambas soportadas):
 
 1. **Auto-creacion (por defecto):** con `Config.Database.AutoCreateSchema = true`, el recurso ejecuta el DDL al arrancar. Es idempotente (`CREATE TABLE IF NOT EXISTS`), asi que no daña datos existentes.
 2. **Import manual:** pon `Config.Database.AutoCreateSchema = false` e importa `database/install.sql` en tu base de datos antes de iniciar el recurso.
+
+El runtime recorre `BOOTING → READY`. Un fallo de Bridge, validación de config,
+migración o lectura inicial lo deja en `FAILED`; no acepta acciones ni
+suscripciones y nunca continúa con estado vacío como si la base de datos
+estuviera sana. Durante un stop pasa a `STOPPING`.
 
 Tuning relacionado en [`config/config.lua`](../config/config.lua):
 
@@ -158,9 +172,20 @@ Para darte material de prueba:
 
 ---
 
-## 7. Comandos de debug (solo con `Config.Debug = true`)
+## 7. Herramientas administrativas y de debug
 
-Se registran solo si el debug esta activo.
+Los comandos de diagnóstico se registran solo si `Config.Debug = true`; los
+constructores permanecen inertes mientras debug esté apagado. Para jugadores
+todos requieren además `is_player_ace_allowed <source> sonar_farm.admin`; la
+consola del servidor está autorizada. Esta doble puerta se aplica también a
+operaciones destructivas.
+
+### Constructores de zonas
+
+| Comando | Descripcion |
+| --- | --- |
+| `/farm_builder` | Diseña una zona grid y copia la configuración Lua. |
+| `/farm_slots` | Diseña una zona de slots explícitos y copia la configuración Lua. |
 
 ### Estado y persistencia (servidor, Etapa 2)
 
@@ -180,10 +205,9 @@ Pasan por **toda** la cadena autoritativa: rate limit, cooldown, anti-teleport, 
 
 | Comando | Descripcion |
 | --- | --- |
-| `/farm_plant [cropType]` | Planta en tu posicion real (default `carrot`). |
+| `/farm_plant [cropType]` | Planta en el slot configurado vacio mas cercano (default `carrot`). |
 | `/farm_water [cropId]` | Riega. Sin id, coge el cultivo mas cercano. |
 | `/farm_harvest [cropId]` | Cosecha. Sin id, coge el cultivo mas cercano. |
-| `/farm_near [radio]` | Lista cultivos cercanos segun el servidor (imprime en F8). |
 
 `/farm_water` y `/farm_harvest` resuelven el cultivo mas cercano si no pasas id, para no tener que copiar UUIDs a mano. Todos pasan por la misma capa `Actions` que usa ox_target: no hay logica especial de debug.
 
@@ -235,6 +259,9 @@ alcance de cualquier surco, avisa y no planta.
 9. Entra en un interior -> los props desaparecen. Sal -> vuelven.
 10. Con dos jugadores: A planta y B (cerca) debe ver el prop aparecer sin recargar nada. A cosecha y el prop desaparece para B.
 11. `restart sonar_farm` -> **no** deben quedar props huerfanos en el campo.
+12. Mueve al jugador a un routing bucket distinto de `0`: el servidor debe
+    cancelar la suscripción, ordenar limpieza y rechazar farming con
+    `wrong_instance`. Al volver a `0`, debe resuscribirse.
 
 ### Prueba de rendimiento
 
@@ -256,6 +283,9 @@ de `0.05 ms`.
 | Alejarse y `/farm_harvest <id>` | `You are too far away.` |
 | Cosechar cultivo ajeno con `OwnerOnlyHarvest = true` | `This crop belongs to someone else.` |
 | Plantar mas de `MaxCropsPerPlayer` | `You have reached your active crop limit.` |
+| Usar `/farm_builder`, `/farm_slots` o `/farm_debug_clear` sin ACE | Permiso denegado; no cambia estado. |
+| Ejecutar una accion antes de `READY` | `service_unavailable`; no cambia estado ni inventario. |
+| Ejecutar farming en routing bucket distinto de `0` | `wrong_instance`; caché y props se limpian. |
 
 ---
 
@@ -264,10 +294,11 @@ de `0.05 ms`.
 | Sintoma | Causa probable | Solucion |
 | --- | --- | --- |
 | `attempt to index a nil value (field 'Crops')` | Los ficheros de `config/` no estan declarados en `fxmanifest.lua` | Asegurate de que `config/config.lua`, `config/crops.lua`, `config/zones.lua` y `config/minigames.lua` estan en `shared_scripts`, y **antes** del resto. |
-| `oxmysql is not started. Persistence is unavailable.` | oxmysql no arranco antes | Revisa orden en `server.cfg` y connection string. |
+| `oxmysql is not started. Persistence is unavailable.` | oxmysql no arranco antes | Revisa orden en `server.cfg` y connection string. El runtime queda `FAILED`. |
 | `Schema creation failed: ...` | Permisos DB o connection string | Verifica credenciales/permisos `CREATE`. |
 | `Corrupt data JSON for crop <id>` | Edicion manual del campo `data` | El registro se carga con `data={}`; corrige el JSON en DB si procede. |
-| No aparecen los comandos `/farm_debug_*` o `/farm_*` | `Config.Debug = false` | Activa debug en `config/config.lua`. |
+| No aparecen los comandos `/farm_debug_*` o `/farm_*` | `Config.Debug = false` | Activa debug temporalmente en `config/config.lua`. |
+| El comando existe pero responde permiso denegado | Falta el ACE administrativo | Concede `sonar_farm.admin` al principal correcto; debug no basta. |
 | Cambios no persisten tras crash | Ventana `SaveInterval` | Es esperado en crash duro; baja `SaveInterval`. |
 | `You do not have the required seeds` teniendolas | Items no instalados en ox_inventory | Copia `data/ox_inventory_items.lua` (seccion 4) y reinicia ox_inventory. |
 | `You are not inside a farming zone` en pleno campo | (obsoleto: el plantado ya no usa radio) | Usa surcos: mira el suelo con ox_target o `/farm_plant` junto a un slot. |
@@ -279,10 +310,10 @@ de `0.05 ms`.
 | No aparece ningun prop y `cache=0` | El servidor no te ha suscrito | `/farm_resync`. Si sigue en 0, revisa que el cultivo este en tu celda o adyacente (`Config.Sync.CellRadius`). |
 | Props flotando o medio enterrados | Terreno en pendiente | `Config.Render.GroundSnap = true` (por defecto). Si persiste, el raycast no encontro suelo y se usa la z guardada. |
 | Faltan props en un campo muy poblado | Tope `Config.Render.MaxProps` alcanzado | Es intencionado: se priorizan los mas cercanos. Sube el tope solo si mides el coste. |
-| Props visibles dentro de un interior | `Config.Render.SkipInInteriors = false` | Actívalo. Los routing buckets no son legibles desde el cliente, asi que se usa la deteccion de interior. |
+| Props visibles dentro de un interior | `Config.Render.SkipInInteriors = false` | Actívalo. El interior se filtra en cliente; los routing buckets se validan en servidor. |
 | Las plantas se ven en fase equivocada | Reloj del sistema del jugador desfasado | Se corrige solo: el servidor manda `serverTime` y el cliente ajusta el offset. Comprueba `clockOffset` en `/farm_render`. |
 | Props huerfanos tras varios `restart` | Version antigua sin limpieza | Ya se destruyen en `onResourceStop`. Los huerfanos previos desaparecen al reconectar. |
-| `Plant seeds` no aparece en el campo | Fuera de la zona, o `Config.Zones` mal ubicado | La opcion cubre todo el radio de la zona; si no sale, no estas dentro. |
+| `Plant seeds` no aparece en el campo | Fuera de un slot, servicio no disponible o bucket no permitido | Acércate a una esfera de slot y confirma que el runtime está `READY`. |
 | `Usar la semilla no hace nada` | Falta `client.export` en ox_inventory | Ver seccion 6. |
 | `Stand next to an empty planting plot` usando semilla | No hay surco vacio cerca | Acercate a un slot; comprueba `grid` en `config/zones.lua`. |
 | `Something is already growing there` en surco vacio | Cache desfasada | Se auto-resynca; si persiste, `/farm_resync`. |
@@ -294,7 +325,7 @@ de `0.05 ms`.
 
 - `luac -p` es un smoke test rapido de sintaxis Lua antes de commitear: valida sintaxis, pero **no** detecta ficheros que faltan en `fxmanifest.lua`. Tras anadir un fichero nuevo, verifica siempre que esta declarado en el manifiesto.
 - El snapshot swap en `Flush` es imprescindible para no perder escrituras concurrentes durante el `await` de la DB.
-- En oxmysql, un array de parametros con un `nil` en medio rompe el binding (Lua no distingue hueco de fin de array). Para columnas nullable, enviar `''` y usar `NULLIF(?, '')` en el SQL.
+- En oxmysql, un array de parametros con un `nil` en medio rompe el binding (Lua no distingue hueco de fin de array). Las cadenas nullable usan `''` + `NULLIF(?, '')`; el slot numérico usa el sentinel `0` + `NULLIF(?, 0)`.
 - Validar la posicion con `GetEntityCoords(GetPlayerPed(source))` en el servidor, no con el `vector3` que envia el cliente. Es la diferencia entre un anti-cheat real y uno decorativo.
 - El anti-teleport necesita tolerancia o castiga a jugadores legitimos: al conectar y al cambiar de routing bucket o interior, las coordenadas del servidor son poco fiables (a veces el origen del mapa). Tres guardas lo cubren: la primera muestra solo inicializa la cache, las muestras viejas se descartan y hay grace period al conectar.
 - Cada modulo libera en `playerDropped` lo que el mismo reserva (buckets en `ratelimit`, cache de posicion y cooldowns en `validation`). Centralizar la limpieza en un modulo ajeno acopla y se olvida una tabla; los cooldowns eran justo esa tercera tabla facil de olvidar.
@@ -307,11 +338,11 @@ de `0.05 ms`.
 - Un snapshot que reemplaza la cache puede tragarse los deltas que llegan durante el viaje de ida y vuelta. Hay que **bufferearlos** mientras la suscripcion esta en vuelo y reaplicarlos despues, o un cultivo plantado en esa ventana queda invisible hasta el siguiente cambio de celda.
 - Las celdas suscritas se derivan de la posicion real en el servidor y el callback **no acepta argumentos**. Si el cliente pudiera nombrar sus celdas, podria volcar todos los cultivos del mapa y sus propietarios.
 - Al cliente se le manda `isMine`, nunca el `citizenid` ajeno. No hay ninguna funcionalidad que lo necesite y filtrarlo alimenta metagaming.
-- `canInteract` de ox_target se ejecuta mientras el jugador apunta, asi que no puede contener busquedas. Capturar el `cropId` en el closure de la opcion (los props se recrean en cada cambio de fase, asi que siempre esta ligado al cultivo correcto) sale gratis; buscar el id recorriendo el pool costaria por frame.
+- `canInteract` de ox_target se ejecuta mientras el jugador apunta. Las opciones viven en la esfera permanente del slot y consultan directamente su ocupante: vacío muestra plantar; ocupado muestra inspeccionar/regar/cosechar sin superposición.
 - La distancia de ox_target debe quedar **por debajo** de `MaxInteractDistance`. Igualarlas hace que el jugador vea rechazos `too_far` apuntando a algo que el target le dejaba pulsar.
 - Sin `onResourceStop` que destruya los props, cada `restart` en desarrollo deja objetos huerfanos que nadie puede borrar. Se sufre veinte veces al dia.
 - No existe un native fiable para escalar props, asi que la variacion visual es solo rotacion. Derivarla del `cropId` (y no de `math.random`) es lo que garantiza que dos jugadores vean la misma planta igual.
 - La validacion de modelos al arrancar no es un lujo: sin ella, un nombre de prop equivocado no da ningun error, simplemente no aparece nada, y se pierde una tarde depurando el streaming.
 - El plantado libre (radio) se veia flexible y resulto ser el enemigo de la estetica y de la economia: sin slots, no hay tope real por zona y las plantas se solapan. Con slots, la capacidad es una decision de diseno (`rows * cols`).
-- Los indices de slot son 1-based a proposito: el truco `NULLIF(?, '')` de oxmysql trata el `0` como vacio, asi que un slot `0` se guardaria como NULL.
+- Los indices de slot son 1-based a proposito: `0` queda reservado como sentinel denso y `NULLIF(?, 0)` lo convierte en SQL `NULL`.
 - Plantar dos jugadores el mismo surco a la vez requiere lock por `zone:slot`, no solo por `cropId`: el occupancy check no es atomico sin el.

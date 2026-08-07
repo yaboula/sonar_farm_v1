@@ -6,6 +6,36 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
 
 ## [Unreleased]
 
+### Stabilized — Puerta obligatoria de Etapas 1–4
+
+- Runtime fail-closed con estados explícitos `BOOTING`, `READY`, `FAILED` y
+  `STOPPING`. Las acciones y suscripciones se rechazan hasta completar Bridge,
+  migraciones y carga de estado; un error SQL ya no se interpreta como tabla
+  vacía.
+- Validación de configuración al arranque para frameworks, ACE, cultivos,
+  modelos, zonas, slots, límites, sincronización, render y routing buckets.
+- QB-Core es el único adaptador operativo. La autodetección es determinista y
+  ESX/Qbox fallan con un error claro mientras sigan siendo stubs.
+- `Config.Debug = false` por defecto. Todos los comandos de diagnóstico,
+  operaciones destructivas y constructores requieren además el ACE
+  `sonar_farm.admin`; debug nunca concede privilegios por sí mismo.
+- Farming público limitado por defecto al routing bucket `0`, con cancelación
+  de suscripción y limpieza del cliente al cambiar de instancia.
+- Eliminado el callback legado `sonar_farm:nearby`, que exponía identificadores.
+  Las suscripciones tienen ahora un token bucket separado y logs de flood
+  amortiguados.
+- Estado endurecido: UUID con semilla de entropía, comprobación de colisión,
+  índices de celda/propietario/slot verificados al cargar, detección de slots
+  huérfanos, cultivos desconocidos, duplicados y reparación de celdas obsoletas.
+- La persistencia nullable usa arrays densos: strings mediante `''` y
+  `NULLIF(?, '')`; slots mediante `0` y `NULLIF(?, 0)`.
+- Resuscripción forzada tras hot restart y buffer de deltas durante snapshots.
+  El pool administra cultivos y props de slots por tags independientes.
+- Restaurados tiempos de crecimiento de producción para los cuatro cultivos.
+- Suite Lua ejecutable fuera de FiveM y CI para parseo, regresiones, whitespace
+  y detección básica de secretos. `Config.Features.Minigames` continúa en
+  `false`; no se añadió código de Etapa 5.
+
 ### Added
 
 - **Zone Builder premium (`/farm_builder`):** Herramienta de administración in-game para diseñar zonas de cuadrícula en tiempo real.
@@ -39,7 +69,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
 ### Fixed
 
 - **Corrección de incompatibilidad en `shared/time.lua`:** `os.time()` provocaba `attempt to index a nil value (global 'os')` en el cliente FiveM debido a que el runtime cliente de Lua no expone la librería `os`. Reemplazado por comprobación `type(os) == 'table'` que utiliza `GetNetworkTimeAccurate() / 1000` en cliente y `os.time()` en servidor.
-- **Corrección de bind SQL en `server/modules/database/database.lua`:** `NULLIF(slot, '')` provocaba `Truncated incorrect DECIMAL value` en MySQL al intentar comparar una columna numérica (`INT`) con una cadena vacía (`''`). Se separaron las columnas nulas por tipo: `NULLABLE_STR_COLUMNS` conserva `NULLIF`, mientras que `slot` se envía como `nil` directo a oxmysql.
+- **Corrección de bind SQL en `server/modules/database/database.lua`:** `NULLIF(slot, '')` provocaba `Truncated incorrect DECIMAL value` en MySQL al intentar comparar una columna numérica (`INT`) con una cadena vacía (`''`). Se separaron las columnas nulas por tipo: strings con `NULLIF(?, '')` y `slot` con el sentinel denso `0` convertido mediante `NULLIF(?, 0)`.
 - **Refresco visual inmediato tras sync (`client/modules/sync/client.lua`):** Al recibir los eventos de red `CROP_SYNC` o `CROP_REMOVE`, se invoca inmediatamente `Crops.Refresh()` para crear/destruir el prop en la misma trama, eliminando la espera de hasta 2000ms del bucle de sincronización.
 - **Unificación de targets en esferas permanentes (`client/modules/zones/slots.lua`):** Elimina la pérdida del indicador azul de `ox_target` y las opciones tras plantar. Todas las interacciones de surco (`Plant seeds`, `Inspect`, `Water`, `Harvest`) conviven de forma permanente en la esfera `addSphereZone` de cada slot con filtrado por `canInteract`, eliminando raycasts fallidos sobre modelos de prop sin colisión física.
 - `Growth.Evaluate` y la evaluacion pura de `Physiology` se mueven a `shared/` (`shared/growth.lua`, `shared/physiology.lua`). El cliente predice el crecimiento para renderizar, y con dos copias de la formula la divergencia seria cuestion de tiempo. Los mutadores (`Physiology.Apply`, `Physiology.Water`) siguen siendo exclusivos del servidor.
@@ -78,7 +108,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
   - Wrapper `Bridge.Target.AddSphereZone`, que encaja con zonas definidas por centro y radio.
 
 - **Etapa 3 — Logica Autoritativa, Anti-Exploit y Fisiologia Vegetal:**
-  - Bucle de gameplay completo como callbacks de `ox_lib` con respuesta uniforme `{ ok, reason, data }`: `sonar_farm:plant`, `sonar_farm:water`, `sonar_farm:harvest` y la consulta de solo lectura `sonar_farm:nearby`.
+  - Bucle de gameplay completo como callbacks de `ox_lib` con respuesta uniforme `{ ok, reason, data }`: `sonar_farm:plant`, `sonar_farm:water` y `sonar_farm:harvest`.
   - Posicion validada siempre en servidor con `GetEntityCoords(GetPlayerPed(source))`; las coordenadas del cliente se ignoran, lo que elimina noclip e interaccion a distancia.
   - Rate limiting por token bucket sin ticks (`server/modules/security/ratelimit.lua`), con recarga perezosa por tiempo transcurrido.
   - Validacion multinivel (`server/modules/security/validation.lua`): cooldown por accion, distancia real, anti-teleport, zona y cultivo permitido, herramienta, estado del cultivo, permisos y limite de cultivos por jugador.
@@ -90,7 +120,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
   - Eventos publicos para integraciones: `sonar_farm:cropPlanted`, `sonar_farm:cropWatered`, `sonar_farm:cropHarvested`.
   - Contenido: 4 verduras con fisiologia diferenciada (carrot, potato, lettuce, tomato), 2 zonas de Grapeseed (una con cultivos restringidos) e items de ox_inventory en `data/ox_inventory_items.lua`.
   - Configuracion nueva: `Config.Security`, `Config.Cooldowns`, `Config.Farming` y `Config.Quality`.
-  - Comandos de cliente para probar el bucle real (`/farm_plant`, `/farm_water`, `/farm_harvest`, `/farm_near`), con traduccion de codigos de rechazo en el cliente.
+  - Comandos de cliente para probar el bucle real (`/farm_plant`, `/farm_water`, `/farm_harvest`), con traduccion de codigos de rechazo en el cliente.
   - Documentacion: `docs/API.md` (callbacks, codigos de rechazo, eventos y punto de extension de calidad).
 
 - **Etapa 2 — Motor de Estado en Memoria y Persistencia Asincrona:**

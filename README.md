@@ -7,8 +7,8 @@ Script de farming escalable para **FiveM**, disenado como **plataforma** (no com
 ## Filosofia
 
 - **Server-authoritative (Zero-Trust):** el servidor es la unica fuente de verdad; el cliente solo envia intencion.
-- **Data-driven:** el contenido (cultivos, zonas, minijuegos) vive en config, no en el codigo.
-- **Escalabilidad por diseno:** Bridge Layer multi-framework, plugin system (`RegisterCrop`), minijuegos registrables.
+- **Data-driven:** los cultivos y las zonas actuales viven en config, no en el codigo.
+- **Escalabilidad por diseno:** Bridge desacoplado y contratos internos preparados para ampliar el producto por etapas.
 - **Rendimiento primero:** 0.00 ms en reposo, crecimiento sin ticks (timestamp), culling agresivo, props client-side.
 
 ## Stack y dependencias
@@ -17,7 +17,7 @@ Script de farming escalable para **FiveM**, disenado como **plataforma** (no com
 | ------------- | ------------------------------------------------ | ----------- |
 | QB-Core       | Framework base (MVP)                             | Si          |
 | ox_lib        | Notify, context menu, input, progressbar         | Si          |
-| ox_inventory  | Inventario + metadata (quality, freshness)       | Si          |
+| ox_inventory  | Inventario + metadata de calidad                 | Si          |
 | ox_target     | Interaccion por objetivo                         | Si          |
 | oxmysql       | Persistencia (a partir de Etapa 2)               | Si          |
 
@@ -36,10 +36,9 @@ sonar_farm/
       database/  Acceso a datos (oxmysql)
       state/     Hot-state en RAM + crecimiento por timestamp
       security/  Rate limiting y validacion anti-exploit
-      farming/   Acciones autoritativas: plant, care, harvest, query
+      farming/   Acciones autoritativas: plant, care, harvest
       logger/    Logging por niveles con conectores
-  client/        Motor visual, interaccion y minijuegos
-  web/           SPA de NUI (React + Vite + Tailwind) — a partir de Etapa 9
+  client/        Motor visual, interaccion y herramientas de administracion
   docs/          Documentacion tecnica (espanol)
 ```
 
@@ -48,13 +47,19 @@ sonar_farm/
 1. Clonar dentro de `resources/[local]/` de tu servidor FiveM.
 2. Asegurar que `oxmysql`, `qb-core`, `ox_lib`, `ox_inventory` y `ox_target` estan iniciados antes.
 3. Copiar los items de [`data/ox_inventory_items.lua`](data/ox_inventory_items.lua) a `ox_inventory/data/items.lua` y reiniciar `ox_inventory`.
-4. Anadir `ensure sonar_farm` a tu `server.cfg`.
+4. Conceder `sonar_farm.admin` solo a administradores que deban usar las
+   herramientas de desarrollo.
+5. Anadir `ensure sonar_farm` a tu `server.cfg`.
+
+```cfg
+add_ace group.admin sonar_farm.admin allow
+```
 
 El esquema de base de datos se crea solo al arrancar (`Config.Database.AutoCreateSchema`). Detalles y alternativa manual en [docs/RUNBOOK.md](docs/RUNBOOK.md).
 
 ## Estado del proyecto
 
-En construccion por etapas. Ver [docs/DECISIONES.md](docs/DECISIONES.md) para la vision completa, [docs/API.md](docs/API.md) para la superficie publica y [CHANGELOG.md](CHANGELOG.md) para el historial.
+Etapas 1–4 estabilizadas. Ver [docs/DECISIONES.md](docs/DECISIONES.md) para la vision completa, [docs/API.md](docs/API.md) para el contrato actual y [CHANGELOG.md](CHANGELOG.md) para el historial.
 
 - [x] Etapa 1 — Bootstrap del recurso + Bridge Layer
 - [x] Etapa 2 — Motor de estado + persistencia
@@ -66,3 +71,8 @@ En construccion por etapas. Ver [docs/DECISIONES.md](docs/DECISIONES.md) para la
 Los cultivos ya se ven y se interactuan con `ox_target`. Plantar funciona usando el item de semilla o desde el menu del campo. La barra de progreso actual es un **placeholder deliberado** que la Etapa 5 sustituye por minijuegos.
 
 **Requisito de la Etapa 4:** los props de plantas (`bzzz_plants_*`) viven en su propio recurso de streaming, que debe estar iniciado. Si falta, el cliente avisa por consola con el nombre exacto del modelo y usa un respaldo. Ver [docs/RUNBOOK.md](docs/RUNBOOK.md).
+
+La version actual soporta **QB-Core**. Los adaptadores ESX y Qbox son stubs
+deliberados: si se seleccionan o detectan, el arranque falla de forma explicita
+en lugar de aceptar jugadores con un Bridge incompleto. `Config.Debug` viene
+desactivado; activarlo no concede permisos sin el ACE configurado.

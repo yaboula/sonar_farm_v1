@@ -35,6 +35,11 @@ Todos los callbacks devuelven exactamente esta estructura:
 El servidor nunca genera texto para el jugador; el cliente traduce el código.
 Esto mantiene el servidor agnóstico al idioma y evita duplicar textos.
 
+Todos los callbacks de jugador pueden rechazar con `service_unavailable`,
+`player_not_ready` o `wrong_instance` antes de evaluar la acción. Así no se
+expone ni muta estado durante el arranque, sin personaje válido o fuera del
+routing bucket público.
+
 ### Coordenadas: nunca las del cliente
 
 El servidor obtiene la posición del jugador con
@@ -231,8 +236,10 @@ local response = lib.callback.await('sonar_farm:subscribe', false)
 }
 ```
 
-Con `ok = false` el ped todavía no ha hecho streaming y el cliente reintenta en su
-siguiente pasada.
+Con `ok = false` el servicio aún no está listo, el personaje no está disponible,
+el jugador no está en el routing bucket público o se ha superado el límite
+específico de suscripciones. El cliente limpia su caché cuando corresponde y
+reintenta sin exponer estado anterior.
 
 **Dos detalles del payload que importan**
 
@@ -250,44 +257,15 @@ del sistema mal vería las plantas en la fase equivocada.
 
 ---
 
-### `sonar_farm:nearby`
-
-Consulta de solo lectura. No muta estado ni toca inventario.
-
-**Petición**
-
-```lua
-local crops = lib.callback.await('sonar_farm:nearby', false, 20.0) -- radio, máx 50
-```
-
-**Respuesta**
-
-```lua
-{
-    {
-        cropId = 'a3f1c9e2-...',
-        cropType = 'carrot',
-        owner = 'BIV71460',
-        distance = 3.4,
-        state = 'mature',
-        progress = 100,   -- porcentaje
-        water = 42.5,
-        health = 88.0,
-    },
-}
-```
-
-La Etapa 4 sustituye este escaneo por radio por suscripciones a celdas
-espaciales.
-
----
-
 ## 3. Códigos de rechazo
 
 Definidos en `Sonar.Constants.REJECT`. El cliente los traduce a texto.
 
 | Código                  | Significado                                  |
 | ----------------------- | -------------------------------------------- |
+| `service_unavailable`   | Runtime aún no está en estado `READY`        |
+| `player_not_ready`      | Framework/personaje/identifier no disponible |
+| `wrong_instance`        | Routing bucket no permitido                  |
 | `rate_limited`          | El jugador está saturando eventos            |
 | `cooldown`              | Acción repetida demasiado rápido             |
 | `too_far`               | Fuera del rango de interacción               |
@@ -387,6 +365,9 @@ un mínimo de 1 unidad.
 | `Config.Farming.WaterRefillThreshold`| `95`    | Agua por encima de la cual no se puede regar    |
 | `Config.Security.MaxInteractDistance`| `3.0`   | Distancia máxima de interacción (m)             |
 | `Config.Security.MaxSpeedMps`        | `60.0`  | Velocidad implícita que se considera sospechosa |
+| `Config.Security.AllowedRoutingBuckets` | `{ 0 }` | Instancias donde se permite farming público  |
+| `Config.Security.SubscriptionBucket` | `3 / 1s` | Presupuesto separado para snapshots           |
+| `Config.Admin.Ace`                    | `sonar_farm.admin` | ACE de herramientas administrativas |
 | `Config.Quality.DefaultScore`        | `75`    | Puntuación del proveedor stub                   |
 | `Config.Quality.MechanizedCap`       | `80`    | Techo de calidad del trabajo automatizado       |
 | `Config.Sync.CellRadius`             | `1`     | Celdas alrededor del jugador (1 = bloque 3x3)   |
@@ -409,12 +390,13 @@ permisos, pero sí predice qué modelo toca mostrar.
 | ------------------------------------- | -------------------------------------------------------- |
 | `client/modules/render/pool.lua`      | Pool genérico de entidades no networkeadas por clave      |
 | `client/modules/render/crops.lua`     | Caché local, predicción, fases, culling y tope de props   |
-| `client/modules/render/target.lua`    | Opciones de ox_target ancladas al prop                    |
+| `client/modules/zones/slots.lua`      | Esferas permanentes: plantar vacío; operar ocupado        |
 | `client/modules/sync/client.lua`      | Hilo único adaptativo, suscripción y deltas               |
 | `client/modules/interaction/actions.lua` | Punto único de acción, traducción de rechazos, resync  |
 
-El pool es **agnóstico al contenido**: gestiona entidades por clave y no sabe qué es
-un cultivo, así que la maquinaria de la Etapa 9 lo reutiliza sin cambios.
+El pool es **agnóstico al contenido** y separa entidades por tag. Los props de
+cultivos y los props opcionales de slots se refrescan y destruyen de forma
+independiente.
 
 ### Autocorrección
 
