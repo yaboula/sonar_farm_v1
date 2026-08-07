@@ -36,8 +36,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
 - **`zone1` (local test):** Primera zona de slots explícitos añadida a `config/zones.lua`. 24 slots dispuestos en dos filas diagonales, restringida a `tomato`, con headings individuales por slot y centroide calculado exacto.
 
 
+### Fixed
 
-- **Plantado por slots fijos** en lugar de plantado libre dentro de un radio. Cada zona define surcos (`grid` y/o `slots` en `config/zones.lua`); el cliente mira un surco vacio con ox_target (o usa la semilla sobre el slot mas cercano). Las coordenadas del cultivo salen siempre de config en el servidor.
+- **Corrección de incompatibilidad en `shared/time.lua`:** `os.time()` provocaba `attempt to index a nil value (global 'os')` en el cliente FiveM debido a que el runtime cliente de Lua no expone la librería `os`. Reemplazado por comprobación `type(os) == 'table'` que utiliza `GetNetworkTimeAccurate() / 1000` en cliente y `os.time()` en servidor.
+- **Corrección de bind SQL en `server/modules/database/database.lua`:** `NULLIF(slot, '')` provocaba `Truncated incorrect DECIMAL value` en MySQL al intentar comparar una columna numérica (`INT`) con una cadena vacía (`''`). Se separaron las columnas nulas por tipo: `NULLABLE_STR_COLUMNS` conserva `NULLIF`, mientras que `slot` se envía como `nil` directo a oxmysql.
+- **Refresco visual inmediato tras sync (`client/modules/sync/client.lua`):** Al recibir los eventos de red `CROP_SYNC` o `CROP_REMOVE`, se invoca inmediatamente `Crops.Refresh()` para crear/destruir el prop en la misma trama, eliminando la espera de hasta 2000ms del bucle de sincronización.
+- **Unificación de targets en esferas permanentes (`client/modules/zones/slots.lua`):** Elimina la pérdida del indicador azul de `ox_target` y las opciones tras plantar. Todas las interacciones de surco (`Plant seeds`, `Inspect`, `Water`, `Harvest`) conviven de forma permanente en la esfera `addSphereZone` de cada slot con filtrado por `canInteract`, eliminando raycasts fallidos sobre modelos de prop sin colisión física.
 - `Growth.Evaluate` y la evaluacion pura de `Physiology` se mueven a `shared/` (`shared/growth.lua`, `shared/physiology.lua`). El cliente predice el crecimiento para renderizar, y con dos copias de la formula la divergencia seria cuestion de tiempo. Los mutadores (`Physiology.Apply`, `Physiology.Water`) siguen siendo exclusivos del servidor.
 - `Validation.CropLimit` ya no recorre todo el estado: `State` mantiene un indice por propietario (`State.owners`, `State.CountByOwner`) actualizado en `Add`, `Remove`, `Update` y `LoadAll`. Era la deuda declarada al cerrar la Etapa 3.
 
