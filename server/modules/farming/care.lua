@@ -64,6 +64,7 @@ lib.callback.register(CALLBACKS.WATER, function(source, payload)
         Physiology.Water(record, waterAmount(score))
 
         local updated = State.Get(record.id)
+        Sync.OnCropChanged(updated or record)
 
         TriggerEvent(PUBLIC.CROP_WATERED, {
             cropId = record.id,

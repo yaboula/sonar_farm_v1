@@ -32,14 +32,19 @@ RegisterCommand('farm_debug_plant', function(src, args)
     local growthTime = tonumber(args[2]) or 300
     local x, y, z, h = resolveCoords(src)
 
-    local id = State.Add({
+    local id, record = State.Add({
         crop_type = cropType,
         owner = (src and src > 0) and Bridge.GetIdentifier(src) or nil,
         zone = 'debug',
         pos_x = x, pos_y = y, pos_z = z, heading = h,
+        planted_at = Sonar.Time.Now(),
         growth_time = growthTime,
-        data = { water = 100, health = 100 },
+        data = { water = 100, health = 100, lastCare = Sonar.Time.Now() },
     })
+
+    -- Keep subscribed clients in sync, or the debug crop renders for nobody
+    -- until they cross a cell boundary.
+    Sync.OnCropChanged(record)
 
     reply(src, ('Planted %s (id=%s, growth=%ds) at %.1f, %.1f, %.1f'):format(cropType, id, growthTime, x, y, z))
 end, false)
@@ -77,10 +82,15 @@ end, false)
 
 -- /farm_debug_clear
 RegisterCommand('farm_debug_clear', function(src)
-    local ids = {}
-    for id in pairs(State.crops) do ids[#ids + 1] = id end
-    for _, id in ipairs(ids) do State.Remove(id) end
-    reply(src, ('Cleared %d crops (queued for deletion).'):format(#ids))
+    local targets = {}
+    for id, record in pairs(State.crops) do
+        targets[#targets + 1] = { id = id, cell = record.cell }
+    end
+    for _, target in ipairs(targets) do
+        State.Remove(target.id)
+        Sync.OnCropRemoved(target.id, target.cell)
+    end
+    reply(src, ('Cleared %d crops (queued for deletion).'):format(#targets))
 end, false)
 
 Logger.Info('Debug commands registered (/farm_debug_plant|dump|grow|save|clear).', 'debug')

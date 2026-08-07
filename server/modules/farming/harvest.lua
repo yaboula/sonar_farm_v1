@@ -47,6 +47,7 @@ lib.callback.register(CALLBACKS.HARVEST, function(source, payload)
         -- A dead crop yields nothing; clear it so the plot is usable again.
         if condition.state == CROP_STATE.DEAD then
             State.Remove(record.id)
+            Sync.OnCropRemoved(record.id, record.cell)
             return reject(REJECT.CROP_DEAD)
         end
 
@@ -72,6 +73,7 @@ lib.callback.register(CALLBACKS.HARVEST, function(source, payload)
         end
 
         State.Remove(record.id)
+        Sync.OnCropRemoved(record.id, record.cell)
 
         Logger.Info(('Harvested %s x%d (quality %.1f, %s).')
             :format(record.crop_type, units, quality, metadata.tier), 'farming', {

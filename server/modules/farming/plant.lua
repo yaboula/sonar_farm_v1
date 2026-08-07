@@ -62,7 +62,7 @@ lib.callback.register(CALLBACKS.PLANT, function(source, payload)
     local now = os.time()
     local ped = GetPlayerPed(source)
 
-    local cropId = State.Add({
+    local cropId, record = State.Add({
         crop_type = cropType,
         owner = Bridge.GetIdentifier(source),
         zone = zone.zoneKey,
@@ -81,6 +81,8 @@ lib.callback.register(CALLBACKS.PLANT, function(source, payload)
             plantScore = score,
         },
     })
+
+    Sync.OnCropChanged(record)
 
     Logger.Info(('Planted %s (%s) in zone %s.'):format(cropType, cropId, zone.zoneKey), 'farming', {
         source = source,

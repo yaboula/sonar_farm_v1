@@ -60,11 +60,16 @@ Constants.CALLBACKS = {
     WATER = 'sonar_farm:water',
     HARVEST = 'sonar_farm:harvest',
     NEARBY = 'sonar_farm:nearby',
+    SUBSCRIBE = 'sonar_farm:subscribe',
 }
 
 -- Networked event names. Prefixed to avoid collisions with other resources.
 Constants.EVENTS = {
     BRIDGE_READY = 'sonar_farm:bridgeReady',
+    -- Server -> client render deltas (Stage 4). Sent only to the players
+    -- subscribed to the affected spatial cell.
+    CROP_SYNC = 'sonar_farm:cropSync',
+    CROP_REMOVE = 'sonar_farm:cropRemove',
 }
 
 -- Public server events other resources can listen to (platform API).
