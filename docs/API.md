@@ -179,6 +179,66 @@ local response = lib.callback.await('sonar_farm:harvest', false, {
 
 ---
 
+### `sonar_farm:subscribe`
+
+Suscribe al jugador a su celda espacial y las 8 adyacentes, y devuelve el snapshot
+de esos cultivos. A partir de ahí el jugador recibe **solo deltas** de esas celdas.
+
+**No acepta argumentos, y es deliberado.** El servidor deriva las celdas de la
+posición real del jugador. Si el cliente pudiera nombrar sus celdas, un cliente
+modificado podría suscribirse a celdas arbitrarias y volcar todos los cultivos del
+mapa junto con quién es dueño de cada uno.
+
+**Petición**
+
+```lua
+local response = lib.callback.await('sonar_farm:subscribe', false)
+```
+
+**Respuesta**
+
+```lua
+{
+    ok = true,
+    cells = { '22:50', '22:51', ... },   -- celdas suscritas
+    serverTime = 1786000000,             -- para alinear el reloj del cliente
+    crops = {
+        {
+            id = 'a3f1c9e2-...',
+            cropType = 'carrot',
+            cell = '22:50',
+            x = 2236.8, y = 5031.6, z = 44.2,
+            heading = 180.0,
+            plantedAt = 1785999400,
+            growthTime = 900,
+            water = 82.5,
+            health = 100,
+            lastCare = 1785999400,
+            isMine = true,
+        },
+    },
+}
+```
+
+Con `ok = false` el ped todavía no ha hecho streaming y el cliente reintenta en su
+siguiente pasada.
+
+**Dos detalles del payload que importan**
+
+- **Lleva timestamps, no estado calculado.** El cliente deriva el crecimiento y la
+  condición localmente con las fórmulas compartidas (`shared/growth.lua`,
+  `shared/physiology.lua`). Un campo lleno de cultivos creciendo **no genera ni un
+  byte** de red mientras crece. El cliente solo puede equivocarse en lo que
+  *dibuja*; toda acción la sigue decidiendo el servidor.
+- **`isMine` en lugar del identificador.** El `citizenid` de otro jugador nunca
+  llega a un cliente, así que nadie puede volcar quién es dueño de qué campo. Se
+  calcula por destinatario.
+
+`serverTime` permite al cliente corregir su reloj: sin eso, un jugador con la hora
+del sistema mal vería las plantas en la fase equivocada.
+
+---
+
 ### `sonar_farm:nearby`
 
 Consulta de solo lectura. No muta estado ni toca inventario.
@@ -256,6 +316,15 @@ end)
 | `sonar_farm:cropWatered`    | Cultivo regado     | `cropId`, `cropType`, `owner`, `source`          |
 | `sonar_farm:cropHarvested`  | Cultivo cosechado  | `+ quality`, `units`, `theft`, `xp`              |
 
+Los deltas de render (`sonar_farm:cropSync`, `sonar_farm:cropRemove`) **no** son API
+pública: son el transporte interno del motor visual y pueden cambiar. Los eventos de
+arriba son el contrato estable para terceros.
+
+Por eso el motor de sincronización se dispara con llamadas explícitas
+(`Sync.OnCropChanged`, `Sync.OnCropRemoved`) desde los handlers, en lugar de
+escuchar los eventos públicos: hacer que el funcionamiento interno dependa de una
+superficie que otros pueden modificar sería frágil.
+
 ---
 
 ## 5. Punto de extensión: proveedores de calidad
@@ -307,3 +376,36 @@ un mínimo de 1 unidad.
 | `Config.Security.MaxSpeedMps`        | `60.0`  | Velocidad implícita que se considera sospechosa |
 | `Config.Quality.DefaultScore`        | `75`    | Puntuación del proveedor stub                   |
 | `Config.Quality.MechanizedCap`       | `80`    | Techo de calidad del trabajo automatizado       |
+| `Config.Sync.CellRadius`             | `1`     | Celdas alrededor del jugador (1 = bloque 3x3)   |
+| `Config.Sync.TickNear`               | `500`   | Intervalo (ms) con cultivos cerca               |
+| `Config.Sync.TickFar`                | `2000`  | Intervalo (ms) sin cultivos cerca               |
+| `Config.Render.Radius`               | `30.0`  | Distancia (m) a la que se crean props           |
+| `Config.Render.MaxProps`             | `50`    | Tope duro de props simultáneos                  |
+| `Config.Render.TargetDistance`       | `2.2`   | Distancia de ox_target (bajo el límite servidor)|
+| `Config.Render.GroundSnap`           | `true`  | Asentar props con raycast al suelo              |
+| `Config.Render.FallbackModel`        | —       | Modelo usado si el prop configurado no existe   |
+
+---
+
+## 7. Motor visual (cliente)
+
+El cliente es "tonto" en decisiones y "listo" en dibujo: no calcula rendimientos ni
+permisos, pero sí predice qué modelo toca mostrar.
+
+| Módulo                                | Responsabilidad                                          |
+| ------------------------------------- | -------------------------------------------------------- |
+| `client/modules/render/pool.lua`      | Pool genérico de entidades no networkeadas por clave      |
+| `client/modules/render/crops.lua`     | Caché local, predicción, fases, culling y tope de props   |
+| `client/modules/render/target.lua`    | Opciones de ox_target ancladas al prop                    |
+| `client/modules/sync/client.lua`      | Hilo único adaptativo, suscripción y deltas               |
+| `client/modules/interaction/actions.lua` | Punto único de acción, traducción de rechazos, resync  |
+
+El pool es **agnóstico al contenido**: gestiona entidades por clave y no sabe qué es
+un cultivo, así que la maquinaria de la Etapa 9 lo reutiliza sin cambios.
+
+### Autocorrección
+
+Un rechazo del servidor cuyo motivo implique caché obsoleta (`crop_not_found`,
+`crop_not_mature`, `crop_dead`, `already_watered`) fuerza una resuscripción. Cada
+desacuerdo con el servidor se convierte en una corrección, que es precisamente lo
+que hace segura la predicción del cliente.

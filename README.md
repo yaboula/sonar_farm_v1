@@ -59,8 +59,10 @@ En construccion por etapas. Ver [docs/DECISIONES.md](docs/DECISIONES.md) para la
 - [x] Etapa 1 — Bootstrap del recurso + Bridge Layer
 - [x] Etapa 2 — Motor de estado + persistencia
 - [x] Etapa 3 — Logica de servidor autoritativa (plantar / cuidar / cosechar)
-- [ ] Etapa 4 — Motor visual (streaming/culling)
+- [x] Etapa 4 — Motor visual (streaming/culling + ox_target)
 - [ ] Etapa 5 — Motor de minijuegos
 - [ ] ... (ver docs/DECISIONES.md)
 
-El bucle de la Etapa 3 se prueba con comandos de cliente (`/farm_plant`, `/farm_water`, `/farm_harvest`, `/farm_near`) mientras `Config.Debug = true`. La interaccion con `ox_target` y los props llegan en la Etapa 4.
+Los cultivos ya se ven y se interactuan con `ox_target`. Plantar funciona usando el item de semilla o desde el menu del campo. La barra de progreso actual es un **placeholder deliberado** que la Etapa 5 sustituye por minijuegos.
+
+**Requisito de la Etapa 4:** los props de plantas (`bzzz_plants_*`) viven en su propio recurso de streaming, que debe estar iniciado. Si falta, el cliente avisa por consola con el nombre exacto del modelo y usa un respaldo. Ver [docs/RUNBOOK.md](docs/RUNBOOK.md).

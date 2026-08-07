@@ -155,6 +155,58 @@ La detección de movimiento imposible **debe** tolerar los casos en que las coor
 
 ---
 
+## Decisiones de la Etapa 4 (implementación)
+
+Las 23 preguntas de [CUESTIONARIO_ETAPA4.md](CUESTIONARIO_ETAPA4.md) se cerraron con las recomendaciones aceptadas. Lo que sigue es lo que condiciona etapas futuras.
+
+### La decisión que estructura el resto
+
+**El cliente deriva el crecimiento desde timestamps, no lo recibe calculado.** El crecimiento es una función pura del tiempo, así que el cliente puede predecirlo sin poder falsearlo: la predicción solo afecta a qué modelo dibuja y qué opciones ofrece, nunca a lo que recibe. Un campo lleno de cultivos creciendo no genera tráfico de red.
+
+Consecuencia obligatoria: la fórmula vive en **un solo fichero compartido** (`shared/growth.lua`, `shared/physiology.lua`), no duplicada. Con dos copias, la divergencia es cuestión de tiempo y se manifiesta como "la planta se ve madura pero el servidor no me deja cosechar". Los mutadores (`Apply`, `Water`) siguen siendo exclusivos del servidor.
+
+Segunda consecuencia: predecir desde timestamps exige que ambos lados compartan el mismo "ahora". El servidor manda `serverTime` en cada sincronización y el cliente guarda el offset, de modo que un jugador con la hora del sistema mal no ve fases equivocadas.
+
+### Sincronización
+
+- **Snapshot + deltas por celda.** El snapshot resuelve la entrada (aparecer, bajar de un coche) y los deltas el mantenimiento. Solo deltas tendría el problema del arranque en frío: quien acaba de conectar vería un campo vacío.
+- **Las celdas se derivan de la posición real en el servidor y el callback no acepta argumentos.** Si el cliente pudiera nombrar sus celdas, un cliente modificado volcaría todos los cultivos del mapa y sus propietarios.
+- **`isMine` en lugar del `citizenid`.** Ninguna funcionalidad necesita el identificador ajeno en el cliente, y filtrarlo alimenta metagaming.
+- **Deltas bufferizados durante la suscripción.** El snapshot reemplaza la caché, así que sin buffer un cultivo plantado durante el viaje de ida y vuelta quedaría invisible hasta el siguiente cambio de celda.
+- **Los deltas de render no son API pública.** El motor interno se dispara con llamadas explícitas desde los handlers, no escuchando los eventos públicos: acoplar el funcionamiento interno a una superficie que otros pueden modificar sería frágil.
+
+### Renderizado
+
+- Props **no networkeados**: cero NetIDs, cero tráfico de física.
+- Radio de 30m con **tope duro** de props priorizando los más cercanos. El caso patológico (20 jugadores × 25 cultivos en la misma zona) son 500 entidades y unos FPS de un dígito.
+- **Snap al suelo por raycast**: la `pos_z` guardada es la posición del pie del jugador y flota o se entierra en cualquier pendiente.
+- **Variación solo de rotación**, derivada del `cropId`. No hay native fiable para escalar props, así que no se ofrece escala. Derivarlo del id (y no de `math.random`) garantiza que dos jugadores vean la misma planta igual.
+- **Destruir y recrear** al cambiar de fase: no hay swap limpio de modelo en una entidad viva, y una fase cambia 3 veces en 15 minutos.
+- **Validación de modelos al arrancar**, con aviso por nombre y respaldo en runtime. Un nombre de prop equivocado no produce ningún error: simplemente no aparece nada.
+
+### Interacción
+
+- **Anclada al prop** (`AddLocalEntity`): un solo ciclo de vida para "existe visualmente" y "es interactuable".
+- **Distancia por debajo del umbral del servidor** (2.2 frente a 3.0). Si ox_target deja pulsar, el servidor no rechaza por distancia; un `too_far` pasa a significar lo que debe, un intento de exploit.
+- **El `cropId` se captura en el closure** de la opción, no se busca desde la entidad. `canInteract` corre mientras el jugador apunta, así que no puede contener búsquedas.
+- **Sin `DrawText3D`**: obligaría a un bucle por frame por planta visible. El estado se muestra en la opción `Inspect`, que solo se calcula al apuntar.
+
+### Robustez
+
+- **Autocorrección por rechazo.** Un rechazo cuyo motivo implique caché obsoleta fuerza resuscripción. Cada desacuerdo con el servidor se convierte en una corrección, y eso es lo que hace segura la predicción.
+- **Limpieza en `onResourceStop`.** Sin ella, cada `restart` deja props huérfanos que nadie puede borrar.
+- **Interiores en lugar de routing bucket.** Los buckets no son legibles desde el cliente, así que se usa la detección de interior como proxy honesto.
+
+### Alcance
+
+Nada de PTFX, sonidos ni animaciones: eso es la Etapa 6. La barra de progreso es un placeholder deliberadamente pobre y marcado como temporal, porque la Etapa 5 la sustituye por minijuegos. Construirla bien ahora sería hacer la Etapa 6 dos veces.
+
+### Deuda pagada
+
+`Validation.CropLimit` ya no recorre todo el estado: `State` mantiene un índice por propietario. Se pagó aprovechando que esta etapa ya tocaba el indexado espacial.
+
+---
+
 ## Principios de ingeniería (no negociables)
 
 - **Server-authoritative** en todo lo que da valor.
