@@ -9,6 +9,10 @@ import { FieldsView } from "./views/FieldsView";
 import { SuppliesView } from "./views/SuppliesView";
 import { TodayView } from "./views/TodayView";
 import { WorkView } from "./views/WorkView";
+import { WorkCreateView } from "./views/WorkCreateView";
+import { BuyerOrderDetailView } from "./views/BuyerOrderDetailView";
+import { ContractDetailView } from "./views/ContractDetailView";
+import { PurchaseReviewView } from "./views/PurchaseReviewView";
 
 const PATH_TO_ROUTE: Record<string, HubRoute> = {
   "/today": "today",
@@ -39,6 +43,14 @@ export function App() {
         <Route path="/supplies" element={<SuppliesView />} />
         <Route path="/company" element={<CompanyView />} />
         <Route path="/work/assignments/:assignmentId" element={<AssignmentDetailView />} />
+        <Route path="/work/assignments/new" element={<WorkCreateView kind="assignment" />} />
+        <Route path="/work/orders/:orderId" element={<BuyerOrderDetailView />} />
+        <Route path="/work/contracts/new" element={<WorkCreateView kind="contract" />} />
+        <Route path="/work/contracts/:contractId" element={<ContractDetailView mode="public" />} />
+        <Route path="/work/contracts/active/:contractId" element={<ContractDetailView mode="active" />} />
+        <Route path="/work/contracts/active/:contractId/progress" element={<ContractDetailView mode="progress" />} />
+        <Route path="/work/contracts/active/:contractId/completion" element={<ContractDetailView mode="completion" />} />
+        <Route path="/supplies/purchases/:purchaseId/review" element={<PurchaseReviewView />} />
         <Route path="*" element={<Navigate to={"/" + capabilities.routes[0]} replace />} />
       </Routes>
     </SurfaceStage>

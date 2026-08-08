@@ -48,7 +48,7 @@ describe("Farm Business Hub", () => {
 
     for (const label of ["Fields", "Work", "Supplies", "Company", "Today"]) {
       await user.click(screen.getByRole("link", { name: label }));
-      expect(screen.getByRole("heading", { name: label })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: label })).toBeInTheDocument();
     }
   });
 
@@ -161,5 +161,35 @@ describe("Farm Business Hub", () => {
     await user.selectOptions(screen.getByLabelText("Preview role"), "visitor");
 
     expect(await screen.findByRole("heading", { name: "Access restricted" })).toBeInTheDocument();
+  });
+
+  it("removes unauthorized Work areas for a Visitor", async () => {
+    const user = userEvent.setup();
+    renderApp("/work");
+    await user.selectOptions(screen.getByLabelText("Preview role"), "visitor");
+    expect(await screen.findByRole("tab", { name: "Public Contracts" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Assignments" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Buyer Orders" })).not.toBeInTheDocument();
+  });
+
+  it("opens a real Buyer Order Detail from Work", async () => {
+    const user = userEvent.setup();
+    renderApp("/work?area=buyerOrders");
+    expect(await screen.findByRole("tab", { name: "Buyer Orders" })).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("button", { name: "Open Buyer Order" }));
+    expect(await screen.findByRole("heading", { name: /BO-204 · County Produce Depot/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Prepare Delivery" })).toBeInTheDocument();
+  });
+
+  it("preserves a purchase draft while Tablet blocks physical confirmation", async () => {
+    const user = userEvent.setup();
+    renderApp("/supplies");
+    await user.click(await screen.findByRole("button", { name: "Add Tomato Seedling" }));
+    await user.click(screen.getByRole("button", { name: "Review Purchase" }));
+    expect(await screen.findByRole("heading", { name: "Purchase Review" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Farm Tablet" }));
+    await user.click(screen.getByRole("button", { name: "Complete at Office Terminal" }));
+    expect(screen.getByRole("heading", { name: "Complete at Office Terminal" })).toBeInTheDocument();
+    expect(screen.getByText(/No funds or stock changed/)).toBeInTheDocument();
   });
 });
