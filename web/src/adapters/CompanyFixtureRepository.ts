@@ -137,6 +137,11 @@ export class CompanyFixtureRepository {
     return cargo ? { ok: true, message: `Route set to ${cargo.destination}.`, handoff: { kind: "world", scope: { fieldId: "warehouse" } } } : { ok: false, message: "This cargo is no longer available in your custody." };
   }
 
+  setRoute(destination: "office" | "warehouse" | "registry"): IntentResult {
+    const labels = { office: "Grapeseed Farm Office", warehouse: "Farm Warehouse", registry: "San Andreas Business Registry" };
+    return { ok: true, closeSurface: true, message: `Route set to ${labels[destination]}.`, handoff: { kind: "route", scope: { fieldId: destination } } };
+  }
+
   prepareOrder(reservationId: string, context: HubContextModel): IntentResult {
     if (!context.capabilities.manageWarehouse) return { ok: false, message: "Warehouse management permission is required." };
     if (context.presence !== "warehouse") return { ok: false, closeSurface: true, message: "Continue at the Farm Warehouse." };

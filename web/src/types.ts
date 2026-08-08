@@ -150,6 +150,7 @@ export type ActionIntent =
   | { type: "cropPlan.cancel"; planId: string }
   | { type: "field.setRoute"; scope: FieldScopeRef }
   | { type: "companyCargo.setRoute"; cargoId: string }
+  | { type: "company.setRoute"; destination: "office" | "warehouse" | "registry" }
   | { type: "warehouse.prepareOrder"; reservationId: string }
   | { type: "warehouse.createWholesale"; itemId: string; quantity: number; quality: string }
   | { type: "warehouse.confirmWholesale"; saleId: string }

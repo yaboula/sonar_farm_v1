@@ -378,6 +378,7 @@ export class FixtureHubAdapter implements HubAdapter {
     if (intent.type === "cropPlan.cancel") return this.fields.cancelPlan(intent.planId, context);
     if (intent.type === "field.setRoute") return this.fields.setRoute(intent.scope, context);
     if (intent.type === "companyCargo.setRoute") return this.company.setCargoRoute(intent.cargoId, context);
+    if (intent.type === "company.setRoute") return this.company.setRoute(intent.destination);
     if (intent.type === "warehouse.prepareOrder") return this.company.prepareOrder(intent.reservationId, context);
     if (intent.type === "warehouse.createWholesale") return this.company.createWholesale(intent.itemId, intent.quantity, intent.quality, context);
     if (intent.type === "warehouse.confirmWholesale") return this.company.confirmWholesale(intent.saleId, context);
