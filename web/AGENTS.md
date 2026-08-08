@@ -21,3 +21,4 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Assignment Detail is the first Phase 2 view. Its master state is Worker + In Progress; `Resume Field Work` requests a world handoff and never fabricates verified progress.
 - Worker and Supervisor are the explicit Assignment Detail perspectives. Manager and Owner inherit Supervisor behavior until dedicated variants are designed.
 - Deep-view actions come from adapter-provided `availableActions`; components do not infer business rules from role labels or status copy.
+- Product selection controls use the reusable `FarmSelect` component. Never expose the operating system's native select popup inside the Sonar Farm product UI.

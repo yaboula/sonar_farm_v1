@@ -24,6 +24,7 @@ import {
 } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { fixtureHubAdapter } from "../adapters/FixtureHubAdapter";
+import { FarmSelect } from "../components/FarmSelect";
 import { StatePanel } from "../components/StatePanel";
 import { ELIGIBLE_ASSIGNEES } from "../data/assignmentFixtures";
 import { useHub } from "../store/HubContext";
@@ -438,7 +439,14 @@ export function AssignmentDetailView() {
           footer={<><button type="button" onClick={closeDialog}>Keep assignee</button><button type="button" className="confirm" disabled={pending || assigneeId === assignment.assignee.id} onClick={() => completeDialogAction({ type: "assignment.reassign", assignmentId, assigneeId })}>Confirm Reassignment</button></>}
         >
           <p>Verified progress, deadline and reserved pay stay attached to the Assignment.</p>
-          <label className="dialog-field"><span>Eligible Worker</span><select autoFocus value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)}>{ELIGIBLE_ASSIGNEES.map((worker) => <option value={worker.id} key={worker.id}>{worker.name}</option>)}</select></label>
+          <FarmSelect
+            autoFocus
+            className="dialog-field"
+            label="Eligible Worker"
+            value={assigneeId}
+            options={ELIGIBLE_ASSIGNEES.map((worker) => ({ value: worker.id, label: worker.name }))}
+            onChange={setAssigneeId}
+          />
         </DetailDialog>
       ) : null}
 

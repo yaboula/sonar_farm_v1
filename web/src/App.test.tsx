@@ -134,6 +134,25 @@ describe("Farm Business Hub", () => {
     expect(screen.queryByRole("dialog", { name: /Review Assignment result/i })).not.toBeInTheDocument();
   });
 
+  it("reassigns through the reusable keyboard-select control", async () => {
+    const user = userEvent.setup();
+    renderApp("/work/assignments/asg-1048");
+
+    await user.click(await screen.findByRole("button", { name: "Assignment Controls" }));
+    await user.click(screen.getByRole("button", { name: "Reassign Worker" }));
+
+    const workerSelect = screen.getByRole("combobox", { name: "Eligible Worker" });
+    await user.click(workerSelect);
+    expect(screen.getByRole("option", { name: "Noah Reed" })).toHaveAttribute("aria-selected", "true");
+
+    await user.keyboard("{ArrowDown}{Enter}");
+    expect(workerSelect).toHaveTextContent("Sofia Bennett");
+    await user.click(screen.getByRole("button", { name: "Confirm Reassignment" }));
+
+    expect(await screen.findByText("Assignment reassigned to Sofia Bennett.")).toBeInTheDocument();
+    expect(screen.getAllByText("Sofia Bennett").length).toBeGreaterThan(0);
+  });
+
   it("shows Restricted after live permission loss", async () => {
     const user = userEvent.setup();
     renderApp("/work/assignments/asg-1048");

@@ -7,6 +7,8 @@
 - Primary implementation evidence: `web/qa/phase2/assignment-detail-office-worker-1920x1080.png`
 - Tablet evidence: `web/qa/phase2/assignment-detail-tablet-worker-1920x1080.png`
 - Supervisor dialog evidence: `web/qa/phase2/assignment-review-supervisor-1920x1080.png`
+- Select source: `C:/Users/aboul/AppData/Local/Temp/codex-clipboard-98d89fc2-9d0d-4c9a-9bfe-493dfdbca7e7.png`
+- Reusable select evidence: `web/qa/phase2/farm-select-reassignment-open-1920x1080.png`
 - Responsive evidence: `web/qa/phase2/assignment-detail-office-worker-1280x720.png` and `web/qa/phase2/assignment-detail-office-worker-3440x1440.png`
 - Browser viewport and density: `1920 × 1080` at density `1` for the primary comparison; additional viewports `1280 × 720` and `3440 × 1440` at density `1`
 - Logical product canvas: opaque `1440 × 810`, uniformly scaled inside each physical surface
@@ -88,6 +90,8 @@ Browser-validated:
 - live role change to an unauthorized role produces Restricted;
 - Office/Tablet switching keeps the current deep route;
 - browser console contains no warnings or errors.
+- the reusable Worker selector supports pointer selection, Arrow keys, Enter,
+  Escape-without-closing-the-dialog, selected state and disabled confirmation.
 
 Automated coverage additionally verifies Escape dialog dismissal, incomplete
 submission rejection, state mutations, Manager/Owner Supervisor inheritance and
@@ -101,6 +105,20 @@ permission loss while the view is open.
 - Findings: no actionable P0, P1 or P2 mismatch was found against the accepted
   V1 product source or original art direction.
 - Result: no visual fix iteration was required. The first comparison passes.
+
+### Iteration 2 — reusable product select
+
+- Earlier finding: `[P2]` the operating-system option popup introduced a bright
+  blue selection surface, platform typography and spacing that did not belong
+  to the Sonar Farm design system.
+- Fix: replaced the native product `<select>` with the reusable `FarmSelect`
+  listbox/combobox component using the approved charcoal, warm yellow, local
+  typefaces, Phosphor icons, focus states and short material motion.
+- Post-fix evidence: the supplied source screenshot and
+  `web/qa/phase2/farm-select-reassignment-open-1920x1080.png` were opened in one
+  comparison input. The blue OS chrome is gone, selected/active states remain
+  distinct, the menu aligns to the field and no nearby layout changed.
+- Result: the P2 is resolved. No actionable P0/P1/P2 issue remains.
 
 ## Follow-up polish
 

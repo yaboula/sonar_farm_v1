@@ -104,6 +104,11 @@ Submit, approve, correction, reassignment, cancellation and blocker resolution
 use accessible modal dialogs. Cancellation and correction require notes. Resume
 is not destructive and does not require confirmation.
 
+Product selection inside these dialogs uses the reusable `FarmSelect`
+combobox/listbox. It owns the charcoal/yellow visual states, pointer and keyboard
+behavior, focus management, disabled options and outside/Escape dismissal. Native
+operating-system select popups are not used in the product UI.
+
 ### Fixture scenarios
 
 - `asg-1048`: Worker in progress, partial verification.
