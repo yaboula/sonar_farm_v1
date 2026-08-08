@@ -1922,6 +1922,63 @@ select:focus-visible {
 .company-cargo-list em[data-tone="success"] { color: var(--success); }
 .company-inline-link { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 12px; padding: 9px 0; border-top: 1px solid var(--border-neutral); color: var(--accent); font-family: var(--display); font-weight: 600; text-transform: uppercase; }
 
+.company-tabbar { display: flex; gap: 4px; margin-bottom: 13px; border-bottom: 1px solid var(--border-neutral); }
+.company-tabbar button { display: flex; align-items: center; gap: 7px; padding: 9px 12px; border-bottom: 2px solid transparent; color: var(--text-muted); font-family: var(--display); font-size: 13px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.company-tabbar button:hover,
+.company-tabbar button.is-selected { border-color: var(--accent); color: var(--accent); }
+.company-tabbar em { min-width: 18px; padding: 1px 4px; border: 1px solid currentColor; font-size: 9px; font-style: normal; text-align: center; }
+.warehouse-layout { grid-template-columns: minmax(0, 1.2fr) minmax(310px, 0.8fr); }
+.warehouse-stock-list,
+.company-record-list { display: grid; gap: 7px; }
+.warehouse-stock-list button {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-neutral);
+  color: inherit;
+  background: rgba(8, 11, 9, 0.88);
+  text-align: left;
+}
+.warehouse-stock-list button:hover,
+.warehouse-stock-list button.is-selected { border-color: var(--border-accent); background: rgba(245, 195, 49, 0.04); }
+.warehouse-stock-list svg { color: var(--text-secondary); }
+.warehouse-stock-list span { display: grid; gap: 2px; }
+.warehouse-stock-list small { color: var(--text-muted); font-size: 10px; }
+.warehouse-stock-list b { color: var(--accent); font-family: var(--display); font-size: 14px; }
+.warehouse-stock-list em { padding: 3px 5px; border: 1px solid var(--border-neutral); color: var(--text-muted); font-size: 9px; font-style: normal; text-transform: uppercase; }
+.warehouse-stock-list em[data-status="discrepancy"] { border-color: rgba(193, 88, 70, 0.5); color: var(--error); }
+.warehouse-stock-list em[data-status="low"] { border-color: var(--border-accent); color: var(--accent); }
+.warehouse-quality { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 13px; }
+.warehouse-quality span { display: grid; gap: 2px; padding: 9px; border: 1px solid var(--border-neutral); text-align: center; }
+.warehouse-quality strong { color: var(--accent); font-family: var(--display); font-size: 19px; }
+.warehouse-quality small { color: var(--text-muted); font-size: 10px; }
+.company-number-field { display: grid; gap: 5px; margin-top: 12px; }
+.company-number-field > span { color: var(--text-secondary); font-size: 11px; text-transform: uppercase; }
+.company-number-field input { height: 37px; padding: 0 10px; border: 1px solid var(--border-neutral); color: var(--text-primary); background: rgba(6, 9, 7, 0.88); font: inherit; }
+.company-number-field input:focus { border-color: var(--border-accent); outline: none; }
+.company-number-field small { color: var(--text-muted); font-size: 10px; }
+.company-record-list article {
+  min-height: 66px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-neutral);
+  background: rgba(8, 11, 9, 0.9);
+}
+.company-record-list article.is-warning { border-left: 3px solid var(--error); }
+.company-record-list article > svg { color: var(--accent); }
+.company-record-list article > span { display: grid; gap: 2px; }
+.company-record-list article small { color: var(--text-muted); font-size: 11px; }
+.company-record-list article > em { color: var(--text-secondary); font-size: 10px; font-style: normal; text-transform: uppercase; }
+.company-record-list article > b { color: var(--accent); font-family: var(--display); }
+.company-record-list article > button { display: flex; align-items: center; gap: 5px; padding: 7px 9px; border: 1px solid var(--border-neutral); color: var(--text-secondary); font-family: var(--display); font-size: 11px; text-transform: uppercase; }
+.company-record-list article > button:hover,
+.company-record-list article > button.is-primary { border-color: var(--border-accent); color: var(--accent); }
+
 /* Deep Work & Supplies experiences */
 
 .domain-detail-view {

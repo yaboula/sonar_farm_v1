@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { ACTOR_BY_ROLE, capabilitiesFor } from "../data/fixtures";
-import type { CompanyCargoData, CompanyHomeData, FarmRole, HubContextModel, TreasurySnapshot, WarehouseData } from "../types";
+import type { CompanyCargoData, CompanyHomeData, FarmRole, HubContextModel, LedgerEntry, TreasurySnapshot, WarehouseData } from "../types";
 import { FixtureHubAdapter } from "./FixtureHubAdapter";
 
 function context(role: FarmRole, presence: HubContextModel["presence"] = "office", surface: HubContextModel["surface"] = "office"): HubContextModel {
@@ -53,5 +53,23 @@ describe("Company domain adapter", () => {
     const after = await adapter.load<TreasurySnapshot>({ kind: "companyTreasury" }, owner);
     expect(after.data!.available).toBe(before.data!.available - 18);
     expect(after.data?.recentEntries[0]).toMatchObject({ type: "purchase", linkedId: draft.entityId });
+  });
+
+  it("sells only unreserved Warehouse stock and posts one atomic settlement", async () => {
+    const owner = context("owner", "warehouse", "tablet");
+    const beforeStock = await adapter.load<WarehouseData>({ kind: "companyWarehouse" }, owner);
+    const beforeTreasury = await adapter.load<TreasurySnapshot>({ kind: "companyTreasury" }, owner);
+    const draft = await adapter.dispatch({ type: "warehouse.createWholesale", itemId: "wh-lettuce", quantity: 3, quality: "Fine" }, owner);
+    const confirmed = await adapter.dispatch({ type: "warehouse.confirmWholesale", saleId: draft.entityId! }, owner);
+    const duplicate = await adapter.dispatch({ type: "warehouse.confirmWholesale", saleId: draft.entityId! }, owner);
+    const afterStock = await adapter.load<WarehouseData>({ kind: "companyWarehouse" }, owner);
+    const afterTreasury = await adapter.load<TreasurySnapshot>({ kind: "companyTreasury" }, owner);
+    const ledger = await adapter.load<LedgerEntry[]>({ kind: "companyLedger" }, owner);
+    expect(confirmed.ok).toBe(true);
+    expect(duplicate.ok).toBe(false);
+    expect(afterStock.data?.items.find((item) => item.id === "wh-lettuce")?.available).toBe((beforeStock.data?.items.find((item) => item.id === "wh-lettuce")?.available ?? 0) - 3);
+    expect(afterTreasury.data!.available).toBe(beforeTreasury.data!.available + 435);
+    expect(ledger.data?.filter((item) => item.linkedId === draft.entityId)).toHaveLength(1);
+    expect(afterStock.data?.reservations).toEqual(beforeStock.data?.reservations);
   });
 });
