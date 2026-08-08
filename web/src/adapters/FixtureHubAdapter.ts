@@ -1,6 +1,7 @@
 import { cloneAssignmentFixtures } from "../data/assignmentFixtures";
 import { cloneWorkSupplyFixtures } from "../data/workSupplyFixtures";
 import { FieldFixtureRepository } from "./FieldFixtureRepository";
+import { CompanyFixtureRepository } from "./CompanyFixtureRepository";
 import type {
   ActionIntent,
   AssignmentCreateInput,
@@ -121,26 +122,22 @@ function nextBuyerActions(action: BuyerOrderAction): BuyerOrderDetail["available
 export class FixtureHubAdapter implements HubAdapter {
   private assignments = cloneAssignmentFixtures();
   private workSupplies = cloneWorkSupplyFixtures();
-  private personalBalance = 1680;
-  private companyBalance = 24680;
-  private procurementBudget = 6200;
   private assignmentSequence = 1062;
   private contractSequence = 84;
   private purchaseSequence = 301;
   private fields = new FieldFixtureRepository();
+  private company = new CompanyFixtureRepository();
 
   constructor(private readonly delayMs = 80) {}
 
   reset() {
     this.assignments = cloneAssignmentFixtures();
     this.workSupplies = cloneWorkSupplyFixtures();
-    this.personalBalance = 1680;
-    this.companyBalance = 24680;
-    this.procurementBudget = 6200;
     this.assignmentSequence = 1062;
     this.contractSequence = 84;
     this.purchaseSequence = 301;
     this.fields.reset();
+    this.company.reset();
   }
 
   private loadWork(context: HubContextModel): WorkQueueData {
@@ -185,12 +182,12 @@ export class FixtureHubAdapter implements HubAdapter {
     return {
       products: structuredClone(this.workSupplies.products),
       allowedPayers: canCompanyBuy ? ["personal", "company"] : ["personal"],
-      personalBalance: this.personalBalance,
-      companyBalance: canCompanyBuy ? this.companyBalance : undefined,
+      personalBalance: this.company.getPersonalBalance(context.actorId),
+      companyBalance: canCompanyBuy ? this.company.getCompanyBalance() : undefined,
       procurement: canCompanyBuy
         ? {
             monthlyBudget: 12000,
-            remaining: this.procurementBudget,
+            remaining: this.company.getProcurementBudget(),
             transactionLimit: 1500,
             allowedCategories: ["Seedlings", "Seeds", "Hand Tools", "Watering", "Fertilizer", "Pest Treatment"],
             recentPurchases: this.workSupplies.purchases
@@ -280,6 +277,78 @@ export class FixtureHubAdapter implements HubAdapter {
       return { request, state: "ready", data: safe as TData };
     }
 
+    if (request.kind === "companyHome") return { request, state: "ready", data: this.company.loadHome(context) as TData };
+    if (request.kind === "companyProfile") return { request, state: "ready", data: this.company.loadProfile(context) as TData };
+    if (request.kind === "companyCargo") {
+      if (!context.capabilities.viewOwnCompanyCargo) return { request, state: "restricted", data: null };
+      return { request, state: "ready", data: this.company.loadCargo(context) as TData };
+    }
+    if (request.kind === "companyWarehouse") {
+      const data = this.company.loadWarehouse(context);
+      return data ? { request, state: "ready", data: data as TData } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyWholesaleReview") {
+      const data = this.company.loadWholesale(request.saleId, context);
+      return context.capabilities.sellWholesaleStock ? { request, state: "ready", data: data as TData | null } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyStaff") {
+      const data = this.company.loadStaff(context);
+      return data ? { request, state: "ready", data: data as TData } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyStaffMember") {
+      const data = this.company.loadMember(request.memberId, context);
+      return context.capabilities.viewStaff ? { request, state: "ready", data: data as TData | null } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyApplications") {
+      const data = this.company.loadApplications(context);
+      return data ? { request, state: "ready", data: data as TData } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyApplicationReview") {
+      const data = this.company.loadApplication(request.applicationId, context);
+      return context.capabilities.reviewApplications ? { request, state: "ready", data: data as TData | null } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyJobApplication") {
+      return context.role === "visitor" ? { request, state: "ready", data: this.company.loadOwnApplication(context) as TData | null } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyTreasury") {
+      const data = this.company.loadTreasury(context);
+      return data ? { request, state: "ready", data: data as TData } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyLedger") {
+      const data = this.company.loadLedger(context);
+      return data ? { request, state: "ready", data: data as TData } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyLeases") {
+      const data = this.company.loadLeases(context);
+      return data ? { request, state: "ready", data: data as TData } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyLeaseDetail") {
+      const data = this.company.loadLease(request.leaseId, context);
+      return context.capabilities.viewLeases ? { request, state: "ready", data: data as TData | null } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyRolePolicies") {
+      const data = this.company.loadRolePolicies(context);
+      return data ? { request, state: "ready", data: data as TData } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyIdentity") {
+      const data = this.company.loadIdentity(context);
+      return data ? { request, state: "ready", data: data as TData } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyBusinessSale" || request.kind === "companySaleReview") {
+      const data = this.company.loadBusinessSale(context);
+      return data ? { request, state: "ready", data: data as TData } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyPublicSale") {
+      const data = this.company.loadPublicSale(context);
+      return context.capabilities.buyBusiness ? { request, state: "ready", data: data as TData | null } : { request, state: "restricted", data: null };
+    }
+    if (request.kind === "companyOwnershipTransfer") {
+      const data = this.company.loadTransfer(request.listingId, context);
+      return data ? { request, state: "ready", data: data as TData } : { request, state: "restricted", data: null };
+    }
+
+    if (request.kind !== "purchaseReview") return { request, state: "restricted", data: null };
+
     const purchase = this.workSupplies.purchases.find((item) => item.id === request.purchaseId);
     if (!purchase) return { request, state: "ready", data: null };
     const allowed = purchase.payer === "personal"
@@ -308,6 +377,27 @@ export class FixtureHubAdapter implements HubAdapter {
     if (intent.type === "cropPlan.update") return this.fields.updatePlan(intent.planId, intent.input, context);
     if (intent.type === "cropPlan.cancel") return this.fields.cancelPlan(intent.planId, context);
     if (intent.type === "field.setRoute") return this.fields.setRoute(intent.scope, context);
+    if (intent.type === "companyCargo.setRoute") return this.company.setCargoRoute(intent.cargoId, context);
+    if (intent.type === "warehouse.prepareOrder") return this.company.prepareOrder(intent.reservationId, context);
+    if (intent.type === "warehouse.createWholesale") return this.company.createWholesale(intent.itemId, intent.quantity, intent.quality, context);
+    if (intent.type === "warehouse.confirmWholesale") return this.company.confirmWholesale(intent.saleId, context);
+    if (intent.type === "jobApplication.saveDraft") return this.company.saveApplication(intent.input, context, false);
+    if (intent.type === "jobApplication.submit") return this.company.saveApplication(intent.input, context, true);
+    if (intent.type === "jobApplication.withdraw") return this.company.withdrawApplication(intent.applicationId, context);
+    if (intent.type === "staffApplication.transition") return this.company.transitionApplication(intent.applicationId, intent.action, intent.role, context);
+    if (intent.type === "staff.invite") return this.company.inviteStaff(intent.candidateId, intent.role, context);
+    if (intent.type === "staffInvitation.accept") return this.company.acceptInvitation(intent.invitationId, context);
+    if (intent.type === "staff.transition") return this.company.transitionStaff(intent.memberId, intent.action, intent.role, context);
+    if (intent.type === "treasury.contribute") return this.company.contribute(intent.amount, context);
+    if (intent.type === "lease.transition") return this.company.transitionLease(intent.leaseId, intent.action, context);
+    if (intent.type === "rolePolicy.save") return this.company.savePolicy(intent.role, intent.permissions, intent.transactionLimit, context);
+    if (intent.type === "rolePolicy.reset") return this.company.resetPolicy(intent.role, context);
+    if (intent.type === "company.rename") return this.company.rename(intent.name, context);
+    if (intent.type === "businessSale.saveDraft") return this.company.saveSaleDraft(intent.askingPrice, context);
+    if (intent.type === "businessSale.publish") return this.company.publishSale(intent.listingId, context);
+    if (intent.type === "businessSale.cancel") return this.company.cancelSale(intent.listingId, context);
+    if (intent.type === "businessSale.reserve") return this.company.reserveSale(intent.listingId, context);
+    if (intent.type === "businessSale.confirm") return this.company.confirmSale(intent.listingId, intent.party, context);
     return { ok: false, message: "This action is unavailable." };
   }
 
@@ -521,10 +611,10 @@ export class FixtureHubAdapter implements HubAdapter {
     const subtotal = safeLines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
     const fees = payer === "company" ? 0 : Math.round(subtotal * 0.025);
     const total = subtotal + fees;
-    const balance = payer === "company" ? this.companyBalance : this.personalBalance;
+    const balance = payer === "company" ? this.company.getCompanyBalance() : this.company.getPersonalBalance(context.actorId);
     const id = `pur-${this.purchaseSequence++}`;
     this.workSupplies.purchases.push({
-      id, reference: id.toUpperCase(), payer, lines: safeLines, subtotal, fees, total, balance, projectedBalance: balance - total, budgetRemaining: payer === "company" ? this.procurementBudget : undefined, transactionLimit: payer === "company" ? 1500 : undefined, ownership: payer === "company" ? "Company" : "Personal", inventoryCapacity: payer === "company" ? "18 of 40 company slots used" : "7 of 20 personal slots used", fulfillment: "Office Terminal · Supplier counter", status: "draft",
+      id, reference: id.toUpperCase(), payer, lines: safeLines, subtotal, fees, total, balance, projectedBalance: balance - total, budgetRemaining: payer === "company" ? this.company.getProcurementBudget() : undefined, transactionLimit: payer === "company" ? 1500 : undefined, ownership: payer === "company" ? "Company" : "Personal", inventoryCapacity: payer === "company" ? "18 of 40 company slots used" : "7 of 20 personal slots used", fulfillment: "Office Terminal · Supplier counter", status: "draft",
     });
     return { ok: true, changed: true, entityId: id, message: "Purchase draft ready for review." };
   }
@@ -532,10 +622,11 @@ export class FixtureHubAdapter implements HubAdapter {
   private confirmPurchase(purchaseId: string, context: HubContextModel): IntentResult {
     const purchase = this.workSupplies.purchases.find((item) => item.id === purchaseId);
     if (!purchase || purchase.status !== "draft") return { ok: false, message: "This purchase can no longer be confirmed." };
-    if (!context.capabilities.physicalTransactions) return { ok: false, closeSurface: true, message: "Complete this purchase at an Office Terminal." };
+    if (!context.capabilities.physicalTransactions || context.presence !== "office") return { ok: false, closeSurface: true, message: "Complete this purchase at an Office Terminal." };
     if (purchase.payer === "company" && !context.capabilities.buyCompanySupplies) { purchase.failureReason = "permission_lost"; return { ok: false, message: "Company purchasing permission was removed." }; }
-    if (purchase.total > purchase.balance) { purchase.failureReason = "insufficient_funds"; return { ok: false, message: "The selected payer has insufficient funds." }; }
-    if (purchase.payer === "company" && purchase.total > this.procurementBudget) { purchase.failureReason = "budget_exceeded"; return { ok: false, message: "The procurement budget is insufficient." }; }
+    const liveBalance = purchase.payer === "company" ? this.company.getCompanyBalance() : this.company.getPersonalBalance(context.actorId);
+    if (purchase.total > liveBalance) { purchase.failureReason = "insufficient_funds"; return { ok: false, message: "The selected payer has insufficient funds." }; }
+    if (purchase.payer === "company" && purchase.total > this.company.getProcurementBudget()) { purchase.failureReason = "budget_exceeded"; return { ok: false, message: "The procurement budget is insufficient." }; }
     if (purchase.payer === "company" && purchase.transactionLimit && purchase.total > purchase.transactionLimit && !context.capabilities.approveProcurement) { purchase.failureReason = "budget_exceeded"; return { ok: false, message: "This purchase exceeds your transaction limit and requires approval." }; }
     for (const line of purchase.lines) {
       const product = this.workSupplies.products.find((item) => item.id === line.productId);
@@ -550,8 +641,8 @@ export class FixtureHubAdapter implements HubAdapter {
       if (purchase.payer === "company") product.companyOwned += line.quantity;
       else product.personalOwned += line.quantity;
     }
-    if (purchase.payer === "company") { this.companyBalance -= purchase.total; this.procurementBudget -= purchase.total; }
-    else this.personalBalance -= purchase.total;
+    if (purchase.payer === "company") this.company.recordPurchase(purchase.total, purchase.id, context);
+    else this.company.debitPersonal(context.actorId, purchase.total);
     return { ok: true, changed: true, receiptId: purchase.receiptId, message: `Purchase completed · receipt ${purchase.receiptId}.` };
   }
 

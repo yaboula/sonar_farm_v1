@@ -22,7 +22,7 @@ export function BuyerOrderDetailView() {
   const { orderId = "" } = useParams();
   const hub = useHub(); const navigate = useNavigate(); const location = useLocation();
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? "/work?area=buyerOrders";
-  const context = useMemo<HubContextModel>(() => ({ role: hub.role, surface: hub.surface, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.role, hub.surface, hub.viewState, hub.capabilities]);
+  const context = useMemo<HubContextModel>(() => ({ actorId: hub.actorId, role: hub.role, surface: hub.surface, presence: hub.presence, capabilitiesRevision: hub.capabilitiesRevision, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.actorId, hub.role, hub.surface, hub.presence, hub.capabilitiesRevision, hub.viewState, hub.capabilities]);
   const [model, setModel] = useState<HubViewModel<BuyerOrderDetail> | null>(null);
   const [dialog, setDialog] = useState<BuyerOrderAction>(); const [notice, setNotice] = useState<string>(); const [pending, setPending] = useState(false);
   const reload = useCallback(() => fixtureHubAdapter.load<BuyerOrderDetail>({ kind: "buyerOrderDetail", orderId }, context).then(setModel), [context, orderId]);

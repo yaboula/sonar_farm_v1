@@ -15,7 +15,7 @@ const ACTION_LABEL: Record<ContractAction, string> = {
 export function ContractDetailView({ mode }: { mode: "public" | "active" | "progress" | "completion" }) {
   const { contractId = "" } = useParams(); const hub = useHub(); const navigate = useNavigate(); const location = useLocation();
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? `/work?area=${mode === "public" ? "publicContracts" : "activeContract"}`;
-  const context = useMemo<HubContextModel>(() => ({ role: hub.role, surface: hub.surface, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.role, hub.surface, hub.viewState, hub.capabilities]);
+  const context = useMemo<HubContextModel>(() => ({ actorId: hub.actorId, role: hub.role, surface: hub.surface, presence: hub.presence, capabilitiesRevision: hub.capabilitiesRevision, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.actorId, hub.role, hub.surface, hub.presence, hub.capabilitiesRevision, hub.viewState, hub.capabilities]);
   const [model, setModel] = useState<HubViewModel<ContractDetail> | null>(null); const [dialog, setDialog] = useState<ContractAction>(); const [notice, setNotice] = useState<string>(); const [pending, setPending] = useState(false); const [handoff, setHandoff] = useState<string>();
   const reload = useCallback(() => fixtureHubAdapter.load<ContractDetail>({ kind: "contractDetail", contractId, mode }, context).then(setModel), [contractId, context, mode]);
   useEffect(() => { void reload(); }, [reload]);

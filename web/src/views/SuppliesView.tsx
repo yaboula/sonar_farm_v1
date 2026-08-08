@@ -14,7 +14,7 @@ const categoryOptions = ["All", "Seedlings", "Seeds", "Hand Tools", "Watering", 
 
 export function SuppliesView() {
   const hub = useHub(); const navigate = useNavigate(); const [searchParams, setSearchParams] = useSearchParams();
-  const context = useMemo<HubContextModel>(() => ({ role: hub.role, surface: hub.surface, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.role, hub.surface, hub.viewState, hub.capabilities]);
+  const context = useMemo<HubContextModel>(() => ({ actorId: hub.actorId, role: hub.role, surface: hub.surface, presence: hub.presence, capabilitiesRevision: hub.capabilitiesRevision, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.actorId, hub.role, hub.surface, hub.presence, hub.capabilitiesRevision, hub.viewState, hub.capabilities]);
   const [model, setModel] = useState<HubViewModel<SuppliesHubData> | null>(null); const [query, setQuery] = useState(""); const [category, setCategory] = useState("All"); const [payer, setPayer] = useState<SupplyPayer>("personal"); const [cart, setCart] = useState<Record<string, number>>({}); const [notice, setNotice] = useState<string>(); const [pending, setPending] = useState(false); const [materialAction, setMaterialAction] = useState<{ item: IssuedMaterialRecord; action: "return" | "flag" }>();
   const contextKey = `${hub.role}:${hub.surface}:${hub.viewState}`;
   const [loadedFor, setLoadedFor] = useState("");

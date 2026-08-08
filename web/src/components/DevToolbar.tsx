@@ -1,6 +1,6 @@
 import { Desktop, DeviceTablet } from "@phosphor-icons/react";
 import { useHub } from "../store/HubContext";
-import type { FarmRole, ViewState } from "../types";
+import type { FarmRole, HubPresence, ViewState } from "../types";
 
 const ROLES: FarmRole[] = [
   "owner",
@@ -22,8 +22,10 @@ const STATES: ViewState[] = [
   "unavailable",
 ];
 
+const PRESENCES: HubPresence[] = ["remote", "office", "warehouse", "registry"];
+
 export function DevToolbar() {
-  const { role, surface, viewState, setRole, setSurface, setViewState } = useHub();
+  const { role, surface, presence, viewState, setRole, setSurface, setPresence, setViewState } = useHub();
 
   return (
     <aside className="dev-toolbar" aria-label="Preview controls">
@@ -56,6 +58,13 @@ export function DevToolbar() {
             {item}
           </option>
         ))}
+      </select>
+      <select
+        aria-label="Preview presence"
+        value={presence}
+        onChange={(event) => setPresence(event.target.value as HubPresence)}
+      >
+        {PRESENCES.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
       <select
         aria-label="Preview state"

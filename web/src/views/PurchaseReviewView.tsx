@@ -21,7 +21,7 @@ const failureCopy: Record<NonNullable<PurchaseReview["failureReason"]>, string> 
 export function PurchaseReviewView() {
   const { purchaseId = "" } = useParams(); const hub = useHub(); const navigate = useNavigate(); const location = useLocation();
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? "/supplies?area=market";
-  const context = useMemo<HubContextModel>(() => ({ role: hub.role, surface: hub.surface, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.role, hub.surface, hub.viewState, hub.capabilities]);
+  const context = useMemo<HubContextModel>(() => ({ actorId: hub.actorId, role: hub.role, surface: hub.surface, presence: hub.presence, capabilitiesRevision: hub.capabilitiesRevision, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.actorId, hub.role, hub.surface, hub.presence, hub.capabilitiesRevision, hub.viewState, hub.capabilities]);
   const [model, setModel] = useState<HubViewModel<PurchaseReview> | null>(null); const [confirm, setConfirm] = useState(false); const [pending, setPending] = useState(false); const [notice, setNotice] = useState<string>(); const [handoff, setHandoff] = useState(false);
   const reload = useCallback(() => fixtureHubAdapter.load<PurchaseReview>({ kind: "purchaseReview", purchaseId }, context).then(setModel), [context, purchaseId]);
   useEffect(() => { void reload(); }, [reload]);

@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { capabilitiesFor } from "../data/fixtures";
+import { ACTOR_BY_ROLE, capabilitiesFor } from "../data/fixtures";
 import { createMixedSlotFieldFixture, createScaleFieldFixture } from "../data/fieldFixtures";
 import type { CropPlan, FieldDetail, FieldsOverviewData, FieldSyncState, HubContextModel } from "../types";
 import { FixtureHubAdapter } from "./FixtureHubAdapter";
 import { applyFieldDelta, createFieldSyncState, projectFieldDelta } from "./fieldSync";
 
 const context = (role: HubContextModel["role"], surface: HubContextModel["surface"] = "office"): HubContextModel => ({
+  actorId: ACTOR_BY_ROLE[role],
   role,
   surface,
+  presence: surface === "office" ? "office" : "remote",
+  capabilitiesRevision: 1,
   viewState: "ready",
   capabilities: capabilitiesFor(role, surface),
 });

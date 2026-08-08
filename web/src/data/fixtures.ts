@@ -20,6 +20,16 @@ export const ROLE_LABELS: Record<FarmRole, string> = {
   owner: "Owner",
 };
 
+export const ACTOR_BY_ROLE: Record<FarmRole, string> = {
+  visitor: "actor-morgan",
+  contractor: "actor-avery",
+  worker: "staff-noah",
+  procurement: "staff-lena",
+  supervisor: "staff-jordan",
+  manager: "staff-maya",
+  owner: "staff-elijah",
+};
+
 export function capabilitiesFor(role: FarmRole, surface: "office" | "tablet"): HubCapabilities {
   const isManagement = ["supervisor", "manager", "owner"].includes(role);
   const isEmployee = ["worker", "procurement", "supervisor", "manager", "owner"].includes(role);
@@ -60,6 +70,25 @@ export function capabilitiesFor(role: FarmRole, surface: "office" | "tablet"): H
     createFieldAssignments: isManagement,
     createFieldContracts: ["manager", "owner"].includes(role),
     setFieldRoute: isEmployee || role === "contractor",
+    viewCompanyProfile: true,
+    viewOwnCompanyCargo: isEmployee || role === "contractor",
+    viewTeamCompanyCargo: ["supervisor", "manager", "owner"].includes(role),
+    viewWarehouse: ["supervisor", "manager", "owner"].includes(role),
+    manageWarehouse: ["manager", "owner"].includes(role),
+    sellWholesaleStock: ["manager", "owner"].includes(role),
+    viewStaff: ["manager", "owner"].includes(role),
+    reviewApplications: ["manager", "owner"].includes(role),
+    inviteStaff: ["manager", "owner"].includes(role),
+    viewProcurementLedger: isCompanyBuyer,
+    viewTreasury: ["manager", "owner"].includes(role),
+    contributeTreasury: role === "owner",
+    viewCompanyLedger: ["manager", "owner"].includes(role),
+    viewLeases: ["supervisor", "manager", "owner"].includes(role),
+    manageLeases: ["manager", "owner"].includes(role),
+    manageRolePolicies: role === "owner",
+    renameCompany: role === "owner",
+    sellBusiness: role === "owner",
+    buyBusiness: role === "visitor",
   };
 }
 

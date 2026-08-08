@@ -1,5 +1,7 @@
 export type HubSurface = "office" | "tablet";
 
+export type HubPresence = "remote" | "office" | "warehouse" | "registry";
+
 export type FarmRole =
   | "visitor"
   | "contractor"
@@ -61,11 +63,33 @@ export interface HubCapabilities {
   createFieldAssignments: boolean;
   createFieldContracts: boolean;
   setFieldRoute: boolean;
+  viewCompanyProfile: boolean;
+  viewOwnCompanyCargo: boolean;
+  viewTeamCompanyCargo: boolean;
+  viewWarehouse: boolean;
+  manageWarehouse: boolean;
+  sellWholesaleStock: boolean;
+  viewStaff: boolean;
+  reviewApplications: boolean;
+  inviteStaff: boolean;
+  viewProcurementLedger: boolean;
+  viewTreasury: boolean;
+  contributeTreasury: boolean;
+  viewCompanyLedger: boolean;
+  viewLeases: boolean;
+  manageLeases: boolean;
+  manageRolePolicies: boolean;
+  renameCompany: boolean;
+  sellBusiness: boolean;
+  buyBusiness: boolean;
 }
 
 export interface HubContextModel {
+  actorId: string;
   role: FarmRole;
   surface: HubSurface;
+  presence: HubPresence;
+  capabilitiesRevision: number;
   viewState: ViewState;
   capabilities: HubCapabilities;
   selectedKind?: SelectionKind;
@@ -124,7 +148,28 @@ export type ActionIntent =
   | { type: "cropPlan.create"; input: CropPlanInput }
   | { type: "cropPlan.update"; planId: string; input: CropPlanInput }
   | { type: "cropPlan.cancel"; planId: string }
-  | { type: "field.setRoute"; scope: FieldScopeRef };
+  | { type: "field.setRoute"; scope: FieldScopeRef }
+  | { type: "companyCargo.setRoute"; cargoId: string }
+  | { type: "warehouse.prepareOrder"; reservationId: string }
+  | { type: "warehouse.createWholesale"; itemId: string; quantity: number; quality: string }
+  | { type: "warehouse.confirmWholesale"; saleId: string }
+  | { type: "jobApplication.saveDraft"; input: JobApplicationInput }
+  | { type: "jobApplication.submit"; input: JobApplicationInput }
+  | { type: "jobApplication.withdraw"; applicationId: string }
+  | { type: "staffApplication.transition"; applicationId: string; action: "interview" | "accept" | "reject"; role?: FarmRole }
+  | { type: "staff.invite"; candidateId: string; role: FarmRole }
+  | { type: "staffInvitation.accept"; invitationId: string }
+  | { type: "staff.transition"; memberId: string; action: "suspend" | "reinstate" | "remove" | "change_role"; role?: FarmRole }
+  | { type: "treasury.contribute"; amount: number }
+  | { type: "lease.transition"; leaseId: string; action: "start" | "pay" | "end" }
+  | { type: "rolePolicy.save"; role: FarmRole; permissions: string[]; transactionLimit?: number }
+  | { type: "rolePolicy.reset"; role: FarmRole }
+  | { type: "company.rename"; name: string }
+  | { type: "businessSale.saveDraft"; askingPrice: number }
+  | { type: "businessSale.publish"; listingId: string }
+  | { type: "businessSale.cancel"; listingId: string }
+  | { type: "businessSale.reserve"; listingId: string }
+  | { type: "businessSale.confirm"; listingId: string; party: "buyer" | "seller" };
 
 export type HubViewRequest =
   | { kind: "hub"; route: HubRoute }
@@ -135,7 +180,27 @@ export type HubViewRequest =
   | { kind: "contractCreate" }
   | { kind: "purchaseReview"; purchaseId: string }
   | { kind: "fieldsOverview" }
-  | { kind: "fieldDetail"; fieldId: string };
+  | { kind: "fieldDetail"; fieldId: string }
+  | { kind: "companyHome" }
+  | { kind: "companyProfile" }
+  | { kind: "companyCargo" }
+  | { kind: "companyWarehouse" }
+  | { kind: "companyWholesaleReview"; saleId: string }
+  | { kind: "companyStaff" }
+  | { kind: "companyStaffMember"; memberId: string }
+  | { kind: "companyApplications" }
+  | { kind: "companyApplicationReview"; applicationId: string }
+  | { kind: "companyJobApplication" }
+  | { kind: "companyTreasury" }
+  | { kind: "companyLedger" }
+  | { kind: "companyLeases" }
+  | { kind: "companyLeaseDetail"; leaseId: string }
+  | { kind: "companyRolePolicies" }
+  | { kind: "companyIdentity" }
+  | { kind: "companyBusinessSale" }
+  | { kind: "companySaleReview" }
+  | { kind: "companyPublicSale" }
+  | { kind: "companyOwnershipTransfer"; listingId: string };
 
 export interface HubViewModel<TData = unknown> {
   request: HubViewRequest;
@@ -666,4 +731,288 @@ export interface CompanyModuleFixture {
   value: string;
   permission?: keyof Omit<HubCapabilities, "routes">;
   surfaceRestriction?: HubSurface;
+}
+
+export type CompanyOperationalStatus = "operating" | "for_sale" | "temporarily_unavailable" | "unowned";
+export type CompanyArea = "public" | "operations" | "people" | "finance" | "ownership";
+
+export interface CompanyRecord {
+  id: string;
+  name: string;
+  originalName: string;
+  brandName: "Sonar Farm";
+  status: CompanyOperationalStatus;
+  ownerId?: string;
+  ownerName?: string;
+  description: string;
+  officeLocation: string;
+  foundedAt: string;
+  capabilitiesRevision: number;
+}
+
+export interface CompanyHomeModule {
+  id: string;
+  area: CompanyArea;
+  title: string;
+  detail: string;
+  value: string;
+  path: string;
+  priority: "critical" | "attention" | "normal";
+  badge?: string;
+}
+
+export interface CompanyHomeData {
+  company: CompanyRecord;
+  headline: string;
+  modules: CompanyHomeModule[];
+  procurementLink?: { remaining: number; pending: number; path: string };
+}
+
+export interface CompanyProfile {
+  company: CompanyRecord;
+  ownershipLabel: string;
+  publicFields: Array<{ name: string; cropSummary: string; status: string }>;
+  publicContracts: number;
+  applicationsOpen: boolean;
+  contractorTerms: string[];
+  sale?: { listingId: string; askingPrice: number; status: string };
+  availableActions: Array<"contracts" | "sale" | "apply" | "supplies" | "route">;
+}
+
+export type CargoStatus = "carrying" | "partial_deposit" | "ready" | "completed" | "mismatch";
+export interface CargoRecord {
+  id: string;
+  reference: string;
+  product: string;
+  quantity: number;
+  unit: string;
+  quality: string;
+  source: string;
+  custodianId: string;
+  custodian: string;
+  ownership: "Company";
+  linkedKind: "assignment" | "contract" | "buyer_order";
+  linkedId: string;
+  destination: string;
+  status: CargoStatus;
+  restriction: string;
+  availableActions: Array<"set_route" | "open_work">;
+}
+
+export interface CompanyCargoData {
+  records: CargoRecord[];
+  scopeLabel: string;
+  warehousePresence: boolean;
+}
+
+export type WarehouseItemStatus = "stocked" | "low" | "reserved" | "full" | "discrepancy";
+export interface WarehouseReservation {
+  id: string;
+  itemId: string;
+  quantity: number;
+  sourceKind: "buyer_order" | "assignment" | "contract";
+  sourceId: string;
+  sourceLabel: string;
+  status: "active" | "prepared" | "released";
+}
+
+export interface WarehouseItem {
+  id: string;
+  name: string;
+  category: "produce" | "material" | "tool";
+  unit: string;
+  total: number;
+  available: number;
+  reserved: number;
+  quality: Array<{ label: string; quantity: number }>;
+  incoming: number;
+  status: WarehouseItemStatus;
+  location: string;
+  discrepancy?: string;
+}
+
+export interface WarehouseData {
+  items: WarehouseItem[];
+  reservations: WarehouseReservation[];
+  incomingCargo: CargoRecord[];
+  capacity: { used: number; total: number };
+  atWarehouse: boolean;
+  canManage: boolean;
+  canSellWholesale: boolean;
+}
+
+export interface WholesaleSale {
+  id: string;
+  reference: string;
+  itemId: string;
+  itemName: string;
+  quality: string;
+  quantity: number;
+  unitPrice: number;
+  payout: number;
+  availableBefore: number;
+  availableAfter: number;
+  status: "draft" | "processing" | "completed" | "failed";
+  failureReason?: string;
+  ledgerEntryId?: string;
+}
+
+export type StaffStatus = "active" | "off_duty" | "suspended" | "pending_removal";
+export interface StaffMember {
+  id: string;
+  name: string;
+  role: FarmRole;
+  status: StaffStatus;
+  joinedAt: string;
+  lastActivity: string;
+  activeAssignment?: string;
+  companyCargo: number;
+  issuedMaterials: number;
+  permissionExceptions: string[];
+  unresolvedIssues: string[];
+  availableActions: Array<"suspend" | "reinstate" | "remove" | "change_role">;
+}
+
+export type ApplicationStatus = "draft" | "submitted" | "under_review" | "interview" | "accepted" | "rejected" | "withdrawn";
+export interface JobApplicationInput {
+  introduction: string;
+  availability: string;
+  preferredWork: string;
+  rulesAccepted: boolean;
+}
+
+export interface StaffApplication extends JobApplicationInput {
+  id: string;
+  applicantId: string;
+  applicant: string;
+  submittedAt?: string;
+  updatedAt: string;
+  status: ApplicationStatus;
+  reviewer?: string;
+  warning?: string;
+  proposedRole: FarmRole;
+  availableActions: Array<"submit" | "withdraw" | "interview" | "accept" | "reject">;
+}
+
+export interface StaffInvite {
+  id: string;
+  candidateId: string;
+  candidate: string;
+  role: FarmRole;
+  invitedBy: string;
+  expiresAt: string;
+  status: "pending" | "accepted" | "declined" | "expired";
+}
+
+export interface StaffData {
+  members: StaffMember[];
+  applications: StaffApplication[];
+  invitations: StaffInvite[];
+  candidates: Array<{ id: string; name: string; eligible: boolean; reason?: string }>;
+  assignableRoles: FarmRole[];
+}
+
+export type LedgerStatus = "completed" | "pending" | "escrowed" | "released" | "refunded" | "reversed" | "failed";
+export interface LedgerEntry {
+  id: string;
+  idempotencyKey: string;
+  type: "purchase" | "assignment_pay" | "contract_escrow" | "buyer_order" | "lease" | "wholesale" | "rename" | "owner_contribution" | "business_sale";
+  amount: number;
+  direction: "credit" | "debit" | "reserve" | "release";
+  actorId: string;
+  actor: string;
+  at: string;
+  source: string;
+  destination: string;
+  linkedKind?: string;
+  linkedId?: string;
+  status: LedgerStatus;
+  balanceAfter: number;
+  reason?: string;
+}
+
+export interface TreasurySnapshot {
+  available: number;
+  escrowReserved: number;
+  assignmentPayReserved: number;
+  leaseObligations: number;
+  pendingBuyerIncome: number;
+  warehouseValuation: number;
+  personalBalance?: number;
+  recentEntries: LedgerEntry[];
+  availableActions: Array<"ledger" | "contribute">;
+}
+
+export type LeaseStatus = "starter" | "available" | "active" | "payment_due" | "grace" | "expired" | "ended";
+export interface CompanyLease {
+  id: string;
+  fieldId: string;
+  fieldName: string;
+  location: string;
+  status: LeaseStatus;
+  recurringPrice: number;
+  billing: string;
+  nextPayment?: string;
+  graceDeadline?: string;
+  capacity: number;
+  allowedCrops: string[];
+  activeCrops: string;
+  linkedWork: string[];
+  restriction?: string;
+  availableActions: Array<"start" | "pay" | "end" | "open_field">;
+}
+
+export interface RolePolicy {
+  role: FarmRole;
+  memberCount: number;
+  permissions: Array<{ id: string; group: "operations" | "people" | "finance" | "ownership"; label: string; enabled: boolean; locked?: boolean }>;
+  transactionLimit?: number;
+  pendingChanges: number;
+}
+
+export interface CompanyIdentityTerms {
+  currentName: string;
+  originalName: string;
+  lastRenamedAt?: string;
+  renameCost: number;
+  cooldownEndsAt?: string;
+  namingRules: string[];
+  available: boolean;
+}
+
+export type SaleListingStatus = "not_listed" | "draft" | "published" | "reserved" | "awaiting_seller" | "locked" | "completed" | "cancelled" | "expired" | "listing_changed";
+export interface BusinessSaleListing {
+  id: string;
+  version: number;
+  companyId: string;
+  companyName: string;
+  sellerId?: string;
+  sellerName?: string;
+  buyerId?: string;
+  buyerName?: string;
+  askingPrice: number;
+  suggestedValuation: number;
+  treasuryIncluded: number;
+  warehouseValuation: number;
+  activeLeases: number;
+  staffCount: number;
+  activeObligations: number;
+  saleFee: number;
+  sellerProceeds: number;
+  expiresAt?: string;
+  status: SaleListingStatus;
+  buyerConfirmed: boolean;
+  sellerConfirmed: boolean;
+  initialSale: boolean;
+  availableActions: Array<"save" | "publish" | "cancel" | "reserve" | "confirm_buyer" | "confirm_seller">;
+}
+
+export interface OwnershipTransfer {
+  listing: BusinessSaleListing;
+  company: CompanyRecord;
+  buyerFunds: number;
+  assets: string[];
+  liabilities: string[];
+  staffContinuity: string;
+  formerOwnerExit: string;
 }

@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { capabilitiesFor } from "../data/fixtures";
+import { ACTOR_BY_ROLE, capabilitiesFor } from "../data/fixtures";
 import type { AssignmentDetail, FarmRole, HubContextModel } from "../types";
 import { FixtureHubAdapter } from "./FixtureHubAdapter";
 
 function context(role: FarmRole): HubContextModel {
   return {
+    actorId: ACTOR_BY_ROLE[role],
     role,
     surface: "office",
+    presence: "office",
+    capabilitiesRevision: 1,
     viewState: "ready",
     capabilities: capabilitiesFor(role, "office"),
   };

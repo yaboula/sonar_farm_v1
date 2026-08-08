@@ -108,15 +108,21 @@ export function AssignmentDetailView() {
   const hub = useHub();
   const requestContext = useMemo<HubContextModel>(
     () => ({
+      actorId: hub.actorId,
       role: hub.role,
       surface: hub.surface,
+      presence: hub.presence,
+      capabilitiesRevision: hub.capabilitiesRevision,
       viewState: hub.viewState,
       capabilities: hub.capabilities,
       selectedKind: hub.selectedKind,
       selectedId: hub.selectedId,
     }),
     [
+      hub.actorId,
       hub.capabilities,
+      hub.capabilitiesRevision,
+      hub.presence,
       hub.role,
       hub.selectedId,
       hub.selectedKind,

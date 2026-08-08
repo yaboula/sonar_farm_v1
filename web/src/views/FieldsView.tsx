@@ -35,11 +35,14 @@ export function FieldsView() {
   const [filter, setFilter] = useState<FieldFilter>((searchParams.get("filter") as FieldFilter) || "all");
   const [query, setQuery] = useState(searchParams.get("query") ?? "");
   const context = useMemo<HubContextModel>(() => ({
+    actorId: hub.actorId,
     role: hub.role,
     surface: hub.surface,
+    presence: hub.presence,
+    capabilitiesRevision: hub.capabilitiesRevision,
     viewState: hub.viewState,
     capabilities: hub.capabilities,
-  }), [hub.role, hub.surface, hub.viewState, hub.capabilities]);
+  }), [hub.actorId, hub.role, hub.surface, hub.presence, hub.capabilitiesRevision, hub.viewState, hub.capabilities]);
 
   useEffect(() => {
     let active = true;

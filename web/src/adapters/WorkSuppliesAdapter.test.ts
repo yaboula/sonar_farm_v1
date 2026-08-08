@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { capabilitiesFor } from "../data/fixtures";
+import { ACTOR_BY_ROLE, capabilitiesFor } from "../data/fixtures";
 import type { BuyerOrderDetail, ContractDetail, FarmRole, FieldDetail, HubContextModel, PurchaseReview, SuppliesHubData, WorkQueueData } from "../types";
 import { FixtureHubAdapter } from "./FixtureHubAdapter";
 
 function context(role: FarmRole, surface: "office" | "tablet" = "office"): HubContextModel {
-  return { role, surface, viewState: "ready", capabilities: capabilitiesFor(role, surface) };
+  return { actorId: ACTOR_BY_ROLE[role], role, surface, presence: surface === "office" ? "office" : "remote", capabilitiesRevision: 1, viewState: "ready", capabilities: capabilitiesFor(role, surface) };
 }
 
 describe("FixtureHubAdapter Work and Supplies", () => {

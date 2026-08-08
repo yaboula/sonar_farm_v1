@@ -5,10 +5,11 @@ import {
   useMemo,
   useReducer,
 } from "react";
-import { capabilitiesFor } from "../data/fixtures";
+import { ACTOR_BY_ROLE, capabilitiesFor } from "../data/fixtures";
 import type {
   FarmRole,
   HubContextModel,
+  HubPresence,
   HubSurface,
   NavigationIntent,
   SelectionKind,
@@ -18,6 +19,7 @@ import type {
 interface HubStore extends HubContextModel {
   setRole: (role: FarmRole) => void;
   setSurface: (surface: HubSurface) => void;
+  setPresence: (presence: HubPresence) => void;
   setViewState: (viewState: ViewState) => void;
   select: (kind?: SelectionKind, id?: string) => void;
   dispatchIntent: (intent: NavigationIntent) => void;
@@ -26,13 +28,17 @@ interface HubStore extends HubContextModel {
 type Action =
   | { type: "role"; value: FarmRole }
   | { type: "surface"; value: HubSurface }
+  | { type: "presence"; value: HubPresence }
   | { type: "viewState"; value: ViewState }
   | { type: "select"; kind?: SelectionKind; id?: string }
   | { type: "intent"; intent: NavigationIntent };
 
 const initialState: HubContextModel = {
+  actorId: ACTOR_BY_ROLE.owner,
   role: "owner",
   surface: "office",
+  presence: "office",
+  capabilitiesRevision: 1,
   viewState: "ready",
   capabilities: capabilitiesFor("owner", "office"),
   selectedKind: "assignment",
@@ -44,6 +50,7 @@ function reducer(state: HubContextModel, action: Action): HubContextModel {
     return {
       ...state,
       role: action.value,
+      actorId: ACTOR_BY_ROLE[action.value],
       capabilities: capabilitiesFor(action.value, state.surface),
       selectedKind: undefined,
       selectedId: undefined,
@@ -54,9 +61,12 @@ function reducer(state: HubContextModel, action: Action): HubContextModel {
     return {
       ...state,
       surface: action.value,
+      presence: action.value === "office" ? "office" : "remote",
       capabilities: capabilitiesFor(state.role, action.value),
     };
   }
+
+  if (action.type === "presence") return { ...state, presence: action.value };
 
   if (action.type === "viewState") {
     return { ...state, viewState: action.value };
@@ -82,6 +92,7 @@ export function HubProvider({ children }: PropsWithChildren) {
       ...state,
       setRole: (role) => dispatch({ type: "role", value: role }),
       setSurface: (surface) => dispatch({ type: "surface", value: surface }),
+      setPresence: (presence) => dispatch({ type: "presence", value: presence }),
       setViewState: (viewState) => dispatch({ type: "viewState", value: viewState }),
       select: (kind, id) => dispatch({ type: "select", kind, id }),
       dispatchIntent: (intent) => dispatch({ type: "intent", intent }),

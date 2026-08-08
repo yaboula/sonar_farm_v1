@@ -45,7 +45,7 @@ export function FieldDetailView() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? `/fields?focus=${fieldId}`;
-  const context = useMemo<HubContextModel>(() => ({ role: hub.role, surface: hub.surface, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.role, hub.surface, hub.viewState, hub.capabilities]);
+  const context = useMemo<HubContextModel>(() => ({ actorId: hub.actorId, role: hub.role, surface: hub.surface, presence: hub.presence, capabilitiesRevision: hub.capabilitiesRevision, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.actorId, hub.role, hub.surface, hub.presence, hub.capabilitiesRevision, hub.viewState, hub.capabilities]);
   const [model, setModel] = useState<HubViewModel<FieldDetail> | null>(null);
   const [notice, setNotice] = useState<string>();
   const [handoff, setHandoff] = useState(false);

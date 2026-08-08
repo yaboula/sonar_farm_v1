@@ -25,7 +25,7 @@ export function WorkView() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [model, setModel] = useState<HubViewModel<WorkQueueData> | null>(null);
-  const context = useMemo<HubContextModel>(() => ({ role: hub.role, surface: hub.surface, viewState: hub.viewState, capabilities: hub.capabilities, selectedId: hub.selectedId, selectedKind: hub.selectedKind }), [hub.role, hub.surface, hub.viewState, hub.capabilities, hub.selectedId, hub.selectedKind]);
+  const context = useMemo<HubContextModel>(() => ({ actorId: hub.actorId, role: hub.role, surface: hub.surface, presence: hub.presence, capabilitiesRevision: hub.capabilitiesRevision, viewState: hub.viewState, capabilities: hub.capabilities, selectedId: hub.selectedId, selectedKind: hub.selectedKind }), [hub.actorId, hub.role, hub.surface, hub.presence, hub.capabilitiesRevision, hub.viewState, hub.capabilities, hub.selectedId, hub.selectedKind]);
   const contextKey = `${hub.role}:${hub.surface}:${hub.viewState}`;
   const [loadedFor, setLoadedFor] = useState("");
   useEffect(() => {

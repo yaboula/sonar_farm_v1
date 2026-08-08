@@ -51,7 +51,7 @@ export function WorkCreateView({ kind }: { kind: "assignment" | "contract" }) {
   const routeState = location.state as FieldDraftState | null;
   const returnTo = routeState?.returnTo ?? `/work?area=${kind === "assignment" ? "assignments" : "publicContracts"}`;
   const fieldDraft = routeState?.fieldDraft;
-  const context = useMemo<HubContextModel>(() => ({ role: hub.role, surface: hub.surface, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.role, hub.surface, hub.viewState, hub.capabilities]);
+  const context = useMemo<HubContextModel>(() => ({ actorId: hub.actorId, role: hub.role, surface: hub.surface, presence: hub.presence, capabilitiesRevision: hub.capabilitiesRevision, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.actorId, hub.role, hub.surface, hub.presence, hub.capabilitiesRevision, hub.viewState, hub.capabilities]);
   const [access, setAccess] = useState<HubViewModel<{ nextReference: string }> | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [pending, setPending] = useState(false);
