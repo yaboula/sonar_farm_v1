@@ -163,3 +163,86 @@ visual QA on Office and Tablet before receiving its own commit.
 
 The in-app browser is the primary QA surface. If it blocks local access again,
 QA stops and the blocker is reported before selecting a definitive solution.
+
+## Increment 2.2 — Work and Supplies complete
+
+### Work access model
+
+- Visitor: published Public Contracts only.
+- Contractor: their Active Contract, Progress and Completion.
+- Worker and Procurement: their own Assignments only.
+- Supervisor: team Assignments and Create Assignment.
+- Manager and Owner: Assignments, Buyer Orders and Public Contract Management.
+- Unauthorized tabs are removed before render. Deep links return Restricted.
+
+### Work routes and behavior
+
+- `/work/assignments/new` creates a funded internal Assignment.
+- `/work/orders/:orderId` owns Buyer Order planning and fulfillment transitions.
+- `/work/contracts/:contractId` serves public and management contract detail.
+- `/work/contracts/new` creates a funded draft before publication.
+- `/work/contracts/active/:contractId` is the contractor workspace.
+- `/progress` verifies steps and `/completion` presents the final receipt.
+
+Work list search, tab and selection live in the URL/context and survive deep-view
+return. All economic and permission-sensitive actions are supplied by the
+adapter. Confirmation is mandatory for accepting commitments, publication,
+submission, completion, rejection, abandonment and cancellation.
+
+Public Contract acceptance is atomic in the fixture repository. It reserves the
+contract once and changes the preview context from Visitor to Contractor. The
+contractor supplies personal materials. Reward escrow, cargo ownership, delivery
+destination and failure consequences stay visible throughout the lifecycle.
+
+Buyer Orders support accept, plan, reserve, prepare, complete and reject. Linked
+Assignments are real routes. Warehouse and Company Cargo references remain
+informational until their increments exist and never render false actions.
+
+### Supplies access model
+
+- Every role can make a personal Supply Market purchase.
+- Procurement, Manager and Owner can select Company Funds and view Procurement.
+- Manager and Owner can approve or reject requests.
+- Procurement, Manager and Owner can resolve Issued Materials custody.
+- Tablet supports catalog and review but never executes a physical transaction.
+
+### Supply routes and behavior
+
+Supply Market provides search, category filtering, supplier availability,
+restock information, quantities, payer selection and a functional cart. Catalog
+fixtures cover seedlings, seeds, hand tools, watering, fertilizer and pest
+treatment. Essential planting stock is permanent; other inventory may sell out.
+
+`/supplies/purchases/:purchaseId/review` shows line pricing, fees, payer,
+ownership, balances, budget authority, capacity and fulfillment. Office
+confirmation revalidates permission, funds, budget, transaction limit and stock,
+then updates the in-memory repository and creates a receipt. Tablet produces an
+Office handoff without mutating money or stock.
+
+Company Procurement exposes budget, remaining authority, transaction limit,
+allowed categories, requests, recent purchases and policy attention. Issued
+Materials records employee, Assignment, issued/used/remaining quantities,
+custody status and authorized return/discrepancy actions.
+
+### Adapter contracts
+
+`HubViewRequest` now includes Assignment creation, Buyer Order detail, Contract
+detail/creation and Purchase Review. `ActionIntent` includes every Work and
+Supplies mutation. `IntentResult` can return an entity id, context update,
+receipt, handoff or invalidation signal.
+
+The adapter owns mutable repositories for Assignments, Buyer Orders, Contracts,
+supplier stock, purchases, balances, procurement requests and issued materials.
+Reload resets all fixtures. UI components never invent an available action or
+economic consequence.
+
+### Completion gate
+
+- Every Work/Supplies route has loading, empty, error, restricted and unavailable
+  coverage through the shared state contract.
+- Domain states cover draft, reserved, active, blocked, expired, completed,
+  failed, cancelled, sold out and permission/funds/budget/stock failures.
+- Office and Tablet share the opaque 1440 × 810 product canvas.
+- Mouse, keyboard, focus, Escape dismissal and confirmation behavior are tested.
+- Typecheck, lint, Vitest, production build, Sites packaging and Lua regression
+  remain mandatory before commit.
