@@ -31,3 +31,28 @@ jobs:
             echo "Potential secret found in tracked files."
             exit 1
           fi
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Test frontend
+        run: npm test
+      - name: Build frontend
+        run: npm run build
+      - name: Test Sites worker artifact
+        run: npm run test:sites
