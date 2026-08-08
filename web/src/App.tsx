@@ -13,6 +13,7 @@ import { WorkCreateView } from "./views/WorkCreateView";
 import { BuyerOrderDetailView } from "./views/BuyerOrderDetailView";
 import { ContractDetailView } from "./views/ContractDetailView";
 import { PurchaseReviewView } from "./views/PurchaseReviewView";
+import { FieldDetailView } from "./views/FieldDetailView";
 
 const PATH_TO_ROUTE: Record<string, HubRoute> = {
   "/today": "today",
@@ -28,7 +29,7 @@ export function App() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const current = PATH_TO_ROUTE[location.pathname];
+    const current = PATH_TO_ROUTE[location.pathname] ?? (location.pathname.startsWith("/fields/") ? "fields" : location.pathname.startsWith("/work/") ? "work" : location.pathname.startsWith("/supplies/") ? "supplies" : undefined);
     if (current && !capabilities.routes.includes(current)) {
       navigate("/" + capabilities.routes[0], { replace: true });
     }
@@ -39,6 +40,7 @@ export function App() {
       <Routes>
         <Route path="/today" element={<TodayView />} />
         <Route path="/fields" element={<FieldsView />} />
+        <Route path="/fields/:fieldId" element={<FieldDetailView />} />
         <Route path="/work" element={<WorkView />} />
         <Route path="/supplies" element={<SuppliesView />} />
         <Route path="/company" element={<CompanyView />} />

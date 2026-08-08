@@ -52,6 +52,16 @@ describe("Farm Business Hub", () => {
     }
   });
 
+  it("opens the selected Field without losing the Fields return path", async () => {
+    const user = userEvent.setup();
+    renderApp("/fields");
+    expect(await screen.findByText(/two fields require a decision/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /north field/i }));
+    await user.click(screen.getByRole("button", { name: /open field map/i }));
+    expect(await screen.findByRole("heading", { name: "North Field" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /back to fields/i })).toBeInTheDocument();
+  });
+
   it("redirects when a live role change removes the active route", async () => {
     const user = userEvent.setup();
     renderApp("/today");
