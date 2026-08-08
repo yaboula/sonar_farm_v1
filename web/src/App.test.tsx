@@ -58,7 +58,7 @@ describe("Farm Business Hub", () => {
     expect(await screen.findByText(/two fields require a decision/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /north field/i }));
     await user.click(screen.getByRole("button", { name: /open field map/i }));
-    expect(await screen.findByRole("heading", { name: "North Field" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "North Field" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /back to fields/i })).toBeInTheDocument();
   });
 
