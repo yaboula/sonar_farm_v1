@@ -6,17 +6,26 @@ import { FieldMap } from "./FieldMap";
 
 function ScaleMapHarness() {
   const field = createScaleFieldFixture();
-  const [row, setRow] = useState<string>();
+  const [row, setRow] = useState<string | undefined>("scale-r01");
   const [slot, setSlot] = useState<string>();
   return <FieldMap field={field} layer="overview" selectedRowId={row} selectedSlotId={slot} onSelectRow={setRow} onSelectSlot={(slotId, rowId) => { setSlot(slotId); setRow(rowId); }} />;
 }
 
 describe("FieldMap", () => {
-  it("renders the 20 by 20 limit and moves slot focus by stable identity", async () => {
+  it("shows a fixed 10-Row viewport and fits 20 Slots without zoom", async () => {
     const { container } = render(<ScaleMapHarness />);
-    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
-    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
-    expect(container.querySelectorAll("[data-slot-id]")).toHaveLength(400);
+    expect(container.querySelectorAll("[data-row-id]")).toHaveLength(20);
+    expect(container.querySelectorAll("[data-slot-id]")).toHaveLength(20);
+    expect(screen.queryByRole("button", { name: /zoom/i })).not.toBeInTheDocument();
+    expect(container.querySelector("[data-map-content]")).not.toHaveAttribute("transform");
+    expect(container.querySelector("svg")).toHaveStyle({ height: "600px" });
+    expect(screen.getByText(/Rows 1–10/i)).toBeInTheDocument();
+
+    const scroller = screen.getByTestId("field-map-scroll");
+    scroller.scrollTop = 300;
+    fireEvent.scroll(scroller);
+    expect(screen.getByText(/Rows 11–20/i)).toBeInTheDocument();
+
     const first = container.querySelector<SVGGElement>('[data-slot-id="scale-field:scale-r01:s01"]')!;
     first.focus();
     fireEvent.keyDown(first, { key: "ArrowRight" });

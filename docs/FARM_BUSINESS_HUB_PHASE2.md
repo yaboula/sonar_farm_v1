@@ -265,8 +265,8 @@ identity. `legacyIndex` is retained only as a future bridge aid.
 - `/fields` is a role-adapted portfolio.
 - `/fields/:fieldId` is the shared Field, Row and Slot operating map.
 - `layer`, `row`, `slot` and `panel` live in the URL query.
-- Map zoom and pan are retained in session when Work temporarily replaces the
-  deep view.
+- The map retains its own vertical Row scroll position when Work temporarily
+  replaces the deep view.
 - Return to Fields restores portfolio filter, search and selected Field.
 
 ### Access model
@@ -284,9 +284,11 @@ before render. Components do not infer access from role labels.
 ### Spatial map and layers
 
 The central visualization is SVG generated from authoritative normalized
-topology. It supports 20 × 20 / 400 Slots, semantic Row aggregation, near-zoom
-Slot detail, wheel zoom, drag pan and reset. Keyboard focus roves across Rows and
-Slots with arrows; Enter inspects and Escape returns to the parent scope.
+topology. It supports 20 × 20 / 400 Slots through a fixed 0° grid with no zoom
+or free pan. Its own vertical viewport presents 10 clear Rows at a time and
+scrolls to Rows 11–20. Selecting a Row reveals up to 20 Slots across the same
+rectangle. Keyboard focus roves across Rows and Slots with arrows; Enter
+inspects and Escape returns to the parent scope.
 
 Layers are `Overview`, `Water`, `Health`, `Growth`, `Readiness`, `Work` and
 `Crop Plan`. Readiness includes spoilage. Critical Slot diagnostics remain

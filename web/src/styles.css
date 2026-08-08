@@ -3553,7 +3553,6 @@ select:focus-visible {
 
 .field-layer-tabs,
 .field-context-tabs,
-.field-map-controls,
 .field-action-buttons {
   display: flex;
   align-items: center;
@@ -3650,37 +3649,39 @@ select:focus-visible {
 }
 .field-map-header > div:first-child strong { color: var(--text-secondary); font-size: 11px; font-weight: 500; }
 
-.field-map-controls button {
-  width: 27px;
-  height: 27px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--border-neutral);
-  color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.025);
-  cursor: pointer;
-}
-.field-map-controls button:hover { border-color: var(--border-accent); color: var(--accent); }
-.field-map-controls span { min-width: 38px; color: var(--text-muted); font-size: 10px; text-align: center; }
+.field-map-scroll-hint { display: grid; justify-items: end; gap: 1px; text-align: right; }
+.field-map-scroll-hint strong { color: var(--text-secondary); font-family: var(--display); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.field-map-scroll-hint span { color: var(--text-muted); font-size: 9px; }
 
 .field-map-stage {
   position: relative;
-  height: 294px;
+  height: 300px;
   overflow: hidden;
   background:
     radial-gradient(circle at 50% 45%, rgba(73, 91, 49, 0.16), transparent 56%),
     linear-gradient(155deg, rgba(32, 38, 27, 0.72), rgba(10, 13, 11, 0.98));
 }
 
-.field-map-stage svg {
+.field-map-scroll {
   width: 100%;
   height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-color: rgba(245, 195, 49, 0.32) rgba(5, 7, 5, 0.55);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+.field-map-scroll::-webkit-scrollbar { width: 8px; }
+.field-map-scroll::-webkit-scrollbar-track { background: rgba(5, 7, 5, 0.55); }
+.field-map-scroll::-webkit-scrollbar-thumb { border: 2px solid rgba(5, 7, 5, 0.55); border-radius: 99px; background: rgba(245, 195, 49, 0.38); }
+
+.field-map-scroll svg {
+  width: 100%;
   display: block;
   color: rgba(223, 211, 176, 0.08);
-  cursor: grab;
   user-select: none;
 }
-.field-map-stage svg:active { cursor: grabbing; }
 .field-map-grid { stroke: rgba(245, 195, 49, 0.12); stroke-width: 0.3; }
 
 .field-map-row { cursor: pointer; outline: none; }
@@ -3729,19 +3730,18 @@ select:focus-visible {
 .field-map-north i { width: 1px; height: 17px; margin-top: 2px; background: linear-gradient(var(--accent), transparent); }
 
 .field-map-legend {
-  position: absolute;
-  left: 11px;
-  bottom: 10px;
-  max-width: 315px;
-  padding: 7px 9px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  min-height: 31px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   color: var(--text-muted);
-  background: rgba(7, 9, 8, 0.82);
-  backdrop-filter: blur(3px);
-  pointer-events: none;
+  background: rgba(8, 11, 9, 0.96);
 }
-.field-map-legend > span { display: block; font-size: 9px; line-height: 1.2; }
-.field-map-legend > div { display: flex; gap: 11px; margin-top: 5px; }
+.field-map-legend > span { min-width: 0; overflow: hidden; font-size: 9px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.field-map-legend > div { flex: 0 0 auto; display: flex; gap: 11px; }
 .field-map-legend em { display: flex; align-items: center; gap: 5px; color: var(--text-secondary); font-size: 9px; font-style: normal; }
 .field-map-legend em > i { width: 7px; height: 7px; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 50%; background: rgba(229, 222, 199, 0.14); }
 .field-map-legend em > i[data-tone="good"] { background: #77905d; }
@@ -3905,7 +3905,7 @@ select:focus-visible {
 .surface-stage--tablet .field-operating-layout { grid-template-columns: minmax(0, 1fr) 248px; gap: 11px; }
 .surface-stage--tablet .field-scope-inspector { min-height: 470px; padding: 13px 14px; }
 .surface-stage--tablet .field-scope-inspector h2 { font-size: 25px; }
-.surface-stage--tablet .field-map-stage { height: 304px; }
+.surface-stage--tablet .field-map-stage { height: 300px; }
 .surface-stage--tablet .field-layer-tabs button { padding-inline: 8px; }
 .surface-stage--tablet .slot-work-rule { left: 14px; right: 14px; }
 

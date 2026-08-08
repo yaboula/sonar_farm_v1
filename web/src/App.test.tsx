@@ -85,18 +85,16 @@ describe("Farm Business Hub", () => {
     expect(screen.getByRole("button", { name: "Update Crop Plan" })).toBeEnabled();
   });
 
-  it("restores Field layer, Row and zoom after a linked Work detour", async () => {
+  it("restores Field layer and Row after a linked Work detour", async () => {
     const user = userEvent.setup();
     renderApp("/fields/greenhouse-2?row=green-ra&layer=readiness&panel=work");
     expect(await screen.findByRole("tab", { name: "Readiness" })).toHaveAttribute("aria-selected", "true");
-    await user.click(screen.getByRole("button", { name: "Zoom in" }));
-    expect(screen.getByText("160%")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /zoom/i })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Open Work" }));
     expect(await screen.findByRole("heading", { name: "Harvest Greenhouse 2" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Back to Assignments" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Greenhouse 2" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Readiness" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("160%")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Row A" })).toBeInTheDocument();
   });
 
