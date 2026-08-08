@@ -17,4 +17,7 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - The approved Today screenshot at `D:/Descargas/ChatGPT Image 8 ago 2026, 16_15_37.png` is the visual source of truth for hierarchy, density, typography, and tone.
 - Use Barlow Condensed for display/UI headings, Source Sans 3 for body copy, Phosphor for interface icons, warm yellow for action/selection, and opaque charcoal surfaces.
 - Keep the developer role/surface/state controls behind `import.meta.env.DEV`; they must not ship in the FiveM production build.
-- Phase 1 contains only Today, Fields, Work, Supplies, and Company hubs. Deep entity views, backend/Lua integration, payments, persistence, and minigames are later phases.
+- Phase 1 contains Today, Fields, Work, Supplies, and Company hubs. Phase 2 adds one deep frontend view at a time while backend/Lua integration, real payments, persistence, and minigames remain out of scope.
+- Assignment Detail is the first Phase 2 view. Its master state is Worker + In Progress; `Resume Field Work` requests a world handoff and never fabricates verified progress.
+- Worker and Supervisor are the explicit Assignment Detail perspectives. Manager and Owner inherit Supervisor behavior until dedicated variants are designed.
+- Deep-view actions come from adapter-provided `availableActions`; components do not infer business rules from role labels or status copy.

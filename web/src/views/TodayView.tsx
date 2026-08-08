@@ -9,7 +9,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { StatePanel } from "../components/StatePanel";
 import { useHub } from "../store/HubContext";
-import type { ActionIntent } from "../types";
+import type { NavigationIntent } from "../types";
 
 interface PriorityProps {
   number: number;
@@ -56,9 +56,9 @@ export function TodayView() {
   const navigate = useNavigate();
   const { viewState, dispatchIntent, setViewState } = useHub();
 
-  const go = (intent: ActionIntent) => {
+  const go = (intent: NavigationIntent) => {
     dispatchIntent(intent);
-    navigate("/" + intent.target);
+    navigate(intent.path ?? "/" + intent.target);
   };
 
   if (viewState !== "ready") {
@@ -111,14 +111,16 @@ export function TodayView() {
           type="button"
           onClick={() =>
             go({
+              type: "navigate",
               id: "continue-assignment",
               target: "work",
+              path: "/work/assignments/asg-1048",
               selectionKind: "assignment",
               selectionId: "asg-1048",
             })
           }
         >
-          Continue Assignment
+          Resume Field Work
           <CaretRight size={27} weight="bold" />
         </button>
       </article>
@@ -134,6 +136,7 @@ export function TodayView() {
           action="View Cargo"
           onAction={() =>
             go({
+              type: "navigate",
               id: "view-cargo",
               target: "company",
               selectionKind: "cargo",
@@ -150,6 +153,7 @@ export function TodayView() {
           action="View Field"
           onAction={() =>
             go({
+              type: "navigate",
               id: "view-field",
               target: "fields",
               selectionKind: "field",

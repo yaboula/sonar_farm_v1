@@ -1,109 +1,110 @@
-# Design QA — Farm Business Hub Phase 1
+# Design QA — Farm Business Hub Phase 2 / Assignment Detail
 
 ## Comparison target
 
-- Source visual truth: `D:/Descargas/ChatGPT Image 8 ago 2026, 16_15_37.png`
-- Source pixels: `1672 × 941`
-- Implementation URL: `http://127.0.0.1:4173/#/today`
-- Browser-rendered evidence: `web/qa/implementation-office-1920x1080.png`
-- Normalized product canvas: `web/qa/implementation-office-canvas-1672x941.png`
-- Combined comparison input: `web/qa/today-reference-comparison.png`
-- Browser viewport: `1920 × 1080`, device density `1`
-- Compared state: Office Terminal, Owner, Today, Ready
+- Original art-direction source: `D:/Descargas/ChatGPT Image 8 ago 2026, 16_15_37.png`
+- Accepted V1 product source: `web/qa/phase2/v1-today-office-worker-1920x1080.png`
+- Primary implementation evidence: `web/qa/phase2/assignment-detail-office-worker-1920x1080.png`
+- Tablet evidence: `web/qa/phase2/assignment-detail-tablet-worker-1920x1080.png`
+- Supervisor dialog evidence: `web/qa/phase2/assignment-review-supervisor-1920x1080.png`
+- Responsive evidence: `web/qa/phase2/assignment-detail-office-worker-1280x720.png` and `web/qa/phase2/assignment-detail-office-worker-3440x1440.png`
+- Browser viewport and density: `1920 × 1080` at density `1` for the primary comparison; additional viewports `1280 × 720` and `3440 × 1440` at density `1`
+- Logical product canvas: opaque `1440 × 810`, uniformly scaled inside each physical surface
+- State: Office Terminal, Worker, Ready, Assignment `ASG-1048`, `In Progress`
 
-The implementation screenshot was captured in the Codex in-app browser. The
-logical canvas was cropped from the physical preview and normalized to the same
-`1672 × 941` pixel dimensions as the source. The combined comparison places the
-source on the left and implementation on the right.
+The implementation was rendered and exercised in the Codex in-app browser. The
+V1 source and Assignment Detail capture were opened together in one comparison
+input at equal pixel size. The original art-direction image was also compared in
+the same input with the primary implementation to verify the visual lineage.
 
 ## Full-view comparison evidence
 
-The normalized comparison confirms the same principal composition:
+Assignment Detail preserves the accepted V1 system instead of introducing a
+second dashboard language:
 
-- 66 px dark top navigation with centered primary hubs;
-- Today title and question in the upper-left;
-- dominant farm environment image;
-- large assignment card anchored lower-left;
-- three-priority rail on the right;
-- warm-yellow status, progress and primary action;
-- condensed display type and neutral body type;
-- dark vignette preserving readability over the world asset.
+- identical physical Office/Tablet framing and opaque 16:9 product canvas;
+- the existing condensed display/body typography split;
+- the same charcoal hierarchy, warm-yellow selection and muted olive success;
+- the approved header proportions, navigation rhythm and world vignette;
+- one dominant operational objective, one evidence rail and one persistent
+  contextual action rather than a generic grid of independent dashboard cards;
+- real Phosphor icons with the same weight and alignment as V1.
 
-The master fixture deliberately shows `Owner` instead of the screenshot's
-`Worker`, as required by the Phase 1 plan. The generated farm-office environment
-is not pixel-identical to the reference but matches subject, camera height,
-warmth, density, quiet zones and game-world art direction.
+The deep view is intentionally denser than Today because it is an auditable work
+record. Its title, requirements and action remain above the fold while history,
+terms and materials use one explicit internal scroll region. No page-level
+overflow or hidden persistent control was detected.
 
 ## Focused-region comparison evidence
 
-The assignment card and priority rail are readable at full comparison scale, so
-an additional crop was not required. Their typography, progress anatomy,
-separator placement, action hierarchy, icon weight and spacing were inspected
-in `today-reference-comparison.png`.
+Focused inspection covered the title/deadline band, verified-requirement rows,
+reserved-pay panel, issued-material row, action bar and Supervisor review dialog.
+At `1920 × 1080` the small copy remains readable, the `3 / 8` measure aligns with
+the progress rail, status colors retain their semantic role, and the dialog
+keeps a clear primary/secondary decision hierarchy over a subdued product view.
 
 ## Required fidelity surfaces
 
-- Fonts and typography: local Barlow Condensed and Source Sans 3 reproduce the
-  display/body split, uppercase hierarchy and condensed navigation density.
-- Spacing and layout rhythm: the dominant card, intro and right rail match the
-  source regions. No product control is cropped in the post-fix capture.
-- Colors and tokens: charcoal, muted neutral copy and warm yellow map to the
-  approved palette. Yellow is reserved for status, selection and action.
-- Image quality and assets: the farm scene is sharp and correctly cropped. Real
-  generated raster assets are used for the environment and physical shells;
-  Phosphor supplies interface icons.
-- Copy and content: Today uses the approved English labels and consistent
-  fixtures for assignment, field, cargo and Buyer Order BO-204.
+- Fonts and typography: local Barlow Condensed remains exclusive to display,
+  status and action text; Source Sans 3 handles instructions and operational
+  data. Weight, line height, tracking, wrapping and optical hierarchy match V1.
+- Spacing and layout rhythm: header, breadcrumb, title band, two-column record
+  and persistent action bar form a stable vertical sequence. Borders stay
+  discreet and square-edged rather than becoming generic rounded cards.
+- Colors and tokens: approved charcoal, warm yellow, earth brown and olive are
+  reused from V1. Yellow remains reserved for selection, verified progress and
+  primary action; contrast is sufficient in all inspected states.
+- Image quality and assets: the existing raster farm-world and physical surface
+  assets remain sharp and correctly masked. No placeholder imagery, CSS art,
+  emoji, handcrafted SVG or synthetic icon substitute was introduced.
+- Copy and content: all visible copy is specific to the farming operation and
+  uses canonical identifiers, rows, tools, supervisors, payout rules and audit
+  events. No invented analytics or future module appears.
+- Icons: all operational icons come from Phosphor and share size, stroke/fill
+  behavior and baseline alignment with the V1 header and Today controls.
+
+## Responsive and surface evidence
+
+- `1280 × 720`: Office frame fits without clipping; logical hierarchy and CTA
+  remain visible.
+- `1920 × 1080`: Office and Tablet render complete physical shells with opaque
+  product backgrounds and the world visible only around the device.
+- `3440 × 1440`: the canvas scales uniformly and remains centered; ultrawide
+  space stays outside the product instead of stretching its internal layout.
+- Tablet reuses the same deep-view route and components while changing only the
+  physical shell, surface label and capability context.
+
+## Interaction and accessibility evidence
+
+Browser-validated:
+
+- Work search and tab query survive deep-link entry and `Back to Assignments`;
+- `Resume Field Work` enters the simulated world handoff and returns with `3 / 8`
+  verified progress unchanged;
+- Worker and Supervisor receive different action bars from adapter-provided
+  capabilities;
+- Supervisor review opens an accessible labelled dialog with explicit Approve
+  and Request Correction decisions;
+- live role change to an unauthorized role produces Restricted;
+- Office/Tablet switching keeps the current deep route;
+- browser console contains no warnings or errors.
+
+Automated coverage additionally verifies Escape dialog dismissal, incomplete
+submission rejection, state mutations, Manager/Owner Supervisor inheritance and
+permission loss while the view is open.
 
 ## Comparison history
 
 ### Iteration 1
 
-- Finding: `[P1] Physical frame covered the product canvas`.
-- Evidence: `web/qa/iteration-1-frame-overlap-1920x1080.png` showed the generated
-  industrial bezel on top of the header, assignment and priority rail.
-- Impact: navigation and operational content were clipped, blocking core use.
-- Fix: moved the complete opaque `1440 × 810` canvas above the frame and masked
-  frame art to the external ring only in `src/styles.css`.
-
-### Iteration 2
-
-- Evidence: `web/qa/implementation-office-1920x1080.png` and the normalized
-  combined comparison show the complete header, card, rail and all actions.
-- Result: the earlier P1 is resolved. No new P0/P1/P2 visual mismatch is visible
-  in the Office master state.
-
-## Functional evidence
-
-The automated React suite covers:
-
-- Today master content and primary action;
-- Today to Work navigation with entity context;
-- all five Owner hubs;
-- Office to Tablet surface change without replacing route content;
-- live permission loss and redirect for Visitor;
-- blocked operational state;
-- role/surface capability derivation;
-- fixed-stage fit calculations for 1280×720, 1920×1080, 2560×1440 and
-  3440×1440.
-
-## Remaining QA blocker
-
-After the post-fix Office capture, the in-app browser's local-URL security policy
-stopped further page access. It therefore prevented browser-level Tablet
-captures, alternate viewport captures, live mouse/keyboard interaction checks
-and the final browser console read. Using a different browser automation surface
-would require explicit user permission under the selected-browser policy.
-
-The code, build and automated interaction tests pass, but the required final
-cross-surface browser evidence is incomplete. No product defect is currently
-known; this is a verification blocker.
+- Evidence: primary Office, Tablet, Supervisor-dialog and responsive captures.
+- Findings: no actionable P0, P1 or P2 mismatch was found against the accepted
+  V1 product source or original art direction.
+- Result: no visual fix iteration was required. The first comparison passes.
 
 ## Follow-up polish
 
-- `[P3]` Revisit the precise physical shell crop after Tablet browser capture;
-  it does not affect the protected logical canvas.
-- `[P3]` Compare hover/focus transitions at 1:1 scale once browser access is
-  available again.
+- `[P3]` Revisit microcopy density when real backend error payloads replace the
+  fixtures; this does not block the current product contract.
 
-final result: blocked
+final result: passed

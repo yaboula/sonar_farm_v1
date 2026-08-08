@@ -4,6 +4,7 @@ import { SurfaceStage } from "./components/SurfaceStage";
 import { useHub } from "./store/HubContext";
 import type { HubRoute } from "./types";
 import { CompanyView } from "./views/CompanyView";
+import { AssignmentDetailView } from "./views/AssignmentDetailView";
 import { FieldsView } from "./views/FieldsView";
 import { SuppliesView } from "./views/SuppliesView";
 import { TodayView } from "./views/TodayView";
@@ -37,6 +38,7 @@ export function App() {
         <Route path="/work" element={<WorkView />} />
         <Route path="/supplies" element={<SuppliesView />} />
         <Route path="/company" element={<CompanyView />} />
+        <Route path="/work/assignments/:assignmentId" element={<AssignmentDetailView />} />
         <Route path="*" element={<Navigate to={"/" + capabilities.routes[0]} replace />} />
       </Routes>
     </SurfaceStage>

@@ -7,10 +7,10 @@ import {
 } from "react";
 import { capabilitiesFor } from "../data/fixtures";
 import type {
-  ActionIntent,
   FarmRole,
   HubContextModel,
   HubSurface,
+  NavigationIntent,
   SelectionKind,
   ViewState,
 } from "../types";
@@ -20,7 +20,7 @@ interface HubStore extends HubContextModel {
   setSurface: (surface: HubSurface) => void;
   setViewState: (viewState: ViewState) => void;
   select: (kind?: SelectionKind, id?: string) => void;
-  dispatchIntent: (intent: ActionIntent) => void;
+  dispatchIntent: (intent: NavigationIntent) => void;
 }
 
 type Action =
@@ -28,7 +28,7 @@ type Action =
   | { type: "surface"; value: HubSurface }
   | { type: "viewState"; value: ViewState }
   | { type: "select"; kind?: SelectionKind; id?: string }
-  | { type: "intent"; intent: ActionIntent };
+  | { type: "intent"; intent: NavigationIntent };
 
 const initialState: HubContextModel = {
   role: "owner",

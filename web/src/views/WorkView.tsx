@@ -6,7 +6,8 @@ import {
   Handshake,
   MagnifyingGlass,
 } from "@phosphor-icons/react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { HubScaffold } from "../components/HubScaffold";
 import { StatePanel } from "../components/StatePanel";
 import { WORK } from "../data/fixtures";
@@ -23,9 +24,11 @@ const TAB_LABELS: Record<WorkTab, string> = {
 
 export function WorkView() {
   const { role, viewState, selectedId, select, setViewState } = useHub();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = WORK.find((item) => item.id === selectedId)?.type ?? "assignment";
-  const [tab, setTab] = useState<WorkTab>(initialTab);
-  const [query, setQuery] = useState("");
+  const tab = (searchParams.get("tab") as WorkTab | null) ?? initialTab;
+  const query = searchParams.get("q") ?? "";
   const allowedTabs: WorkTab[] =
     role === "visitor" || role === "contractor"
       ? ["contract"]
@@ -36,10 +39,11 @@ export function WorkView() {
       WORK.filter(
         (item) =>
           item.type === safeTab &&
+          (role !== "worker" || item.type !== "assignment" || item.assigneeId === "staff-noah") &&
           (item.title.toLowerCase().includes(query.toLowerCase()) ||
             item.meta.toLowerCase().includes(query.toLowerCase())),
       ),
-    [query, safeTab],
+    [query, role, safeTab],
   );
   const selected = WORK.find((item) => item.id === selectedId && item.type === safeTab) ?? items[0];
 
@@ -58,7 +62,10 @@ export function WorkView() {
             className={safeTab === item ? "is-selected" : ""}
             key={item}
             onClick={() => {
-              setTab(item);
+              const next = new URLSearchParams(searchParams);
+              next.set("tab", item);
+              next.delete("q");
+              setSearchParams(next);
               select();
             }}
           >
@@ -70,7 +77,13 @@ export function WorkView() {
         <MagnifyingGlass size={18} />
         <input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            const next = new URLSearchParams(searchParams);
+            if (event.target.value) next.set("q", event.target.value);
+            else next.delete("q");
+            next.set("tab", safeTab);
+            setSearchParams(next, { replace: true });
+          }}
           placeholder="Search work"
         />
       </label>
@@ -93,8 +106,19 @@ export function WorkView() {
         <span>Verified progress</span>
         <div><i style={{ width: selected.progress + "%" }} /></div>
       </div>
-      <button type="button" className="inspector-action" onClick={() => select(selected.type, selected.id)}>
-        Keep selected
+      <button
+        type="button"
+        className="inspector-action"
+        onClick={() => {
+          select(selected.type, selected.id);
+          if (selected.type === "assignment") {
+            navigate(`/work/assignments/${selected.id}`, {
+              state: { returnTo: `/work?${searchParams.toString()}` },
+            });
+          }
+        }}
+      >
+        {selected.type === "assignment" ? "View Assignment" : "Keep selected"}
         <CaretRight size={18} />
       </button>
     </div>
