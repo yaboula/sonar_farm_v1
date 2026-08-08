@@ -13,19 +13,21 @@ const cropOptions = [
 
 const labelFor = (crop: string) => cropOptions.find((item) => item.value === crop)?.label ?? crop;
 
-export function CropPlanDialog({ field, initialRowId, pending, onClose, onConfirm }: {
+export function CropPlanDialog({ field, initialRowId, existingPlan, pending, onClose, onConfirm }: {
   field: FieldDetail;
   initialRowId?: string;
+  existingPlan?: FieldDetail["cropPlans"][number];
   pending: boolean;
   onClose: () => void;
   onConfirm: (input: CropPlanInput) => void;
 }) {
   const initialRow = field.topology.rows.find((row) => row.id === initialRowId);
-  const [crop, setCrop] = useState(initialRow?.plannedCrop ?? (initialRow?.cropLabel === "Lettuce" ? "lettuce" : "tomato"));
-  const [rowIds, setRowIds] = useState<string[]>(initialRowId ? [initialRowId] : []);
-  const activePlanRows = new Set(field.cropPlans.filter((plan) => ["reserved", "in_execution"].includes(plan.status)).flatMap((plan) => plan.rowIds));
+  const [crop, setCrop] = useState(existingPlan?.crop ?? initialRow?.plannedCrop ?? (initialRow?.cropLabel === "Lettuce" ? "lettuce" : "tomato"));
+  const [rowIds, setRowIds] = useState<string[]>(existingPlan?.rowIds ?? (initialRowId ? [initialRowId] : []));
+  const activePlanRows = new Set(field.cropPlans.filter((plan) => plan.id !== existingPlan?.id && ["reserved", "in_execution"].includes(plan.status)).flatMap((plan) => plan.rowIds));
   const eligibleRows = field.topology.rows.filter((row) => {
-    if (!row.visibleDetail || activePlanRows.has(row.id) || row.available <= 0) return false;
+    const available = row.available + (existingPlan?.rowIds.includes(row.id) ? row.planned : 0);
+    if (!row.visibleDetail || activePlanRows.has(row.id) || available <= 0) return false;
     if (!row.occupied) return true;
     const existing = row.cropLabel.toLowerCase();
     return existing === crop || existing === labelFor(crop).toLowerCase();
@@ -34,15 +36,15 @@ export function CropPlanDialog({ field, initialRowId, pending, onClose, onConfir
   const review = useMemo(() => {
     const selectedSlots = field.topology.slots.filter((slot) => rowIds.includes(slot.rowId));
     return {
-      eligible: selectedSlots.filter((slot) => slot.status === "empty").length,
-      excluded: selectedSlots.filter((slot) => slot.status !== "empty").length,
+      eligible: selectedSlots.filter((slot) => slot.status === "empty" || (slot.status === "planned" && existingPlan?.rowIds.includes(slot.rowId))).length,
+      excluded: selectedSlots.filter((slot) => slot.status === "occupied").length,
     };
-  }, [field.topology.slots, rowIds]);
+  }, [existingPlan?.rowIds, field.topology.slots, rowIds]);
 
   const toggleRow = (id: string) => setRowIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
 
   return (
-    <ConfirmDialog eyebrow="Agronomic planning" title="Reserve this Crop Plan?" confirmLabel="Reserve Crop Plan" pending={pending} confirmDisabled={!rowIds.length} onClose={onClose} onConfirm={() => onConfirm({ fieldId: field.id, rowIds, crop })}>
+    <ConfirmDialog eyebrow="Agronomic planning" title={existingPlan ? `Update ${existingPlan.reference}?` : "Reserve this Crop Plan?"} confirmLabel={existingPlan ? "Update Crop Plan" : "Reserve Crop Plan"} pending={pending} confirmDisabled={!rowIds.length} onClose={onClose} onConfirm={() => onConfirm({ fieldId: field.id, rowIds, crop })}>
       <div className="crop-plan-dialog-content">
         <p>Planning reserves empty slots and produces no crop. Work must still be issued and completed physically.</p>
         <FarmSelect label="Crop Identity" value={crop} options={cropOptions} onChange={(value) => { setCrop(value); setRowIds([]); }} />
@@ -50,7 +52,8 @@ export function CropPlanDialog({ field, initialRowId, pending, onClose, onConfir
           {field.topology.rows.map((row) => {
             const eligible = eligibleRows.some((item) => item.id === row.id);
             const selected = rowIds.includes(row.id);
-            return <button type="button" key={row.id} disabled={!eligible} aria-pressed={selected} className={selected ? "is-selected" : ""} onClick={() => toggleRow(row.id)}><span>{selected ? <CheckCircle size={17} /> : <Plant size={17} />}{row.label}</span><small>{eligible ? `${row.available} empty slots` : activePlanRows.has(row.id) ? "Reserved" : row.available <= 0 ? "No empty slots" : `Contains ${row.cropLabel}`}</small></button>;
+            const available = row.available + (existingPlan?.rowIds.includes(row.id) ? row.planned : 0);
+            return <button type="button" key={row.id} disabled={!eligible} aria-pressed={selected} className={selected ? "is-selected" : ""} onClick={() => toggleRow(row.id)}><span>{selected ? <CheckCircle size={17} /> : <Plant size={17} />}{row.label}</span><small>{eligible ? `${available} empty slots` : activePlanRows.has(row.id) ? "Reserved" : available <= 0 ? "No empty slots" : `Contains ${row.cropLabel}`}</small></button>;
           })}
         </div>
         <div className="crop-plan-review">

@@ -28,3 +28,28 @@ export function applyFieldDelta(state: FieldSyncState, delta: FieldDelta): Field
   delete plans[delta.planId];
   return { ...state, sequence: delta.sequence, plans };
 }
+
+export function projectFieldDelta(detail: FieldDetail, delta: FieldDelta): FieldDetail {
+  if (delta.kind === "invalidate") return detail;
+  if (delta.kind === "slot_upsert") {
+    return {
+      ...detail,
+      sequence: delta.sequence,
+      topology: {
+        ...detail.topology,
+        slots: detail.topology.slots.map((slot) => slot.id === delta.slot.id ? structuredClone(delta.slot) : slot),
+      },
+    };
+  }
+  if (delta.kind === "plan_upsert") {
+    const exists = detail.cropPlans.some((plan) => plan.id === delta.plan.id);
+    return {
+      ...detail,
+      sequence: delta.sequence,
+      cropPlans: exists
+        ? detail.cropPlans.map((plan) => plan.id === delta.plan.id ? structuredClone(delta.plan) : plan)
+        : [structuredClone(delta.plan), ...detail.cropPlans],
+    };
+  }
+  return { ...detail, sequence: delta.sequence, cropPlans: detail.cropPlans.filter((plan) => plan.id !== delta.planId) };
+}

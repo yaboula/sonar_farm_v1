@@ -246,3 +246,104 @@ economic consequence.
 - Mouse, keyboard, focus, Escape dismissal and confirmation behavior are tested.
 - Typecheck, lint, Vitest, production build, Sites packaging and Lua regression
   remain mandatory before commit.
+
+## Increment 2.3 — Fields operating system
+
+### Operating model
+
+Fields uses a stable `Field → Row → Slot → Plant` hierarchy. A Field owns
+territory, access and lease state. A Row is the minimum planning and Work scope.
+A Slot is a persistent physical position. A Plant is temporary agronomic state
+inside that Slot. Public contracts can grant temporary access, but every Field
+remains company operated.
+
+Business links use `fieldId`, `rowId` and `slotId`. Array position is never an
+identity. `legacyIndex` is retained only as a future bridge aid.
+
+### Routes and preserved context
+
+- `/fields` is a role-adapted portfolio.
+- `/fields/:fieldId` is the shared Field, Row and Slot operating map.
+- `layer`, `row`, `slot` and `panel` live in the URL query.
+- Map zoom and pan are retained in session when Work temporarily replaces the
+  deep view.
+- Return to Fields restores portfolio filter, search and selected Field.
+
+### Access model
+
+- Worker sees all Field summaries and full detail only for assigned Rows.
+- Procurement adds Crop Plan and material-demand context.
+- Supervisor sees agronomy, planning and team Work without company economics.
+- Manager and Owner receive the full operational and business context.
+- Contractor receives only the Active Contract Field and exact contracted Rows.
+- Visitor has no Fields route. Abandoning a contract removes temporary access.
+
+The adapter removes unauthorized plants, slots, events, yield and material data
+before render. Components do not infer access from role labels.
+
+### Spatial map and layers
+
+The central visualization is SVG generated from authoritative normalized
+topology. It supports 20 × 20 / 400 Slots, semantic Row aggregation, near-zoom
+Slot detail, wheel zoom, drag pan and reset. Keyboard focus roves across Rows and
+Slots with arrows; Enter inspects and Escape returns to the parent scope.
+
+Layers are `Overview`, `Water`, `Health`, `Growth`, `Readiness`, `Work` and
+`Crop Plan`. Readiness includes spoilage. Critical Slot diagnostics remain
+explicit even when the selected scope is a Row or Field.
+
+Office keeps map, context and business inspector visible together. Tablet uses
+the same routes and data with a narrower inspector. Neither surface renders live
+player/team positions or remote farming controls.
+
+### Diagnostics and event ledger
+
+Diagnostics arrive fully resolved from the adapter: severity, scope, evidence,
+cause, safe window, impact and authorized next action. V1 emits only water,
+health, growth, readiness, spoilage, occupancy and timestamp-backed findings.
+Pests, fertilizer, pruning and ties remain type-compatible but hidden.
+
+The ledger stores operational events rather than continuous telemetry: planted,
+watered, inspected, harvested, Crop Plan changed, Work linked, access changed
+and restriction applied.
+
+### Crop Plans and Work handoff
+
+Crop Plans progress through `Draft → Reserved → In Execution → Completed` or
+`Cancelled`. The UI currently creates reviewed Reserved plans. One Row accepts
+one crop and one active reservation. Occupied, inaccessible or already-reserved
+scope is excluded with a reason and the estimated material need is shown before
+confirmation.
+
+Reservation never plants. Management explicitly creates an Assignment or
+Public Contract. The Work form receives stable scope and `sourcePlanId`; creation
+moves the plan to In Execution and locks cancellation. Slot-level exceptions
+remain Row attention and never become single-Slot Assignments.
+
+### Synchronization contract
+
+The fixture and future bridge share `FieldSubscription` and ordered
+`FieldDelta` contracts:
+
+1. Load topology with `topologyRevision`.
+2. Load an authorized snapshot with `stateRevision`, `sequence` and `serverTime`.
+3. Apply strictly sequential, idempotent Slot and Crop Plan deltas.
+4. Ignore duplicate sequence values.
+5. Reload on gaps, invalidation or topology mismatch.
+6. Derive time-sensitive presentation from `serverTime`.
+
+The Hub stream remains separate from proximity-based prop streaming. React owns
+normalized positions only; future world-coordinate resolution stays outside UI.
+
+### Master fixtures and completion gate
+
+- North Field: 12 × 8, ASG-1048 and explicit Rows 4–8 water attention.
+- Greenhouse 2: 6 × 8, mature tomatoes and a linked Buyer Order.
+- East Field: homogeneous Rows plus the exact Contractor Row D scope.
+- Orchard Annex: empty, Lease Grace Period and planting suspended.
+- Scale Field: technical 20 × 20 fixture used only for topology/keyboard tests.
+
+Completion requires role and surface redaction, deterministic aggregation,
+exclusive Crop Plans, stable Work scope, ordered delta/resync tests, all shared
+states, mouse/keyboard access, Office/Tablet visual QA, build/Sites/Lua regression
+and no dead actions.

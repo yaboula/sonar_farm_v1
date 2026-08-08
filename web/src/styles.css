@@ -3599,6 +3599,9 @@ select:focus-visible {
   background: var(--success);
   box-shadow: 0 0 0 3px rgba(131, 160, 106, 0.1);
 }
+.field-sync-status--resyncing { color: var(--accent); }
+.field-sync-status--resyncing i { background: var(--accent); animation: field-sync-pulse 900ms ease-in-out infinite alternate; }
+@keyframes field-sync-pulse { to { opacity: 0.3; transform: scale(0.72); } }
 
 .field-sync-status span {
   padding-left: 7px;
@@ -3724,6 +3727,31 @@ select:focus-visible {
   font-size: 10px;
 }
 .field-map-north i { width: 1px; height: 17px; margin-top: 2px; background: linear-gradient(var(--accent), transparent); }
+
+.field-map-legend {
+  position: absolute;
+  left: 11px;
+  bottom: 10px;
+  max-width: 315px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--text-muted);
+  background: rgba(7, 9, 8, 0.82);
+  backdrop-filter: blur(3px);
+  pointer-events: none;
+}
+.field-map-legend > span { display: block; font-size: 9px; line-height: 1.2; }
+.field-map-legend > div { display: flex; gap: 11px; margin-top: 5px; }
+.field-map-legend em { display: flex; align-items: center; gap: 5px; color: var(--text-secondary); font-size: 9px; font-style: normal; }
+.field-map-legend em > i { width: 7px; height: 7px; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 50%; background: rgba(229, 222, 199, 0.14); }
+.field-map-legend em > i[data-tone="good"] { background: #77905d; }
+.field-map-legend em > i[data-tone="warning"] { background: #d5a82f; }
+.field-map-legend em > i[data-tone="critical"] { background: #c15846; }
+.field-map-legend em > i[data-tone="early"] { background: #6b774d; }
+.field-map-legend em > i[data-tone="ready"] { background: #b8c887; }
+.field-map-legend em > i[data-tone="assigned"] { background: #d7b445; }
+.field-map-legend em > i[data-tone="contract"] { background: #b98958; }
+.field-map-legend em > i[data-tone="planned"] { border-color: var(--accent); background: rgba(245, 195, 49, 0.22); }
 
 .field-map-footer {
   height: 29px;
@@ -3873,6 +3901,13 @@ select:focus-visible {
 .crop-plan-follow-up button:hover { border-color: var(--border-accent); color: var(--accent); }
 .crop-plan-follow-up button.danger { color: var(--error); }
 .field-plan-row.is-selected { border-left: 2px solid var(--accent); background: rgba(245, 195, 49, 0.055); }
+
+.surface-stage--tablet .field-operating-layout { grid-template-columns: minmax(0, 1fr) 248px; gap: 11px; }
+.surface-stage--tablet .field-scope-inspector { min-height: 470px; padding: 13px 14px; }
+.surface-stage--tablet .field-scope-inspector h2 { font-size: 25px; }
+.surface-stage--tablet .field-map-stage { height: 304px; }
+.surface-stage--tablet .field-layer-tabs button { padding-inline: 8px; }
+.surface-stage--tablet .slot-work-rule { left: 14px; right: 14px; }
 
 .skeleton-stack {
   width: 300px;

@@ -52,20 +52,23 @@ const COPY: Record<
 interface StatePanelProps {
   state: Exclude<ViewState, "ready">;
   onAction?: () => void;
+  title?: string;
+  body?: string;
+  actionLabel?: string;
 }
 
-export function StatePanel({ state, onAction }: StatePanelProps) {
+export function StatePanel({ state, onAction, title, body, actionLabel }: StatePanelProps) {
   const content = COPY[state];
   const Icon = content.icon;
   return (
     <section className={"state-panel state-panel--" + state} role={state === "error" ? "alert" : undefined}>
       <Icon className={state === "loading" ? "spin" : ""} size={62} weight="thin" />
       <span className="state-kicker">{state}</span>
-      <h1>{content.title}</h1>
-      <p>{content.body}</p>
+      <h1>{title ?? content.title}</h1>
+      <p>{body ?? content.body}</p>
       {content.action ? (
         <button type="button" className="secondary-button" onClick={onAction}>
-          {content.action}
+          {actionLabel ?? content.action}
           <ArrowClockwise size={18} />
         </button>
       ) : null}

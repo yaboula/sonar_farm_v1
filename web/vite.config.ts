@@ -6,6 +6,15 @@ export default defineConfig({
   base: "./",
   build: {
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/@phosphor-icons")) return "vendor-icons";
+          if (id.includes("node_modules/react") || id.includes("node_modules/react-dom") || id.includes("node_modules/react-router")) return "vendor-react";
+          return undefined;
+        },
+      },
+    },
   },
   optimizeDeps: {
     include: ["react", "react-dom/client", "react-router-dom"],

@@ -1,5 +1,5 @@
 import { ArrowsOut, MagnifyingGlassMinus, MagnifyingGlassPlus } from "@phosphor-icons/react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FieldDetail, FieldLayer, FieldRow, FieldSlot } from "../types";
 
 type Props = {
@@ -9,6 +9,19 @@ type Props = {
   selectedSlotId?: string;
   onSelectRow: (rowId?: string) => void;
   onSelectSlot: (slotId?: string, rowId?: string) => void;
+};
+
+type StoredViewport = { zoom: number; pan: { x: number; y: number } };
+const fieldViewportMemory = new Map<string, StoredViewport>();
+
+const LAYER_LEGEND: Record<FieldLayer, { copy: string; items: Array<{ label: string; tone: string }> }> = {
+  overview: { copy: "Occupancy with explicit critical exceptions", items: [{ label: "Occupied", tone: "good" }, { label: "Empty", tone: "empty" }, { label: "Critical", tone: "critical" }] },
+  water: { copy: "Authoritative plant water band", items: [{ label: "Safe", tone: "good" }, { label: "Watch", tone: "warning" }, { label: "Low", tone: "critical" }] },
+  health: { copy: "Current plant health band", items: [{ label: "Healthy", tone: "good" }, { label: "Watch", tone: "warning" }, { label: "Low", tone: "critical" }] },
+  growth: { copy: "Growth progress, not harvest quality", items: [{ label: "Early", tone: "early" }, { label: "Developing", tone: "warning" }, { label: "Mature", tone: "ready" }] },
+  readiness: { copy: "Harvest window including spoilage risk", items: [{ label: "Growing", tone: "good" }, { label: "Ready", tone: "ready" }, { label: "At risk", tone: "critical" }] },
+  work: { copy: "Accountable Work attached to each Slot", items: [{ label: "Assignment", tone: "assigned" }, { label: "Contract", tone: "contract" }, { label: "Unlinked", tone: "empty" }] },
+  plan: { copy: "Planned scope never means planted", items: [{ label: "Reserved", tone: "planned" }, { label: "Occupied", tone: "good" }, { label: "Available", tone: "empty" }] },
 };
 
 function slotTone(field: FieldDetail, slot: FieldSlot, layer: FieldLayer) {
@@ -39,15 +52,29 @@ function slotValue(slot: FieldSlot, layer: FieldLayer) {
 export function FieldMap({ field, layer, selectedRowId, selectedSlotId, onSelectRow, onSelectSlot }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{ x: number; y: number; panX: number; panY: number } | undefined>(undefined);
-  const [zoom, setZoom] = useState(selectedRowId ? 1.35 : 1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const storedViewport = fieldViewportMemory.get(field.id);
+  const [zoom, setZoom] = useState(storedViewport?.zoom ?? (selectedRowId ? 1.35 : 1));
+  const [pan, setPan] = useState(storedViewport?.pan ?? { x: 0, y: 0 });
   const visibleSlots = useMemo(() => field.topology.slots.filter((slot) => slot.visible && (!selectedRowId || slot.rowId === selectedRowId)), [field.topology.slots, selectedRowId]);
   const showSlots = zoom > 1.18 || Boolean(selectedRowId);
+  const legend = LAYER_LEGEND[layer];
 
   const rowSlots = (row: FieldRow) => field.topology.slots.filter((slot) => row.slotIds.includes(slot.id));
   const adjustZoom = (next: number) => setZoom(Math.max(1, Math.min(2.25, next)));
   const reset = () => { setZoom(1); setPan({ x: 0, y: 0 }); onSelectSlot(undefined); onSelectRow(undefined); };
   const focusSlot = (slotId: string) => requestAnimationFrame(() => svgRef.current?.querySelector<SVGGElement>(`[data-slot-id="${slotId}"]`)?.focus());
+  const focusRow = (rowId: string) => requestAnimationFrame(() => svgRef.current?.querySelector<SVGGElement>(`[data-row-id="${rowId}"]`)?.focus());
+
+  useEffect(() => {
+    fieldViewportMemory.set(field.id, { zoom, pan });
+  }, [field.id, pan, zoom]);
+
+  const moveRowSelection = (row: FieldRow, offset: number) => {
+    const rows = field.topology.rows.filter((item) => item.visibleDetail);
+    const current = rows.findIndex((item) => item.id === row.id);
+    const next = rows[Math.max(0, Math.min(rows.length - 1, current + offset))];
+    if (next) { onSelectRow(next.id); focusRow(next.id); }
+  };
 
   const moveSelection = (slot: FieldSlot, direction: "left" | "right" | "up" | "down") => {
     const rows = field.topology.rows.filter((row) => row.visibleDetail);
@@ -66,7 +93,7 @@ export function FieldMap({ field, layer, selectedRowId, selectedSlotId, onSelect
   return (
     <section className="field-map-shell" aria-label={`${field.name} operating map`}>
       <header className="field-map-header">
-        <div><span>Authoritative topology</span><strong>{field.topology.rows.length} Rows · {field.topology.slots.length} slots</strong></div>
+        <div><span>Authoritative topology</span><strong>{field.topology.rows.length} {field.topology.rows.length === 1 ? "Row" : "Rows"} · {field.topology.slots.length} slots</strong></div>
         <div className="field-map-controls" aria-label="Map controls">
           <button type="button" aria-label="Zoom out" onClick={() => adjustZoom(zoom - 0.25)}><MagnifyingGlassMinus size={17} /></button>
           <span>{Math.round(zoom * 100)}%</span>
@@ -97,7 +124,7 @@ export function FieldMap({ field, layer, selectedRowId, selectedSlotId, onSelect
               const last = slots[slots.length - 1].position;
               const selected = selectedRowId === row.id;
               return (
-                <g key={row.id} data-row-id={row.id} className={`field-map-row field-map-row--${row.status}${selected ? " is-selected" : ""}`} role="button" tabIndex={showSlots ? -1 : selected || (!selectedRowId && row.order === 1) ? 0 : -1} aria-label={`${row.label}, ${row.status}, ${row.occupied} occupied, ${row.criticalCount} critical`} onClick={() => { onSelectRow(row.id); setZoom(Math.max(zoom, 1.35)); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectRow(row.id); setZoom(Math.max(zoom, 1.35)); } if (event.key === "Escape") reset(); }}>
+                <g key={row.id} data-row-id={row.id} className={`field-map-row field-map-row--${row.status}${selected ? " is-selected" : ""}`} role="button" tabIndex={showSlots ? -1 : selected || (!selectedRowId && row.order === 1) ? 0 : -1} aria-label={`${row.label}, ${row.status}, ${row.occupied} occupied, ${row.criticalCount} critical`} aria-current={selected ? "true" : undefined} onClick={() => { onSelectRow(row.id); setZoom(Math.max(zoom, 1.35)); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectRow(row.id); setZoom(Math.max(zoom, 1.35)); } if (event.key === "Escape") reset(); if (event.key === "ArrowUp" || event.key === "ArrowLeft") { event.preventDefault(); moveRowSelection(row, -1); } if (event.key === "ArrowDown" || event.key === "ArrowRight") { event.preventDefault(); moveRowSelection(row, 1); } }}>
                   <line className="field-map-row-hit" x1={first.x - 2} y1={first.y} x2={last.x + 2} y2={last.y} />
                   <line className="field-map-row-line" x1={first.x} y1={first.y} x2={last.x} y2={last.y} />
                   <text className="field-map-row-label" x={first.x - 3.5} y={first.y + 1}>{row.label.replace("Row ", "")}</text>
@@ -122,6 +149,7 @@ export function FieldMap({ field, layer, selectedRowId, selectedSlotId, onSelect
           </g>
         </svg>
         <div className="field-map-north" aria-hidden="true"><span>N</span><i /></div>
+        <div className="field-map-legend" aria-label={`${layer} layer legend`}><span>{legend.copy}</span><div>{legend.items.map((item) => <em key={item.label}><i data-tone={item.tone} />{item.label}</em>)}</div></div>
       </div>
       <footer className="field-map-footer"><span>Layer · {layer === "plan" ? "Crop Plan" : layer}</span><span>{selectedRowId ? field.topology.rows.find((row) => row.id === selectedRowId)?.label : "All Rows"}{selectedSlotId ? ` · ${field.topology.slots.find((slot) => slot.id === selectedSlotId)?.label.split(" · ")[1]}` : ""}</span><span>Topology {field.topology.topologyRevision.split("-").at(-1)}</span></footer>
     </section>

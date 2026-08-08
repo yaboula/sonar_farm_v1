@@ -75,6 +75,18 @@ export class FieldFixtureRepository {
     if (context.capabilities.viewFieldMaterialDemand) safe.materialDemand = field.materialDemand;
     const allowed = assignedRows(context.role, field.id);
     if (allowed) safe.permittedRowIds = allowed;
+    if (context.role === "contractor" && allowed) {
+      const rows = field.topology.rows.filter((row) => allowed.includes(row.id));
+      const diagnostics = field.diagnostics.filter((item) => allowed.includes(item.scopeId));
+      safe.occupied = rows.reduce((total, row) => total + row.occupied, 0);
+      safe.planned = rows.reduce((total, row) => total + row.planned, 0);
+      safe.capacity = rows.reduce((total, row) => total + row.slotIds.length, 0);
+      safe.cropSummary = rows.map((row) => row.cropLabel).filter(Boolean).join(" · ") || "Contract scope";
+      safe.attentionCount = diagnostics.length;
+      safe.criticalCount = diagnostics.filter((item) => item.severity === "critical").length;
+      safe.activeAssignments = 0;
+      safe.ownership = "Company Field · Contract access";
+    }
     return safe;
   }
 
@@ -128,6 +140,17 @@ export class FieldFixtureRepository {
       safe.events = safe.events.filter((item) => !item.rowId || visibleRows.includes(item.rowId));
       safe.cropPlans = safe.cropPlans.filter((plan) => plan.rowIds.some((rowId) => visibleRows.includes(rowId)));
       safe.linkedWork = safe.linkedWork.filter((item) => context.role !== "contractor" || item.kind === "contract");
+      if (context.role === "contractor") {
+        safe.topology.rows = safe.topology.rows.filter((row) => visibleRows.includes(row.id));
+        safe.occupied = safe.topology.rows.reduce((total, row) => total + row.occupied, 0);
+        safe.planned = safe.topology.rows.reduce((total, row) => total + row.planned, 0);
+        safe.capacity = safe.topology.rows.reduce((total, row) => total + row.slotIds.length, 0);
+        safe.cropSummary = safe.topology.rows.map((row) => row.cropLabel).filter(Boolean).join(" · ") || "Contract scope";
+        safe.attentionCount = safe.diagnostics.length;
+        safe.criticalCount = safe.diagnostics.filter((item) => item.severity === "critical").length;
+        safe.activeAssignments = 0;
+        safe.ownership = "Company Field · Contract access";
+      }
     }
 
     if (!context.capabilities.viewFieldEconomics) safe.yieldForecast = undefined;
@@ -211,13 +234,53 @@ export class FieldFixtureRepository {
     if (!owner || !plan || plan.status !== "reserved" || plan.linkedAssignmentId || plan.linkedContractId) {
       return { ok: false, message: "This Crop Plan is locked or no longer available." };
     }
-    if (input.fieldId !== owner.id || input.rowIds.join("|") !== plan.rowIds.join("|") || input.crop !== plan.crop) {
-      return { ok: false, message: "Changing reserved scope requires cancelling and creating a new Crop Plan." };
+    if (input.fieldId !== owner.id || !input.rowIds.length) return { ok: false, message: "Select at least one Row from the current Field." };
+    const uniqueRows = [...new Set(input.rowIds)];
+    const rows = owner.topology.rows.filter((row) => uniqueRows.includes(row.id));
+    if (rows.length !== uniqueRows.length) return { ok: false, message: "One or more Rows no longer exist in this topology." };
+    const conflicts = owner.cropPlans.filter((item) => item.id !== plan.id && isActivePlan(item)).filter((item) => scopeIntersects(item, uniqueRows));
+    if (conflicts.length) return { ok: false, message: `${conflicts[0].reference} already reserves part of this scope.` };
+    const cropLabel = input.crop === "tomato" ? "Tomatoes" : input.crop === "potato" ? "Potatoes" : input.crop === "carrot" ? "Carrots" : "Lettuce";
+    const incompatible = rows.find((row) => row.occupied > 0 && row.cropLabel.toLowerCase() !== cropLabel.toLowerCase());
+    if (incompatible) return { ok: false, message: `${incompatible.label} already contains ${incompatible.cropLabel}.` };
+    const eligibleSlots = owner.topology.slots.filter((slot) => uniqueRows.includes(slot.rowId) && (slot.status === "empty" || (slot.status === "planned" && plan.rowIds.includes(slot.rowId))));
+    if (!eligibleSlots.length) return { ok: false, message: "No eligible empty Slots remain in this scope." };
+
+    for (const row of owner.topology.rows.filter((item) => plan.rowIds.includes(item.id))) {
+      row.plannedCrop = undefined;
+      row.planned = 0;
+      row.available = row.slotIds.length - row.occupied;
+      row.cropLabel = row.occupied ? row.cropLabel : "Unassigned";
+      row.status = row.occupied ? "growing" : "empty";
     }
+    for (const slot of owner.topology.slots.filter((item) => plan.rowIds.includes(item.rowId) && item.status === "planned")) {
+      slot.status = "empty";
+      slot.plannedCrop = undefined;
+    }
+    owner.planned = Math.max(0, owner.planned - plan.eligibleSlots);
+    for (const row of rows) {
+      row.plannedCrop = input.crop;
+      row.cropLabel = cropLabel;
+      row.planned = row.available;
+      row.available = 0;
+      row.status = "planned";
+    }
+    for (const slot of owner.topology.slots.filter((item) => uniqueRows.includes(item.rowId) && item.status === "empty")) {
+      slot.status = "planned";
+      slot.plannedCrop = input.crop;
+    }
+    plan.rowIds = uniqueRows;
+    plan.crop = input.crop;
+    plan.cropLabel = cropLabel;
+    plan.eligibleSlots = eligibleSlots.length;
+    plan.excludedSlots = owner.topology.slots.filter((slot) => uniqueRows.includes(slot.rowId) && slot.status === "occupied").map((slot) => ({ slotId: slot.id, reason: "Occupied by an existing plant" }));
+    plan.materialEstimate = [`${cropLabel} seedlings ×${eligibleSlots.length}`, `Initial water ×${eligibleSlots.length}`];
     plan.updatedAt = "Just now";
+    owner.planned += eligibleSlots.length;
     owner.sequence += 1;
+    owner.events.unshift({ id: `evt-update-${plan.id}-${owner.sequence}`, type: "plan_changed", at: "Just now", actor: "Jordan Tate", title: `${plan.reference} updated`, detail: `${cropLabel} reserved for ${rows.map((row) => row.label).join(", ")}.`, rowId: rows.length === 1 ? rows[0].id : undefined });
     this.emit(owner, { kind: "plan_upsert", fieldId: owner.id, topologyRevision: owner.topology.topologyRevision, sequence: owner.sequence, plan });
-    return { ok: true, changed: true, invalidated: [owner.id], message: `${plan.reference} reviewed with no scope changes.` };
+    return { ok: true, changed: true, invalidated: [owner.id], message: `${plan.reference} updated to ${eligibleSlots.length} eligible Slots.` };
   }
 
   cancelPlan(planId: string, context: HubContextModel): IntentResult {

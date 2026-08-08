@@ -75,6 +75,45 @@ describe("Farm Business Hub", () => {
     expect(screen.getByDisplayValue("Row 12")).toBeInTheDocument();
   });
 
+  it("reopens an unlinked reserved Crop Plan for editing", async () => {
+    const user = userEvent.setup();
+    renderApp("/fields/north-field?row=north-r12");
+    await user.click(await screen.findByRole("button", { name: "Crop Plan" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Reserve Crop Plan" }));
+    await user.click(await screen.findByRole("button", { name: "Edit Plan" }));
+    expect(screen.getByRole("dialog", { name: "Update CP-205?" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Update Crop Plan" })).toBeEnabled();
+  });
+
+  it("restores Field layer, Row and zoom after a linked Work detour", async () => {
+    const user = userEvent.setup();
+    renderApp("/fields/greenhouse-2?row=green-ra&layer=readiness&panel=work");
+    expect(await screen.findByRole("tab", { name: "Readiness" })).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(screen.getByText("160%")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open Work" }));
+    expect(await screen.findByRole("heading", { name: "Harvest Greenhouse 2" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Back to Assignments" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Greenhouse 2" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Readiness" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("160%")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Row A" })).toBeInTheDocument();
+  });
+
+  it("shows an explicit Field not found state for unknown stable identity", async () => {
+    renderApp("/fields/unknown-field");
+    expect(await screen.findByRole("heading", { name: "Field not found" })).toBeInTheDocument();
+    expect(screen.getByText(/not part of the authorized company portfolio/i)).toBeInTheDocument();
+  });
+
+  it("blocks Crop Planning while a Lease is in Grace Period", async () => {
+    renderApp("/fields/orchard-annex");
+    expect(await screen.findByRole("heading", { level: 1, name: "Orchard Annex" })).toBeInTheDocument();
+    expect(screen.getByText("Lease Grace Period")).toBeInTheDocument();
+    expect(screen.getByText(/planting is suspended/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Crop Plan" })).not.toBeInTheDocument();
+  });
+
   it("redirects when a live role change removes the active route", async () => {
     const user = userEvent.setup();
     renderApp("/today");

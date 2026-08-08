@@ -3,7 +3,7 @@ import { capabilitiesFor } from "../data/fixtures";
 import { createScaleFieldFixture } from "../data/fieldFixtures";
 import type { CropPlan, FieldDetail, FieldsOverviewData, FieldSyncState, HubContextModel } from "../types";
 import { FixtureHubAdapter } from "./FixtureHubAdapter";
-import { applyFieldDelta, createFieldSyncState } from "./fieldSync";
+import { applyFieldDelta, createFieldSyncState, projectFieldDelta } from "./fieldSync";
 
 const context = (role: HubContextModel["role"], surface: HubContextModel["surface"] = "office"): HubContextModel => ({
   role,
@@ -15,10 +15,13 @@ const context = (role: HubContextModel["role"], surface: HubContextModel["surfac
 describe("Fields domain adapter", () => {
   it("builds stable identities for a 20 by 20 field", () => {
     const field = createScaleFieldFixture();
+    const secondProjection = createScaleFieldFixture();
     expect(field.topology.rows).toHaveLength(20);
     expect(field.topology.slots).toHaveLength(400);
     expect(new Set(field.topology.slots.map((slot) => slot.id)).size).toBe(400);
     expect(field.topology.slots[399].id).toBe("scale-field:scale-r20:s20");
+    expect(field.topology.slots.map((slot) => slot.position)).toEqual(secondProjection.topology.slots.map((slot) => slot.position));
+    expect(field.topology.slots.every((slot) => slot.position.x >= 0 && slot.position.x <= 100 && slot.position.y >= 0 && slot.position.y <= 100)).toBe(true);
   });
 
   it("adapts the portfolio landing to role", async () => {
@@ -40,6 +43,7 @@ describe("Fields domain adapter", () => {
     expect(privateSlot?.visible).toBe(false);
     expect(privateSlot?.plant).toBeUndefined();
     expect(model.data?.yieldForecast).toBeUndefined();
+    expect(model.data?.criticalCount).toBeGreaterThanOrEqual(model.data?.topology.rows.reduce((total, row) => total + row.criticalCount, 0) ?? 0);
   });
 
   it("limits Contractor Fields to the active contract Row", async () => {
@@ -48,6 +52,8 @@ describe("Fields domain adapter", () => {
     const field = await adapter.load<FieldDetail>({ kind: "fieldDetail", fieldId: "east-field" }, context("contractor"));
     const denied = await adapter.load<FieldDetail>({ kind: "fieldDetail", fieldId: "north-field" }, context("contractor"));
     expect(overview.data?.fields.map((item) => item.id)).toEqual(["east-field"]);
+    expect(overview.data?.fields[0]).toMatchObject({ capacity: 8, occupied: 0, planned: 8, ownership: "Company Field · Contract access" });
+    expect(field.data?.topology.rows.map((row) => row.id)).toEqual(["east-rd"]);
     expect(field.data?.topology.rows.filter((row) => row.visibleDetail).map((row) => row.id)).toEqual(["east-rd"]);
     expect(field.data?.topology.slots.every((slot) => slot.rowId === "east-rd")).toBe(true);
     expect(denied.state).toBe("restricted");
@@ -96,6 +102,19 @@ describe("Fields domain adapter", () => {
     expect((await adapter.dispatch({ type: "cropPlan.cancel", planId: created.entityId! }, owner)).ok).toBe(false);
   });
 
+  it("edits an unlinked reserved Crop Plan and releases its previous scope", async () => {
+    const adapter = new FixtureHubAdapter(0);
+    const owner = context("owner");
+    const created = await adapter.dispatch({ type: "cropPlan.create", input: { fieldId: "north-field", rowIds: ["north-r12"], crop: "tomato" } }, owner);
+    const updated = await adapter.dispatch({ type: "cropPlan.update", planId: created.entityId!, input: { fieldId: "north-field", rowIds: ["north-r11"], crop: "tomato" } }, owner);
+    const field = await adapter.load<FieldDetail>({ kind: "fieldDetail", fieldId: "north-field" }, owner);
+    const plan = field.data?.cropPlans.find((item) => item.id === created.entityId);
+    expect(updated.ok).toBe(true);
+    expect(plan).toMatchObject({ rowIds: ["north-r11"], eligibleSlots: 4, status: "reserved" });
+    expect(field.data?.topology.rows.find((row) => row.id === "north-r12")).toMatchObject({ planned: 0, available: 8, status: "empty" });
+    expect(field.data?.topology.rows.find((row) => row.id === "north-r11")).toMatchObject({ planned: 4, available: 0, status: "planned" });
+  });
+
   it("requests resync for gaps and topology changes while ignoring duplicates", () => {
     const field = createScaleFieldFixture(2);
     const initial = createFieldSyncState(field);
@@ -108,5 +127,18 @@ describe("Fields domain adapter", () => {
     expect(gap.resyncRequired).toBe(true);
     const mismatch: FieldSyncState = applyFieldDelta(initial, { kind: "plan_upsert", fieldId: field.id, topologyRevision: "v2", sequence: initial.sequence + 1, plan });
     expect(mismatch.resyncRequired).toBe(true);
+  });
+
+  it("projects accepted deltas without rebuilding stable topology", async () => {
+    const adapter = new FixtureHubAdapter(0);
+    const owner = context("owner");
+    const model = await adapter.load<FieldDetail>({ kind: "fieldDetail", fieldId: "north-field" }, owner);
+    const detail = model.data!;
+    const slot = structuredClone(detail.topology.slots[0]);
+    slot.plant = slot.plant ? { ...slot.plant, water: 91 } : slot.plant;
+    const projected = projectFieldDelta(detail, { kind: "slot_upsert", fieldId: detail.id, topologyRevision: detail.topology.topologyRevision, sequence: detail.sequence + 1, slot });
+    expect(projected.topology.rows).toBe(detail.topology.rows);
+    expect(projected.topology.slots.find((item) => item.id === slot.id)?.plant?.water).toBe(91);
+    expect(projected.sequence).toBe(detail.sequence + 1);
   });
 });
