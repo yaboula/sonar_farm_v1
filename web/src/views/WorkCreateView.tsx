@@ -9,6 +9,19 @@ import { StatePanel } from "../components/StatePanel";
 import { useHub } from "../store/HubContext";
 import type { AssignmentCreateInput, ContractCreateInput, HubContextModel, HubViewModel } from "../types";
 
+type FieldDraftState = {
+  returnTo?: string;
+  fieldDraft?: {
+    fieldId: string;
+    fieldName: string;
+    rowIds: string[];
+    rowLabels: string[];
+    crop: string;
+    cropLabel: string;
+    sourcePlanId?: string;
+  };
+};
+
 const workerOptions = [
   { value: "staff-noah", label: "Noah Reed", description: "Worker · available now" },
   { value: "staff-sofia", label: "Sofia Bennett", description: "Worker · one active Assignment" },
@@ -17,6 +30,8 @@ const workerOptions = [
 const fieldOptions = [
   { value: "north-field", label: "North Field", description: "Tomatoes · rows 1–12" },
   { value: "greenhouse-2", label: "Greenhouse 2", description: "Tomatoes · rows A–F" },
+  { value: "east-field", label: "East Field", description: "Lettuce · contract Row D" },
+  { value: "orchard-annex", label: "Orchard Annex", description: "Planting suspended" },
 ] as const;
 
 const templateOptions = [
@@ -33,14 +48,16 @@ export function WorkCreateView({ kind }: { kind: "assignment" | "contract" }) {
   const hub = useHub();
   const navigate = useNavigate();
   const location = useLocation();
-  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? `/work?area=${kind === "assignment" ? "assignments" : "publicContracts"}`;
+  const routeState = location.state as FieldDraftState | null;
+  const returnTo = routeState?.returnTo ?? `/work?area=${kind === "assignment" ? "assignments" : "publicContracts"}`;
+  const fieldDraft = routeState?.fieldDraft;
   const context = useMemo<HubContextModel>(() => ({ role: hub.role, surface: hub.surface, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.role, hub.surface, hub.viewState, hub.capabilities]);
   const [access, setAccess] = useState<HubViewModel<{ nextReference: string }> | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<string>();
-  const [assignment, setAssignment] = useState<AssignmentCreateInput>({ title: "Water East Tomato Rows", objective: "Restore safe soil moisture and verify every assigned row.", fieldId: "north-field", crop: "Tomatoes", scope: "Rows 9–12", assigneeId: "staff-noah", supervisorId: "staff-jordan", deadline: "Tomorrow, 18:00", payout: 220, requirement: "Verify moisture across four rows", materialIds: ["watering-can"] });
-  const [contract, setContract] = useState<ContractCreateInput>({ template: "Planting", title: "Establish East Field Tomato Row", objective: "Prepare and establish eight tomato planting positions to farm standard.", field: "East Field", scope: "Row E · 8 planting slots", deadline: "12 Aug, 16:00", reward: 860, requirements: "Personal seedlings ×8, hand trowel and watering can", failureRule: "Missing the deadline or unverified planting fails the contract." });
+  const [assignment, setAssignment] = useState<AssignmentCreateInput>(() => ({ title: fieldDraft ? `Establish ${fieldDraft.cropLabel} · ${fieldDraft.rowLabels.join(", ")}` : "Water East Tomato Rows", objective: fieldDraft ? "Prepare and establish every eligible planting slot reserved by the Crop Plan." : "Restore safe soil moisture and verify every assigned row.", fieldId: fieldDraft?.fieldId ?? "north-field", crop: fieldDraft?.cropLabel ?? "Tomatoes", scope: fieldDraft ? fieldDraft.rowLabels.join(", ") : "Rows 9–12", assigneeId: "staff-noah", supervisorId: "staff-jordan", deadline: "Tomorrow, 18:00", payout: 220, requirement: fieldDraft ? "Verify every planned planting slot" : "Verify moisture across four rows", materialIds: ["watering-can"], scopeRef: fieldDraft ? { fieldId: fieldDraft.fieldId, rowIds: fieldDraft.rowIds } : undefined, sourcePlanId: fieldDraft?.sourcePlanId }));
+  const [contract, setContract] = useState<ContractCreateInput>(() => ({ template: "Planting", title: fieldDraft ? `Establish ${fieldDraft.cropLabel} · ${fieldDraft.rowLabels.join(", ")}` : "Establish East Field Tomato Row", objective: fieldDraft ? "Prepare, plant and initially water every position reserved by the Crop Plan." : "Prepare and establish eight tomato planting positions to farm standard.", field: fieldDraft?.fieldName ?? "East Field", scope: fieldDraft ? `${fieldDraft.rowLabels.join(", ")} · reserved planting scope` : "Row E · 8 planting slots", deadline: "12 Aug, 16:00", reward: 860, requirements: "Personal seedlings ×8, hand trowel and watering can", failureRule: "Missing the deadline or unverified planting fails the contract.", scopeRef: fieldDraft ? { fieldId: fieldDraft.fieldId, rowIds: fieldDraft.rowIds } : undefined, sourcePlanId: fieldDraft?.sourcePlanId }));
 
   useEffect(() => { void fixtureHubAdapter.load<{ nextReference: string }>(kind === "assignment" ? { kind: "assignmentCreate" } : { kind: "contractCreate" }, context).then(setAccess); }, [context, kind]);
   if (!access) return <StatePanel state="loading" />;

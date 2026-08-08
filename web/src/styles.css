@@ -3845,6 +3845,35 @@ select:focus-visible {
 .field-handoff p { max-width: 430px; margin: 9px 0 0; color: var(--text-muted); font-size: 14px; }
 .field-handoff button { height: 40px; margin-top: 22px; padding: 0 17px; border: 1px solid var(--border-accent); color: var(--accent); background: transparent; font-family: var(--display); font-weight: 600; text-transform: uppercase; }
 
+.crop-plan-dialog-content { display: grid; gap: 12px; }
+.crop-plan-dialog-content > p { margin: 0; color: var(--text-muted); font-size: 12px; }
+.crop-plan-row-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; max-height: 172px; overflow-y: auto; }
+.crop-plan-row-picker button { min-height: 48px; display: grid; align-content: center; gap: 2px; padding: 6px 7px; border: 1px solid var(--border-neutral); color: var(--text-secondary); background: rgba(255, 255, 255, 0.02); text-align: left; }
+.crop-plan-row-picker button:not(:disabled) { cursor: pointer; }
+.crop-plan-row-picker button:not(:disabled):hover,
+.crop-plan-row-picker button.is-selected { border-color: var(--border-accent); color: var(--accent); background: rgba(245, 195, 49, 0.07); }
+.crop-plan-row-picker button:disabled { opacity: 0.34; }
+.crop-plan-row-picker button span { display: flex; align-items: center; gap: 5px; font-family: var(--display); font-size: 12px; font-weight: 600; text-transform: uppercase; }
+.crop-plan-row-picker button small { color: var(--text-muted); font-size: 9px; }
+.crop-plan-review { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.crop-plan-review > div { display: grid; gap: 1px; padding: 7px; border: 1px solid var(--border-subtle); text-align: center; }
+.crop-plan-review span { color: var(--text-muted); font-size: 9px; text-transform: uppercase; }
+.crop-plan-review strong { color: var(--text-primary); font-family: var(--display); font-size: 18px; }
+.crop-plan-warning,
+.crop-plan-material { min-height: 32px; display: flex; align-items: center; gap: 7px; padding: 6px 8px; border: 1px solid rgba(193, 88, 70, 0.28); color: var(--error); font-size: 11px; }
+.crop-plan-material { border-color: rgba(131, 160, 106, 0.28); color: var(--success); }
+
+.crop-plan-follow-up { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; padding: 8px 11px; border: 1px solid var(--border-accent); background: rgba(245, 195, 49, 0.045); }
+.crop-plan-follow-up > div:first-child { min-width: 0; display: grid; gap: 1px; }
+.crop-plan-follow-up > div:first-child span { color: var(--accent); font-family: var(--display); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; }
+.crop-plan-follow-up > div:first-child strong { color: var(--text-primary); font-size: 12px; }
+.crop-plan-follow-up > div:first-child small { color: var(--text-muted); font-size: 10px; }
+.crop-plan-follow-up > div:last-child { display: flex; gap: 5px; }
+.crop-plan-follow-up button { min-height: 31px; padding: 0 9px; border: 1px solid var(--border-neutral); color: var(--text-secondary); background: transparent; font-family: var(--display); font-size: 10px; font-weight: 600; text-transform: uppercase; }
+.crop-plan-follow-up button:hover { border-color: var(--border-accent); color: var(--accent); }
+.crop-plan-follow-up button.danger { color: var(--error); }
+.field-plan-row.is-selected { border-left: 2px solid var(--accent); background: rgba(245, 195, 49, 0.055); }
+
 .skeleton-stack {
   width: 300px;
   display: grid;

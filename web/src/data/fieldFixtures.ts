@@ -272,7 +272,7 @@ const eastRows: RowSeed[] = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"].m
     water: 67,
     health: 93,
     progress: 46,
-    contractIds: contractRow ? ["pc-077"] : [],
+    contractIds: contractRow ? ["pc-083"] : [],
     materialDemand: contractRow ? "Tomato Seedlings ×8 · contractor supplied" : undefined,
   };
 });
@@ -289,7 +289,7 @@ const eastPlan: CropPlan = {
   eligibleSlots: 8,
   excludedSlots: [],
   materialEstimate: ["Tomato Seedlings ×8", "Initial water ×8"],
-  linkedContractId: "pc-077",
+  linkedContractId: "pc-083",
   createdAt: "Yesterday, 14:20",
   updatedAt: "Today, 15:42",
 };
@@ -368,15 +368,15 @@ const fieldSeeds: FieldSeed[] = [
     nextMilestone: "Contract Row D due today, 20:15",
     yieldForecast: "122–176 lettuce units",
     diagnostics: [
-      diagnostic("diag-east-plan", "planned_empty", "warning", "row", "east-rd", "Row D is reserved but remains empty", "CP-204 is in execution under Public Contract PC-077.", "0 of 8 tomato slots established", "Due today, 20:15", "Contract escrow remains reserved until verification.", "Open the active contract or review its progress.", "set_route"),
+      diagnostic("diag-east-plan", "planned_empty", "warning", "row", "east-rd", "Row D is reserved but remains empty", "CP-204 is in execution under Public Contract PC-083.", "0 of 8 tomato slots established", "Due today, 20:15", "Contract escrow remains reserved until verification.", "Open the active contract or review its progress.", "set_route"),
       diagnostic("diag-east-material", "material_shortage", "info", "row", "east-rd", "Contractor supplies required materials", "Company inventory is not allocated to this contract.", "8 seedlings · hand trowel · watering can", "Before field handoff", "No company procurement cost is expected.", "Confirm contractor materials at the field gate."),
     ],
     events: [
-      event("evt-east-1", "work_linked", "Today, 15:42", "Avery Cole", "PC-077 field access opened", "Row D reserved for the active Contractor.", "east-rd"),
+      event("evt-east-1", "work_linked", "Today, 15:42", "Avery Cole", "PC-083 field access opened", "Row D reserved for the active Contractor.", "east-rd"),
       event("evt-east-2", "plan_changed", "Yesterday, 14:20", "Jordan Tate", "CP-204 reserved", "Row D assigned to Tomatoes for contract planting.", "east-rd"),
     ],
     cropPlans: [eastPlan],
-    linkedWork: [{ id: "pc-077", kind: "contract", title: "Establish East Field Row D", status: "Active", scope: "Row D · 8 slots" }],
+    linkedWork: [{ id: "pc-083", kind: "contract", title: "Establish East Field Row D", status: "Active", scope: "Row D · 8 slots" }],
     materialNeeds: [{ id: "need-east-seedlings", item: "Tomato Seedlings", quantity: "8 contractor supplied", status: "Declared" }],
   },
   {

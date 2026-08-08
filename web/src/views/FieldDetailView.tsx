@@ -15,10 +15,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { fixtureHubAdapter } from "../adapters/FixtureHubAdapter";
 import { DeepViewShell, StatusPill } from "../components/DeepViewShell";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { CropPlanDialog } from "../components/CropPlanDialog";
 import { FieldMap } from "../components/FieldMap";
 import { StatePanel } from "../components/StatePanel";
 import { useHub } from "../store/HubContext";
-import type { FieldDetail, FieldLayer, FieldRow, FieldSlot, HubContextModel, HubViewModel } from "../types";
+import type { CropPlan, CropPlanInput, FieldDetail, FieldLayer, FieldRow, FieldSlot, HubContextModel, HubViewModel } from "../types";
 
 const LAYERS: Array<{ id: FieldLayer; label: string }> = [
   { id: "overview", label: "Overview" },
@@ -46,6 +48,10 @@ export function FieldDetailView() {
   const [model, setModel] = useState<HubViewModel<FieldDetail> | null>(null);
   const [notice, setNotice] = useState<string>();
   const [handoff, setHandoff] = useState(false);
+  const [planDialog, setPlanDialog] = useState(false);
+  const [planPending, setPlanPending] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>();
+  const [cancelPlan, setCancelPlan] = useState<CropPlan>();
   const layer = (LAYERS.some((item) => item.id === searchParams.get("layer")) ? searchParams.get("layer") : "overview") as FieldLayer;
   const panel = (["diagnostics", "work", "history", "plans"].includes(searchParams.get("panel") ?? "") ? searchParams.get("panel") : "diagnostics") as DetailPanel;
   const selectedRowId = searchParams.get("row") ?? undefined;
@@ -84,7 +90,7 @@ export function FieldDetailView() {
   const scopeLabel = selectedSlot?.label ?? selectedRow?.label ?? field.name;
   const tone = field.criticalCount ? "danger" : field.status === "ready" ? "success" : "active";
   const diagnostics = field.diagnostics.filter((item) => !selectedSlot ? !selectedRow ? true : item.scopeId === selectedRow.id || item.scope === "field" : item.scopeId === selectedSlot.id || item.scopeId === selectedSlot.rowId || item.scope === "field");
-  const linkedWork = field.linkedWork.filter((item) => !selectedRow || item.scope.includes(selectedRow.label.replace("Row ", "Row ")) || item.scope.includes("Rows") || item.scope.includes("Field") || field.id === "greenhouse-2");
+  const linkedWork = field.linkedWork.filter((item) => !selectedRow || selectedRow.assignmentIds.includes(item.id) || selectedRow.contractIds.includes(item.id) || item.kind === "buyer_order");
 
   const selectDiagnostic = (scope: string, scopeId: string) => {
     if (scope === "row") setQuery({ row: scopeId, slot: undefined });
@@ -103,12 +109,49 @@ export function FieldDetailView() {
     if (kind === "contract") navigate(`/work/contracts/active/${id}`, { state: { returnTo: `${location.pathname}?${searchParams.toString()}` } });
     if (kind === "buyer_order") navigate(`/work/orders/${id}`, { state: { returnTo: `${location.pathname}?${searchParams.toString()}` } });
   };
+  const createPlan = async (input: CropPlanInput) => {
+    setPlanPending(true);
+    const result = await fixtureHubAdapter.dispatch({ type: "cropPlan.create", input }, context);
+    setPlanPending(false);
+    setPlanDialog(false);
+    setNotice(result.message);
+    if (result.ok) {
+      setSelectedPlanId(result.entityId);
+      setQuery({ panel: "plans", layer: "plan" });
+      await reload();
+    }
+  };
+  const resolvePlanCancellation = async () => {
+    if (!cancelPlan) return;
+    setPlanPending(true);
+    const result = await fixtureHubAdapter.dispatch({ type: "cropPlan.cancel", planId: cancelPlan.id }, context);
+    setPlanPending(false);
+    setCancelPlan(undefined);
+    setSelectedPlanId(undefined);
+    setNotice(result.message);
+    await reload();
+  };
+  const openWorkDraft = (kind: "assignment" | "contract", plan?: CropPlan) => {
+    const rowIds = plan?.rowIds ?? (selectedRow ? [selectedRow.id] : field.topology.rows.filter((row) => row.visibleDetail).map((row) => row.id));
+    const rowLabels = rowIds.map((rowId) => field.topology.rows.find((row) => row.id === rowId)?.label ?? rowId);
+    const cropLabel = plan?.cropLabel ?? selectedRow?.cropLabel ?? field.cropSummary.split(" · ")[0];
+    const crop = plan?.crop ?? cropLabel.toLowerCase().replace(/s$/, "");
+    navigate(kind === "assignment" ? "/work/assignments/new" : "/work/contracts/new", {
+      state: {
+        returnTo: `${location.pathname}?${searchParams.toString()}`,
+        fieldDraft: { fieldId: field.id, fieldName: field.name, rowIds, rowLabels, crop, cropLabel, sourcePlanId: plan?.id },
+      },
+    });
+  };
 
   const actionBar = (
     <>
       <div className="domain-action-summary"><span>{scopeLabel}</span><p>{selectedSlot ? "Slot diagnosis only · Work remains scoped to its Row" : selectedRow ? `${selectedRow.occupied} occupied · ${selectedRow.criticalCount} critical` : field.nextMilestone}</p></div>
       <div className="field-action-buttons">
         {linkedWork[0] ? <button type="button" className="domain-secondary-action" onClick={() => openWork(linkedWork[0].id, linkedWork[0].kind)}><ClipboardText size={18} />Open Work</button> : null}
+        {!selectedSlot && field.availableActions.includes("create_plan") ? <button type="button" className="domain-secondary-action" onClick={() => setPlanDialog(true)}><Plant size={18} />Crop Plan</button> : null}
+        {!selectedSlot && field.availableActions.includes("create_assignment") ? <button type="button" className="domain-secondary-action" onClick={() => openWorkDraft("assignment")}><ClipboardText size={18} />Assignment</button> : null}
+        {!selectedSlot && field.availableActions.includes("create_contract") ? <button type="button" className="domain-secondary-action" onClick={() => openWorkDraft("contract")}><ClipboardText size={18} />Contract</button> : null}
         {field.availableActions.includes("set_route") ? <button type="button" className="domain-primary-action" onClick={() => void setRoute()}><MapPin size={18} />Set Route</button> : null}
       </div>
     </>
@@ -133,8 +176,9 @@ export function FieldDetailView() {
             {panel === "diagnostics" ? diagnostics.length ? diagnostics.map((item) => <button type="button" className={`field-diagnostic-row field-diagnostic-row--${item.severity}`} key={item.id} onClick={() => selectDiagnostic(item.scope, item.scopeId)}><Warning size={19} /><span><strong>{item.title}</strong><small>{item.evidence} · {item.window}</small></span><em>{item.severity}</em><ArrowRight size={16} /></button>) : <div className="inline-empty">No attention requirements affect this scope.</div> : null}
             {panel === "work" ? linkedWork.length ? linkedWork.map((item) => <button type="button" className="field-linked-row" key={item.id} onClick={() => openWork(item.id, item.kind)}><ClipboardText size={20} /><span><strong>{item.title}</strong><small>{item.scope}</small></span><em>{item.status}</em><ArrowRight size={16} /></button>) : <div className="inline-empty">No active Work is linked to this scope.</div> : null}
             {panel === "history" ? field.events.map((item) => <article className="field-event-row" key={item.id}><ClockCounterClockwise size={19} /><span><strong>{item.title}</strong><small>{item.detail}</small></span><time>{item.at}</time></article>) : null}
-            {panel === "plans" ? field.cropPlans.length ? field.cropPlans.map((plan) => <article className="field-plan-row" key={plan.id}><Plant size={20} /><span><strong>{plan.reference} · {plan.cropLabel}</strong><small>{plan.rowIds.map((rowId) => field.topology.rows.find((row) => row.id === rowId)?.label).join(", ")} · {plan.eligibleSlots} slots</small></span><em>{plan.statusLabel}</em></article>) : <div className="inline-empty">No Crop Plan currently reserves this Field.</div> : null}
+            {panel === "plans" ? field.cropPlans.length ? field.cropPlans.map((plan) => <button type="button" className={selectedPlanId === plan.id ? "field-plan-row is-selected" : "field-plan-row"} key={plan.id} onClick={() => setSelectedPlanId(plan.id)}><Plant size={20} /><span><strong>{plan.reference} · {plan.cropLabel}</strong><small>{plan.rowIds.map((rowId) => field.topology.rows.find((row) => row.id === rowId)?.label).join(", ")} · {plan.eligibleSlots} slots</small></span><em>{plan.statusLabel}</em></button>) : <div className="inline-empty">No Crop Plan currently reserves this Field.</div> : null}
           </div>
+          {panel === "plans" && selectedPlanId ? <PlanFollowUp plan={field.cropPlans.find((item) => item.id === selectedPlanId)} onAssignment={(plan) => openWorkDraft("assignment", plan)} onContract={(plan) => openWorkDraft("contract", plan)} onCancel={setCancelPlan} capabilities={field.availableActions} /> : null}
         </div>
         <aside className="field-scope-inspector">
           <span className="inspector-kicker">{selectedSlot ? "Selected Slot" : selectedRow ? "Selected Row" : "Field Scope"}</span>
@@ -142,8 +186,16 @@ export function FieldDetailView() {
         </aside>
       </div>
       {handoff ? <div className="field-handoff"><MapPin size={38} /><span>World handoff prepared</span><h2>{scopeLabel}</h2><p>The future NUI bridge will close the Hub and set the authoritative route. Fixture data has not changed.</p><button type="button" onClick={() => setHandoff(false)}>Return to Field Map</button></div> : null}
+      {planDialog ? <CropPlanDialog field={field} initialRowId={selectedRow?.id} pending={planPending} onClose={() => setPlanDialog(false)} onConfirm={(input) => void createPlan(input)} /> : null}
+      {cancelPlan ? <ConfirmDialog eyebrow="Crop Plan control" title={`Cancel ${cancelPlan.reference}?`} confirmLabel="Cancel Crop Plan" tone="danger-confirm" pending={planPending} onClose={() => setCancelPlan(undefined)} onConfirm={() => void resolvePlanCancellation()}><p>{cancelPlan.rowIds.length} reserved Row{cancelPlan.rowIds.length === 1 ? "" : "s"} will be released. Occupied plants and Work history are not changed.</p></ConfirmDialog> : null}
     </DeepViewShell>
   );
+}
+
+function PlanFollowUp({ plan, onAssignment, onContract, onCancel, capabilities }: { plan?: CropPlan; onAssignment: (plan: CropPlan) => void; onContract: (plan: CropPlan) => void; onCancel: (plan: CropPlan) => void; capabilities: FieldDetail["availableActions"] }) {
+  if (!plan) return null;
+  const reserved = plan.status === "reserved";
+  return <section className="crop-plan-follow-up"><div><span>Selected Crop Plan</span><strong>{plan.reference} · {plan.statusLabel}</strong><small>{reserved ? "Reservation is ready to become accountable Work." : plan.linkedAssignmentId ? `Linked to ${plan.linkedAssignmentId.toUpperCase()}` : plan.linkedContractId ? `Linked to ${plan.linkedContractId.toUpperCase()}` : "Scope is locked."}</small></div>{reserved ? <div>{capabilities.includes("create_assignment") ? <button type="button" onClick={() => onAssignment(plan)}>Create Assignment</button> : null}{capabilities.includes("create_contract") ? <button type="button" onClick={() => onContract(plan)}>Create Public Contract</button> : null}<button type="button" className="danger" onClick={() => onCancel(plan)}>Cancel Plan</button></div> : null}</section>;
 }
 
 function FieldInspector({ field }: { field: FieldDetail }) {

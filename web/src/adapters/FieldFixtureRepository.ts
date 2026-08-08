@@ -136,8 +136,9 @@ export class FieldFixtureRepository {
       safe.materialNeeds = [];
     }
     if (!context.capabilities.viewFieldHistory) safe.events = [];
+    const plantingAllowed = !["grace", "planting_suspended", "lease_expired", "inaccessible", "unavailable"].includes(safe.status);
     safe.availableActions = [
-      ...(context.capabilities.createCropPlans ? ["create_plan" as const] : []),
+      ...(context.capabilities.createCropPlans && plantingAllowed ? ["create_plan" as const] : []),
       ...(context.capabilities.createFieldAssignments ? ["create_assignment" as const] : []),
       ...(context.capabilities.createFieldContracts ? ["create_contract" as const] : []),
       ...(context.capabilities.setFieldRoute ? ["set_route" as const] : []),
@@ -242,8 +243,23 @@ export class FieldFixtureRepository {
     }
     field.planned = Math.max(0, field.planned - plan.eligibleSlots);
     field.sequence += 1;
-    this.emit(field, { kind: "plan_remove", fieldId: field.id, topologyRevision: field.topology.topologyRevision, sequence: field.sequence, planId });
+    this.emit(field, { kind: "plan_upsert", fieldId: field.id, topologyRevision: field.topology.topologyRevision, sequence: field.sequence, plan });
     return { ok: true, changed: true, invalidated: [field.id], message: `${plan.reference} cancelled and its Rows released.` };
+  }
+
+  linkPlanToWork(planId: string, kind: "assignment" | "contract", workId: string) {
+    const field = this.fields.find((item) => item.cropPlans.some((plan) => plan.id === planId));
+    const plan = field?.cropPlans.find((item) => item.id === planId);
+    if (!field || !plan || plan.status !== "reserved") return false;
+    plan.status = "in_execution";
+    plan.statusLabel = "In Execution";
+    plan.updatedAt = "Just now";
+    if (kind === "assignment") plan.linkedAssignmentId = workId;
+    else plan.linkedContractId = workId;
+    field.sequence += 1;
+    field.events.unshift({ id: `evt-link-${workId}`, type: "work_linked", at: "Just now", actor: "Jordan Tate", title: `${workId.toUpperCase()} linked`, detail: `${plan.reference} moved into execution.`, rowId: plan.rowIds.length === 1 ? plan.rowIds[0] : undefined });
+    this.emit(field, { kind: "plan_upsert", fieldId: field.id, topologyRevision: field.topology.topologyRevision, sequence: field.sequence, plan });
+    return true;
   }
 
   setRoute(scope: FieldScopeRef, context: HubContextModel): IntentResult {

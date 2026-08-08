@@ -62,6 +62,19 @@ describe("Farm Business Hub", () => {
     expect(screen.getByRole("button", { name: /back to fields/i })).toBeInTheDocument();
   });
 
+  it("reserves a Row Crop Plan and opens a prefilled Assignment", async () => {
+    const user = userEvent.setup();
+    renderApp("/fields/north-field?row=north-r12");
+    await user.click(await screen.findByRole("button", { name: "Crop Plan" }));
+    const dialog = screen.getByRole("dialog", { name: "Reserve this Crop Plan?" });
+    expect(within(dialog).getByRole("button", { name: /Row 12.*8 empty slots/i })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(dialog).getByRole("button", { name: "Reserve Crop Plan" }));
+    await user.click(await screen.findByRole("button", { name: "Create Assignment" }));
+    expect(await screen.findByRole("heading", { name: "Create Assignment" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Establish Tomatoes · Row 12")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Row 12")).toBeInTheDocument();
+  });
+
   it("redirects when a live role change removes the active route", async () => {
     const user = userEvent.setup();
     renderApp("/today");

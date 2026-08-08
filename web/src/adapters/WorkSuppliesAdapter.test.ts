@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { capabilitiesFor } from "../data/fixtures";
-import type { BuyerOrderDetail, ContractDetail, FarmRole, HubContextModel, PurchaseReview, SuppliesHubData, WorkQueueData } from "../types";
+import type { BuyerOrderDetail, ContractDetail, FarmRole, FieldDetail, HubContextModel, PurchaseReview, SuppliesHubData, WorkQueueData } from "../types";
 import { FixtureHubAdapter } from "./FixtureHubAdapter";
 
 function context(role: FarmRole, surface: "office" | "tablet" = "office"): HubContextModel {
@@ -58,6 +58,13 @@ describe("FixtureHubAdapter Work and Supplies", () => {
       if (!contract.data?.steps.find((step) => step.id === stepId)?.completed) expect((await adapter.dispatch({ type: "contract.verifyStep", contractId: "pc-083", stepId }, context("contractor"))).ok).toBe(true);
     }
     expect((await adapter.dispatch({ type: "contract.transition", contractId: "pc-083", action: "submit" }, context("contractor"))).ok).toBe(true);
+  });
+
+  it("removes temporary Contractor access after abandonment", async () => {
+    const result = await adapter.dispatch({ type: "contract.transition", contractId: "pc-083", action: "abandon" }, context("contractor"));
+    expect(result).toMatchObject({ ok: true, contextUpdate: { role: "visitor" } });
+    const denied = await adapter.load<FieldDetail>({ kind: "fieldDetail", fieldId: "east-field" }, context("visitor"));
+    expect(denied.state).toBe("restricted");
   });
 
   it("keeps Tablet purchase confirmation read-only and completes at Office", async () => {

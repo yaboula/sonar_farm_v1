@@ -329,7 +329,7 @@ export class FixtureHubAdapter implements HubAdapter {
       workType: "Field Operation",
       objective: input.objective.trim(),
       crop: input.crop,
-      field: { id: input.fieldId, name: input.fieldId === "greenhouse-2" ? "Greenhouse 2" : "North Field", scope: input.scope, routeLabel: "Assigned access point" },
+      field: { id: input.fieldId, name: ({ "north-field": "North Field", "greenhouse-2": "Greenhouse 2", "east-field": "East Field", "orchard-annex": "Orchard Annex" } as Record<string, string>)[input.fieldId] ?? input.fieldId, scope: input.scope, routeLabel: "Assigned access point" },
       assignee: { id: input.assigneeId, name: assigneeName, role: "Worker" },
       supervisor: { id: input.supervisorId, name: "Jordan Tate" },
       deadline: input.deadline,
@@ -340,7 +340,10 @@ export class FixtureHubAdapter implements HubAdapter {
       progress: [{ id: `${id}-created`, at: "Just now", title: "Assignment issued", detail: "Reserved pay and work scope recorded.", actor: "Jordan Tate", tone: "neutral" }],
       cancellationSummary: "Cancellation voids reserved pay unless verified work requires review.",
       availableActions: ["accept", "reassign", "cancel"],
+      scopeRef: input.scopeRef,
+      sourcePlanId: input.sourcePlanId,
     });
+    if (input.sourcePlanId) this.fields.linkPlanToWork(input.sourcePlanId, "assignment", id);
     return { ok: true, changed: true, entityId: id, message: `${id.toUpperCase()} created with reserved pay.` };
   }
 
@@ -473,7 +476,12 @@ export class FixtureHubAdapter implements HubAdapter {
     contract.statusLabel = action === "abandon" ? "Failed · Abandoned" : "Cancelled";
     contract.escrowStatus = action === "abandon" ? "refunded" : "void";
     contract.availableActions = [];
-    return { ok: true, changed: true, message: note?.trim() || `${contract.reference} ${contract.statusLabel.toLowerCase()}.` };
+    return {
+      ok: true,
+      changed: true,
+      contextUpdate: action === "abandon" && context.role === "contractor" ? { role: "visitor" } : undefined,
+      message: note?.trim() || `${contract.reference} ${contract.statusLabel.toLowerCase()}.`,
+    };
   }
 
   private verifyContractStep(contractId: string, stepId: string, context: HubContextModel): IntentResult {
@@ -495,8 +503,9 @@ export class FixtureHubAdapter implements HubAdapter {
     if (!input.title.trim() || !input.objective.trim() || input.reward <= 0) return { ok: false, message: "Complete the funded contract terms." };
     const id = `pc-${String(this.contractSequence++).padStart(3, "0")}`;
     this.workSupplies.contracts.unshift({
-      id, reference: id.toUpperCase(), title: input.title, status: "draft", statusLabel: "Draft", objective: input.objective, field: input.field, crop: "Tomatoes", scope: input.scope, deadline: input.deadline, reward: input.reward, escrowStatus: "reserved", materialsPolicy: "Contractor supplies all required materials.", fieldAccess: `${input.field} access after acceptance`, cargoOwnership: "All resulting cargo belongs to Sonar Farm.", deliveryDestination: `${input.field} verification marker`, producedCargo: "No cargo recorded", steps: [{ id: `${id}-step`, label: input.template, detail: input.scope, completed: false }], requirements: [input.requirements], failureRules: [input.failureRule], availableActions: ["publish", "cancel"],
+      id, reference: id.toUpperCase(), title: input.title, status: "draft", statusLabel: "Draft", objective: input.objective, field: input.field, crop: "Tomatoes", scope: input.scope, deadline: input.deadline, reward: input.reward, escrowStatus: "reserved", materialsPolicy: "Contractor supplies all required materials.", fieldAccess: `${input.field} access after acceptance`, cargoOwnership: "All resulting cargo belongs to Sonar Farm.", deliveryDestination: `${input.field} verification marker`, producedCargo: "No cargo recorded", steps: [{ id: `${id}-step`, label: input.template, detail: input.scope, completed: false }], requirements: [input.requirements], failureRules: [input.failureRule], availableActions: ["publish", "cancel"], scopeRef: input.scopeRef, sourcePlanId: input.sourcePlanId,
     });
+    if (input.sourcePlanId) this.fields.linkPlanToWork(input.sourcePlanId, "contract", id);
     return { ok: true, changed: true, entityId: id, message: `${id.toUpperCase()} created with reward held in escrow.` };
   }
 

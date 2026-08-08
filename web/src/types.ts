@@ -221,6 +221,8 @@ export interface AssignmentDetail {
   blocker?: { title: string; detail: string; raisedAt: string };
   reviewerNote?: string;
   availableActions: AvailableAssignmentAction[];
+  scopeRef?: FieldScopeRef;
+  sourcePlanId?: string;
 }
 
 export interface FieldFixture {
@@ -542,6 +544,8 @@ export interface ContractDetail {
   requirements: string[];
   failureRules: string[];
   availableActions: ContractAction[];
+  scopeRef?: FieldScopeRef;
+  sourcePlanId?: string;
 }
 
 export interface ContractCreateInput {

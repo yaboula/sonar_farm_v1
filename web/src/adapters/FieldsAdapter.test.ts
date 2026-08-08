@@ -67,6 +67,35 @@ describe("Fields domain adapter", () => {
     expect(deltas).toEqual([before.data!.sequence + 1]);
   });
 
+  it("links a reserved Crop Plan to stable Assignment scope", async () => {
+    const adapter = new FixtureHubAdapter(0);
+    const owner = context("owner");
+    const created = await adapter.dispatch({ type: "cropPlan.create", input: { fieldId: "north-field", rowIds: ["north-r12"], crop: "tomato" } }, owner);
+    const assignment = await adapter.dispatch({
+      type: "assignment.create",
+      input: {
+        title: "Plant North Row 12",
+        objective: "Execute the reserved tomato Crop Plan.",
+        fieldId: "north-field",
+        crop: "Tomatoes",
+        scope: "Row 12",
+        scopeRef: { fieldId: "north-field", rowIds: ["north-r12"] },
+        sourcePlanId: created.entityId,
+        assigneeId: "staff-noah",
+        supervisorId: "staff-jordan",
+        deadline: "Tomorrow, 18:00",
+        payout: 240,
+        requirement: "Verify all eligible slots",
+        materialIds: ["tomato-seedling"],
+      },
+    }, owner);
+    const field = await adapter.load<FieldDetail>({ kind: "fieldDetail", fieldId: "north-field" }, owner);
+    const plan = field.data?.cropPlans.find((item) => item.id === created.entityId);
+    expect(assignment.ok).toBe(true);
+    expect(plan).toMatchObject({ status: "in_execution", linkedAssignmentId: assignment.entityId, rowIds: ["north-r12"] });
+    expect((await adapter.dispatch({ type: "cropPlan.cancel", planId: created.entityId! }, owner)).ok).toBe(false);
+  });
+
   it("requests resync for gaps and topology changes while ignoring duplicates", () => {
     const field = createScaleFieldFixture(2);
     const initial = createFieldSyncState(field);

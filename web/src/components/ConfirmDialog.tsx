@@ -7,6 +7,7 @@ export function ConfirmDialog({
   confirmLabel,
   tone = "confirm",
   pending = false,
+  confirmDisabled = false,
   onConfirm,
   onClose,
   children,
@@ -16,6 +17,7 @@ export function ConfirmDialog({
   confirmLabel: string;
   tone?: "confirm" | "danger-confirm";
   pending?: boolean;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }>) {
@@ -35,7 +37,7 @@ export function ConfirmDialog({
         <div className="dialog-content">{children}</div>
         <footer className="dialog-actions">
           <button type="button" onClick={onClose}>Go Back</button>
-          <button type="button" className={tone} disabled={pending} onClick={onConfirm}>{pending ? "Working…" : confirmLabel}</button>
+          <button type="button" className={tone} disabled={pending || confirmDisabled} onClick={onConfirm}>{pending ? "Working…" : confirmLabel}</button>
         </footer>
       </section>
     </div>
