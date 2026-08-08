@@ -1,15 +1,30 @@
 import { cloneAssignmentFixtures } from "../data/assignmentFixtures";
+import { cloneWorkSupplyFixtures } from "../data/workSupplyFixtures";
 import type {
   ActionIntent,
+  AssignmentCreateInput,
   AssignmentDetail,
   AvailableAssignmentAction,
+  BuyerOrderAction,
+  BuyerOrderDetail,
+  ContractAction,
+  ContractDetail,
   FarmRole,
   HubAdapter,
   HubContextModel,
   HubViewRequest,
   HubViewModel,
   IntentResult,
+  SuppliesHubData,
+  WorkArea,
+  WorkFixture,
+  WorkQueueData,
 } from "../types";
+
+type AssignmentMutationIntent = Exclude<
+  Extract<ActionIntent, { type: `assignment.${string}` }>,
+  { type: "assignment.create" }
+>;
 
 const wait = (duration: number) => new Promise((resolve) => setTimeout(resolve, duration));
 
@@ -25,7 +40,7 @@ const SUPERVISOR_ACTIONS: AvailableAssignmentAction[] = [
 
 function canReadAssignment(role: FarmRole, assignment: AssignmentDetail) {
   if (MANAGEMENT_ROLES.includes(role)) return true;
-  return role === "worker" && assignment.assignee.id === "staff-noah";
+  return ["worker", "procurement"].includes(role) && assignment.assignee.id === "staff-noah";
 }
 
 function actionsForRole(role: FarmRole, assignment: AssignmentDetail) {
@@ -50,66 +65,267 @@ function addProgress(
   });
 }
 
+function assignmentToQueue(item: AssignmentDetail): WorkFixture {
+  const target = item.requirements.reduce((sum, requirement) => sum + requirement.target, 0);
+  const current = item.requirements.reduce(
+    (sum, requirement) => sum + Math.min(requirement.current, requirement.target),
+    0,
+  );
+  return {
+    id: item.id,
+    type: "assignment",
+    title: item.title,
+    meta: `${item.crop} · ${item.field.scope} · ${item.assignee.name}`,
+    status: item.statusLabel,
+    deadline: item.deadline,
+    progress: target ? Math.round((current / target) * 100) : 0,
+    assigneeId: item.assignee.id,
+  };
+}
+
+function buyerOrderToQueue(item: BuyerOrderDetail): WorkFixture {
+  return {
+    id: item.id,
+    type: "buyerOrder",
+    title: item.buyer,
+    meta: `${item.quantity} ${item.product} · ${item.quality}`,
+    status: item.statusLabel,
+    deadline: item.deadline,
+    progress: item.quantity ? Math.round((item.reservedQuantity / item.quantity) * 100) : 0,
+  };
+}
+
+function contractToQueue(item: ContractDetail): WorkFixture {
+  const complete = item.steps.filter((step) => step.completed).length;
+  return {
+    id: item.id,
+    type: "contract",
+    title: item.title,
+    meta: `${item.field} · ${item.scope}`,
+    status: item.statusLabel,
+    deadline: item.deadline,
+    progress: item.steps.length ? Math.round((complete / item.steps.length) * 100) : 0,
+  };
+}
+
+function nextBuyerActions(action: BuyerOrderAction): BuyerOrderDetail["availableActions"] {
+  if (action === "accept") return ["plan", "reject"];
+  if (action === "plan") return ["create_assignment", "reserve", "reject"];
+  if (action === "reserve") return ["create_assignment", "prepare", "reject"];
+  if (action === "prepare") return ["complete", "reject"];
+  return [];
+}
+
 export class FixtureHubAdapter implements HubAdapter {
   private assignments = cloneAssignmentFixtures();
+  private workSupplies = cloneWorkSupplyFixtures();
+  private personalBalance = 1680;
+  private companyBalance = 24680;
+  private procurementBudget = 6200;
+  private assignmentSequence = 1062;
+  private contractSequence = 84;
+  private purchaseSequence = 301;
 
   constructor(private readonly delayMs = 80) {}
 
   reset() {
     this.assignments = cloneAssignmentFixtures();
+    this.workSupplies = cloneWorkSupplyFixtures();
+    this.personalBalance = 1680;
+    this.companyBalance = 24680;
+    this.procurementBudget = 6200;
+    this.assignmentSequence = 1062;
+    this.contractSequence = 84;
+    this.purchaseSequence = 301;
   }
 
-  async load<TData>(
-    request: HubViewRequest,
-    context: HubContextModel,
-  ): Promise<HubViewModel<TData>> {
-    await wait(this.delayMs);
+  private loadWork(context: HubContextModel): WorkQueueData {
+    const areas: WorkArea[] = [];
+    const items: WorkFixture[] = [];
 
-    if (context.viewState !== "ready") {
-      return { request, state: context.viewState, data: null };
+    if (context.capabilities.viewOwnAssignments || context.capabilities.viewTeamAssignments) {
+      areas.push("assignments");
+      this.assignments
+        .filter((item) => context.capabilities.viewTeamAssignments || item.assignee.id === "staff-noah")
+        .forEach((item) => items.push(assignmentToQueue(item)));
     }
+    if (context.capabilities.manageBuyerOrders) {
+      areas.push("buyerOrders");
+      this.workSupplies.buyerOrders.forEach((item) => items.push(buyerOrderToQueue(item)));
+    }
+    if (context.capabilities.browsePublicContracts || context.capabilities.managePublicContracts) {
+      areas.push("publicContracts");
+      this.workSupplies.contracts
+        .filter((item) => context.capabilities.managePublicContracts || item.status === "published")
+        .filter((item) => item.status !== "active")
+        .forEach((item) => items.push(contractToQueue(item)));
+    }
+    if (context.capabilities.viewActiveContract) {
+      areas.push("activeContract");
+      this.workSupplies.contracts
+        .filter((item) => item.status === "active" || item.status === "awaiting_review" || item.status === "completed")
+        .filter((item) => item.contractor === "Avery Cole")
+        .forEach((item) => items.push(contractToQueue(item)));
+    }
+
+    return {
+      areas,
+      items,
+      canCreateAssignment: context.capabilities.createAssignments,
+      canCreateContract: context.capabilities.managePublicContracts,
+    };
+  }
+
+  private loadSupplies(context: HubContextModel): SuppliesHubData {
+    const canCompanyBuy = context.capabilities.buyCompanySupplies;
+    return {
+      products: structuredClone(this.workSupplies.products),
+      allowedPayers: canCompanyBuy ? ["personal", "company"] : ["personal"],
+      personalBalance: this.personalBalance,
+      companyBalance: canCompanyBuy ? this.companyBalance : undefined,
+      procurement: canCompanyBuy
+        ? {
+            monthlyBudget: 12000,
+            remaining: this.procurementBudget,
+            transactionLimit: 1500,
+            allowedCategories: ["Seedlings", "Seeds", "Hand Tools", "Watering", "Fertilizer", "Pest Treatment"],
+            recentPurchases: this.workSupplies.purchases
+              .filter((purchase) => purchase.payer === "company" && purchase.status === "completed")
+              .slice(-3)
+              .map((purchase) => ({ id: purchase.id, detail: purchase.reference, amount: purchase.total, at: "Just now" })),
+            requests: structuredClone(this.workSupplies.procurementRequests),
+            violations: ["One asset return is overdue by 3 hours."],
+          }
+        : undefined,
+      issuedMaterials: context.capabilities.manageIssuedMaterials
+        ? structuredClone(this.workSupplies.issuedMaterials)
+        : [],
+    };
+  }
+
+  async load<TData>(request: HubViewRequest, context: HubContextModel): Promise<HubViewModel<TData>> {
+    await wait(this.delayMs);
+    if (context.viewState !== "ready") return { request, state: context.viewState, data: null };
 
     if (request.kind === "hub") {
-      return { request, state: "ready", data: {} as TData };
+      const data = request.route === "work"
+        ? this.loadWork(context)
+        : request.route === "supplies"
+          ? this.loadSupplies(context)
+          : {};
+      return { request, state: "ready", data: data as TData };
     }
 
-    const assignment = this.assignments.find((item) => item.id === request.assignmentId);
-    if (!assignment) {
-      return { request, state: "ready", data: null };
+    if (request.kind === "assignmentCreate") {
+      return context.capabilities.createAssignments
+        ? { request, state: "ready", data: { nextReference: `ASG-${this.assignmentSequence}` } as TData }
+        : { request, state: "restricted", data: null };
     }
 
-    if (!canReadAssignment(context.role, assignment)) {
-      return { request, state: "restricted", data: null };
+    if (request.kind === "assignmentDetail") {
+      const assignment = this.assignments.find((item) => item.id === request.assignmentId);
+      if (!assignment) return { request, state: "ready", data: null };
+      if (!canReadAssignment(context.role, assignment)) return { request, state: "restricted", data: null };
+      const safeAssignment = structuredClone(assignment);
+      safeAssignment.availableActions = actionsForRole(context.role, safeAssignment);
+      return { request, state: "ready", data: safeAssignment as TData };
     }
 
-    const safeAssignment = structuredClone(assignment);
-    safeAssignment.availableActions = actionsForRole(context.role, safeAssignment);
-    return { request, state: "ready", data: safeAssignment as TData };
+    if (request.kind === "buyerOrderDetail") {
+      if (!context.capabilities.manageBuyerOrders) return { request, state: "restricted", data: null };
+      const order = this.workSupplies.buyerOrders.find((item) => item.id === request.orderId);
+      return { request, state: "ready", data: (order ? structuredClone(order) : null) as TData | null };
+    }
+
+    if (request.kind === "contractCreate") {
+      return context.capabilities.managePublicContracts
+        ? { request, state: "ready", data: { nextReference: `PC-${String(this.contractSequence).padStart(3, "0")}` } as TData }
+        : { request, state: "restricted", data: null };
+    }
+
+    if (request.kind === "contractDetail") {
+      const contract = this.workSupplies.contracts.find((item) => item.id === request.contractId);
+      if (!contract) return { request, state: "ready", data: null };
+      const publicAccess = request.mode === "public" && (context.capabilities.browsePublicContracts || context.capabilities.managePublicContracts);
+      const activeAccess = request.mode !== "public" && (
+        context.capabilities.managePublicContracts ||
+        (context.capabilities.viewActiveContract && contract.contractor === "Avery Cole")
+      );
+      if (!publicAccess && !activeAccess) return { request, state: "restricted", data: null };
+      const safe = structuredClone(contract);
+      if (request.mode === "public") {
+        safe.availableActions = context.role === "visitor" && safe.status === "published"
+          ? ["accept"]
+          : context.capabilities.managePublicContracts
+            ? safe.availableActions
+            : [];
+      }
+      return { request, state: "ready", data: safe as TData };
+    }
+
+    const purchase = this.workSupplies.purchases.find((item) => item.id === request.purchaseId);
+    if (!purchase) return { request, state: "ready", data: null };
+    const allowed = purchase.payer === "personal"
+      ? context.capabilities.buyPersonalSupplies
+      : context.capabilities.buyCompanySupplies;
+    return allowed
+      ? { request, state: "ready", data: structuredClone(purchase) as TData }
+      : { request, state: "restricted", data: null };
   }
 
   async dispatch(intent: ActionIntent, context: HubContextModel): Promise<IntentResult> {
     await wait(this.delayMs);
+
+    if (intent.type === "assignment.create") return this.createAssignment(intent.input, context);
+    if (intent.type.startsWith("assignment.")) return this.dispatchAssignment(intent as AssignmentMutationIntent, context);
+    if (intent.type === "buyerOrder.transition") return this.transitionBuyerOrder(intent.orderId, intent.action, context);
+    if (intent.type === "contract.accept") return this.acceptContract(intent.contractId, context);
+    if (intent.type === "contract.verifyStep") return this.verifyContractStep(intent.contractId, intent.stepId, context);
+    if (intent.type === "contract.transition") return this.transitionContract(intent.contractId, intent.action, intent.note, context);
+    if (intent.type === "contract.create") return this.createContract(intent.input, context);
+    if (intent.type === "purchase.createDraft") return this.createPurchase(intent.payer, intent.lines, context);
+    if (intent.type === "purchase.confirm") return this.confirmPurchase(intent.purchaseId, context);
+    if (intent.type === "procurement.resolve") return this.resolveProcurement(intent.requestId, intent.decision, context);
+    if (intent.type === "issuedMaterial.transition") return this.transitionIssuedMaterial(intent.materialId, intent.action, context);
+    return { ok: false, message: "This action is unavailable." };
+  }
+
+  private createAssignment(input: AssignmentCreateInput, context: HubContextModel): IntentResult {
+    if (!context.capabilities.createAssignments) return { ok: false, message: "Assignment creation is not permitted." };
+    if (!input.title.trim() || !input.objective.trim() || input.payout <= 0) return { ok: false, message: "Complete the required Assignment terms." };
+    const id = `asg-${this.assignmentSequence++}`;
+    const assigneeName = input.assigneeId === "staff-sofia" ? "Sofia Bennett" : "Noah Reed";
+    this.assignments.unshift({
+      id,
+      reference: id.toUpperCase(),
+      title: input.title.trim(),
+      status: "assigned",
+      statusLabel: "Assigned",
+      workType: "Field Operation",
+      objective: input.objective.trim(),
+      crop: input.crop,
+      field: { id: input.fieldId, name: input.fieldId === "greenhouse-2" ? "Greenhouse 2" : "North Field", scope: input.scope, routeLabel: "Assigned access point" },
+      assignee: { id: input.assigneeId, name: assigneeName, role: "Worker" },
+      supervisor: { id: input.supervisorId, name: "Jordan Tate" },
+      deadline: input.deadline,
+      deadlineIso: "2026-08-09T18:00:00+02:00",
+      requirements: [{ id: `${id}-req`, label: input.requirement, detail: "Requires farm service verification", current: 0, target: 1, unit: "result", status: "pending" }],
+      issuedMaterials: input.materialIds.map((materialId) => ({ id: `${id}-${materialId}`, name: materialId === "watering-can" ? "Watering Can" : "Field Pruners", quantity: "1 issued asset", ownership: "Company", returnRequired: true, status: "issued" })),
+      payout: { amount: input.payout, currency: "USD", status: "reserved", conditions: ["Verified result required.", "Issued assets must be accounted for."] },
+      progress: [{ id: `${id}-created`, at: "Just now", title: "Assignment issued", detail: "Reserved pay and work scope recorded.", actor: "Jordan Tate", tone: "neutral" }],
+      cancellationSummary: "Cancellation voids reserved pay unless verified work requires review.",
+      availableActions: ["accept", "reassign", "cancel"],
+    });
+    return { ok: true, changed: true, entityId: id, message: `${id.toUpperCase()} created with reserved pay.` };
+  }
+
+  private dispatchAssignment(intent: AssignmentMutationIntent, context: HubContextModel): IntentResult {
     const assignment = this.assignments.find((item) => item.id === intent.assignmentId);
-    if (!assignment || !canReadAssignment(context.role, assignment)) {
-      return { ok: false, message: "Assignment is unavailable for this role." };
-    }
+    if (!assignment || !canReadAssignment(context.role, assignment)) return { ok: false, message: "Assignment is unavailable for this role." };
+    const actionName = intent.type.replace("assignment.", "").replace("requestCorrection", "request_correction").replace("resolveBlocker", "resolve_blocker") as AvailableAssignmentAction;
+    if (!actionsForRole(context.role, assignment).includes(actionName)) return { ok: false, message: "This action is no longer available." };
 
-    const actionName = intent.type.replace("assignment.", "")
-      .replace("requestCorrection", "request_correction")
-      .replace("resolveBlocker", "resolve_blocker") as AvailableAssignmentAction;
-    if (!actionsForRole(context.role, assignment).includes(actionName)) {
-      return { ok: false, message: "This action is no longer available." };
-    }
-
-    if (intent.type === "assignment.resume") {
-      return {
-        ok: true,
-        changed: false,
-        closeSurface: true,
-        message: `Return to ${assignment.field.name} · ${assignment.field.scope}`,
-      };
-    }
-
+    if (intent.type === "assignment.resume") return { ok: true, changed: false, closeSurface: true, message: `Return to ${assignment.field.name} · ${assignment.field.scope}` };
     if (intent.type === "assignment.accept") {
       assignment.status = "in_progress";
       assignment.statusLabel = "In Progress";
@@ -117,14 +333,9 @@ export class FixtureHubAdapter implements HubAdapter {
       addProgress(assignment, "Assignment accepted", "Issued materials are now in worker custody.", assignment.assignee.name, "neutral");
       return { ok: true, changed: true, message: "Assignment accepted." };
     }
-
     if (intent.type === "assignment.submit") {
-      const complete = assignment.requirements.every(
-        (item) => item.status === "verified" && item.current >= item.target,
-      );
-      if (!complete) {
-        return { ok: false, message: "Verified requirements are still incomplete." };
-      }
+      const complete = assignment.requirements.every((item) => item.status === "verified" && item.current >= item.target);
+      if (!complete) return { ok: false, message: "Verified requirements are still incomplete." };
       assignment.status = "awaiting_review";
       assignment.statusLabel = "Awaiting Review";
       assignment.payout.status = "pending_review";
@@ -132,7 +343,6 @@ export class FixtureHubAdapter implements HubAdapter {
       addProgress(assignment, "Submitted for review", "All required results are ready for Supervisor review.", assignment.assignee.name, "positive");
       return { ok: true, changed: true, message: "Assignment submitted for review." };
     }
-
     if (intent.type === "assignment.approve") {
       assignment.status = "completed";
       assignment.statusLabel = "Completed";
@@ -142,7 +352,6 @@ export class FixtureHubAdapter implements HubAdapter {
       addProgress(assignment, "Result approved", `Reserved pay of $${assignment.payout.amount} released.`, "Jordan Tate", "positive");
       return { ok: true, changed: true, message: "Result approved and reserved pay released." };
     }
-
     if (intent.type === "assignment.requestCorrection") {
       if (!intent.note.trim()) return { ok: false, message: "Correction notes are required." };
       assignment.status = "in_progress";
@@ -153,7 +362,6 @@ export class FixtureHubAdapter implements HubAdapter {
       addProgress(assignment, "Correction requested", intent.note.trim(), "Jordan Tate", "warning");
       return { ok: true, changed: true, message: "Assignment returned with correction notes." };
     }
-
     if (intent.type === "assignment.resolveBlocker") {
       if (!intent.note.trim()) return { ok: false, message: "Resolution notes are required." };
       assignment.status = "in_progress";
@@ -163,19 +371,13 @@ export class FixtureHubAdapter implements HubAdapter {
       addProgress(assignment, "Blocker resolved", intent.note.trim(), "Jordan Tate", "positive");
       return { ok: true, changed: true, message: "Blocker resolved." };
     }
-
     if (intent.type === "assignment.reassign") {
-      const assignees: Record<string, string> = {
-        "staff-noah": "Noah Reed",
-        "staff-sofia": "Sofia Bennett",
-      };
-      const name = assignees[intent.assigneeId];
+      const name = intent.assigneeId === "staff-sofia" ? "Sofia Bennett" : intent.assigneeId === "staff-noah" ? "Noah Reed" : undefined;
       if (!name) return { ok: false, message: "Selected worker is unavailable." };
       assignment.assignee = { id: intent.assigneeId, name, role: "Worker" };
       addProgress(assignment, "Assignment reassigned", `Responsibility moved to ${name}.`, "Jordan Tate", "neutral");
       return { ok: true, changed: true, message: `Assignment reassigned to ${name}.` };
     }
-
     if (!intent.reason.trim()) return { ok: false, message: "Cancellation reason is required." };
     assignment.status = "cancelled";
     assignment.statusLabel = "Cancelled";
@@ -183,6 +385,157 @@ export class FixtureHubAdapter implements HubAdapter {
     assignment.availableActions = [];
     addProgress(assignment, "Assignment cancelled", intent.reason.trim(), "Jordan Tate", "warning");
     return { ok: true, changed: true, message: "Assignment cancelled." };
+  }
+
+  private transitionBuyerOrder(orderId: string, action: BuyerOrderAction, context: HubContextModel): IntentResult {
+    if (!context.capabilities.manageBuyerOrders) return { ok: false, message: "Buyer Order management is not permitted." };
+    const order = this.workSupplies.buyerOrders.find((item) => item.id === orderId);
+    if (!order || !order.availableActions.includes(action)) return { ok: false, message: "This Buyer Order action is no longer available." };
+    if (action === "create_assignment") return { ok: true, changed: false, entityId: order.id, message: "Assignment planning opened for this Buyer Order." };
+    const labels: Record<Exclude<BuyerOrderAction, "create_assignment">, [BuyerOrderDetail["status"], string]> = {
+      accept: ["accepted", "Accepted"], plan: ["planned", "Fulfillment Planned"], reserve: ["reserved", "Stock Reserved"], prepare: ["ready", "Ready for Delivery"], complete: ["completed", "Completed"], reject: ["rejected", "Rejected"],
+    };
+    const [status, label] = labels[action];
+    order.status = status;
+    order.statusLabel = label;
+    if (action === "reserve") order.reservedQuantity = order.quantity;
+    order.availableActions = nextBuyerActions(action);
+    return { ok: true, changed: true, message: `${order.reference} updated: ${label}.` };
+  }
+
+  private acceptContract(contractId: string, context: HubContextModel): IntentResult {
+    if (context.role !== "visitor") return { ok: false, message: "Only an independent visitor can accept this public contract." };
+    const contract = this.workSupplies.contracts.find((item) => item.id === contractId);
+    if (!contract || contract.status !== "published" || contract.contractor) return { ok: false, message: "This contract has already been reserved." };
+    contract.status = "active";
+    contract.statusLabel = "Active";
+    contract.contractor = "Avery Cole";
+    contract.fieldAccess = `${contract.field} access active`;
+    contract.availableActions = ["set_route_field", "open_supplies", "abandon"];
+    return { ok: true, changed: true, entityId: contract.id, contextUpdate: { role: "contractor" }, message: `${contract.reference} reserved. Reward remains in escrow.` };
+  }
+
+  private transitionContract(contractId: string, action: ContractAction, note: string | undefined, context: HubContextModel): IntentResult {
+    const contract = this.workSupplies.contracts.find((item) => item.id === contractId);
+    const permitted = context.capabilities.managePublicContracts || (context.capabilities.viewActiveContract && contract?.contractor === "Avery Cole");
+    if (!contract || !permitted || !contract.availableActions.includes(action)) return { ok: false, message: "This contract action is no longer available." };
+    if (action === "accept") return { ok: false, message: "Use the public acceptance flow." };
+    if (action === "set_route_field" || action === "set_route_delivery") return { ok: true, changed: false, closeSurface: true, message: action === "set_route_field" ? `Route set to ${contract.field}.` : `Route set to ${contract.deliveryDestination}.` };
+    if (action === "open_supplies") return { ok: true, changed: false, entityId: "supplies", message: "Personal Supply Market opened for required materials." };
+    if (action === "submit") {
+      if (contract.steps.some((step) => !step.completed)) return { ok: false, message: "Verified contract steps are still incomplete." };
+      contract.status = "awaiting_review";
+      contract.statusLabel = "Awaiting Review";
+      contract.availableActions = context.capabilities.managePublicContracts ? ["complete", "cancel"] : [];
+      return { ok: true, changed: true, message: "Contract result submitted for validation." };
+    }
+    if (action === "complete") {
+      contract.status = "completed";
+      contract.statusLabel = "Completed";
+      contract.escrowStatus = "released";
+      contract.acceptedResult = contract.producedCargo;
+      contract.adjustment = 0;
+      contract.availableActions = [];
+      return { ok: true, changed: true, message: `${contract.reference} completed. Escrow released.` };
+    }
+    if (action === "publish") {
+      contract.status = "published";
+      contract.statusLabel = "Available";
+      contract.availableActions = [];
+      return { ok: true, changed: true, message: `${contract.reference} published with funded escrow.` };
+    }
+    contract.status = action === "abandon" ? "failed" : "cancelled";
+    contract.statusLabel = action === "abandon" ? "Failed · Abandoned" : "Cancelled";
+    contract.escrowStatus = action === "abandon" ? "refunded" : "void";
+    contract.availableActions = [];
+    return { ok: true, changed: true, message: note?.trim() || `${contract.reference} ${contract.statusLabel.toLowerCase()}.` };
+  }
+
+  private verifyContractStep(contractId: string, stepId: string, context: HubContextModel): IntentResult {
+    const contract = this.workSupplies.contracts.find((item) => item.id === contractId);
+    if (!contract || !context.capabilities.viewActiveContract || contract.contractor !== "Avery Cole" || contract.status !== "active") return { ok: false, message: "Contract progress is unavailable." };
+    const step = contract.steps.find((item) => item.id === stepId);
+    if (!step || step.completed) return { ok: false, message: "This verification step is no longer available." };
+    step.completed = true;
+    const completed = contract.steps.filter((item) => item.completed).length;
+    contract.producedCargo = `${completed} of ${contract.steps.length} contract steps verified`;
+    contract.availableActions = contract.steps.every((item) => item.completed)
+      ? ["set_route_delivery", "submit", "abandon"]
+      : ["set_route_field", "open_supplies", "abandon"];
+    return { ok: true, changed: true, message: `${step.label} verified.` };
+  }
+
+  private createContract(input: Extract<ActionIntent, { type: "contract.create" }>["input"], context: HubContextModel): IntentResult {
+    if (!context.capabilities.managePublicContracts) return { ok: false, message: "Contract publishing is not permitted." };
+    if (!input.title.trim() || !input.objective.trim() || input.reward <= 0) return { ok: false, message: "Complete the funded contract terms." };
+    const id = `pc-${String(this.contractSequence++).padStart(3, "0")}`;
+    this.workSupplies.contracts.unshift({
+      id, reference: id.toUpperCase(), title: input.title, status: "draft", statusLabel: "Draft", objective: input.objective, field: input.field, crop: "Tomatoes", scope: input.scope, deadline: input.deadline, reward: input.reward, escrowStatus: "reserved", materialsPolicy: "Contractor supplies all required materials.", fieldAccess: `${input.field} access after acceptance`, cargoOwnership: "All resulting cargo belongs to Sonar Farm.", deliveryDestination: `${input.field} verification marker`, producedCargo: "No cargo recorded", steps: [{ id: `${id}-step`, label: input.template, detail: input.scope, completed: false }], requirements: [input.requirements], failureRules: [input.failureRule], availableActions: ["publish", "cancel"],
+    });
+    return { ok: true, changed: true, entityId: id, message: `${id.toUpperCase()} created with reward held in escrow.` };
+  }
+
+  private createPurchase(payer: "personal" | "company", lines: Array<{ productId: string; quantity: number }>, context: HubContextModel): IntentResult {
+    const allowed = payer === "personal" ? context.capabilities.buyPersonalSupplies : context.capabilities.buyCompanySupplies;
+    if (!allowed || !lines.length) return { ok: false, message: "This purchase payer is unavailable." };
+    const detailed = lines.map((line) => {
+      const product = this.workSupplies.products.find((item) => item.id === line.productId);
+      return product && line.quantity > 0 ? { ...line, name: product.name, unit: product.unit, unitPrice: product.unitPrice } : null;
+    });
+    if (detailed.some((line) => !line)) return { ok: false, message: "One or more cart lines are invalid." };
+    const safeLines = detailed.filter((line): line is NonNullable<typeof line> => Boolean(line));
+    const subtotal = safeLines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
+    const fees = payer === "company" ? 0 : Math.round(subtotal * 0.025);
+    const total = subtotal + fees;
+    const balance = payer === "company" ? this.companyBalance : this.personalBalance;
+    const id = `pur-${this.purchaseSequence++}`;
+    this.workSupplies.purchases.push({
+      id, reference: id.toUpperCase(), payer, lines: safeLines, subtotal, fees, total, balance, projectedBalance: balance - total, budgetRemaining: payer === "company" ? this.procurementBudget : undefined, transactionLimit: payer === "company" ? 1500 : undefined, ownership: payer === "company" ? "Company" : "Personal", inventoryCapacity: payer === "company" ? "18 of 40 company slots used" : "7 of 20 personal slots used", fulfillment: "Office Terminal · Supplier counter", status: "draft",
+    });
+    return { ok: true, changed: true, entityId: id, message: "Purchase draft ready for review." };
+  }
+
+  private confirmPurchase(purchaseId: string, context: HubContextModel): IntentResult {
+    const purchase = this.workSupplies.purchases.find((item) => item.id === purchaseId);
+    if (!purchase || purchase.status !== "draft") return { ok: false, message: "This purchase can no longer be confirmed." };
+    if (!context.capabilities.physicalTransactions) return { ok: false, closeSurface: true, message: "Complete this purchase at an Office Terminal." };
+    if (purchase.payer === "company" && !context.capabilities.buyCompanySupplies) { purchase.failureReason = "permission_lost"; return { ok: false, message: "Company purchasing permission was removed." }; }
+    if (purchase.total > purchase.balance) { purchase.failureReason = "insufficient_funds"; return { ok: false, message: "The selected payer has insufficient funds." }; }
+    if (purchase.payer === "company" && purchase.total > this.procurementBudget) { purchase.failureReason = "budget_exceeded"; return { ok: false, message: "The procurement budget is insufficient." }; }
+    if (purchase.payer === "company" && purchase.transactionLimit && purchase.total > purchase.transactionLimit && !context.capabilities.approveProcurement) { purchase.failureReason = "budget_exceeded"; return { ok: false, message: "This purchase exceeds your transaction limit and requires approval." }; }
+    for (const line of purchase.lines) {
+      const product = this.workSupplies.products.find((item) => item.id === line.productId);
+      if (!product || (product.stock !== "base" && product.stock < line.quantity)) { purchase.failureReason = product?.stock === 0 ? "sold_out" : "stock_changed"; return { ok: false, message: product?.stock === 0 ? `${line.name} is sold out.` : `${line.name} stock changed before confirmation.` }; }
+    }
+    purchase.status = "completed";
+    purchase.receiptId = `SF-${Date.now().toString().slice(-6)}`;
+    purchase.failureReason = undefined;
+    for (const line of purchase.lines) {
+      const product = this.workSupplies.products.find((item) => item.id === line.productId)!;
+      if (product.stock !== "base") product.stock -= line.quantity;
+      if (purchase.payer === "company") product.companyOwned += line.quantity;
+      else product.personalOwned += line.quantity;
+    }
+    if (purchase.payer === "company") { this.companyBalance -= purchase.total; this.procurementBudget -= purchase.total; }
+    else this.personalBalance -= purchase.total;
+    return { ok: true, changed: true, receiptId: purchase.receiptId, message: `Purchase completed · receipt ${purchase.receiptId}.` };
+  }
+
+  private resolveProcurement(requestId: string, decision: "approve" | "reject", context: HubContextModel): IntentResult {
+    if (!context.capabilities.approveProcurement) return { ok: false, message: "Procurement approval is not permitted." };
+    const request = this.workSupplies.procurementRequests.find((item) => item.id === requestId);
+    if (!request || request.status !== "pending") return { ok: false, message: "This procurement request is no longer pending." };
+    request.status = decision === "approve" ? "approved" : "rejected";
+    return { ok: true, changed: true, message: `${request.id.toUpperCase()} ${request.status}.` };
+  }
+
+  private transitionIssuedMaterial(materialId: string, action: "return" | "flag", context: HubContextModel): IntentResult {
+    if (!context.capabilities.manageIssuedMaterials) return { ok: false, message: "Issued material management is not permitted." };
+    const material = this.workSupplies.issuedMaterials.find((item) => item.id === materialId);
+    if (!material || !material.availableActions.includes(action)) return { ok: false, message: "This material action is no longer available." };
+    material.status = action === "return" ? "returned" : "discrepancy";
+    material.availableActions = [];
+    return { ok: true, changed: true, message: action === "return" ? `${material.asset} returned and custody closed.` : `${material.asset} discrepancy recorded for review.` };
   }
 }
 

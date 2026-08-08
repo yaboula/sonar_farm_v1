@@ -22,11 +22,13 @@ export const ROLE_LABELS: Record<FarmRole, string> = {
 
 export function capabilitiesFor(role: FarmRole, surface: "office" | "tablet"): HubCapabilities {
   const isManagement = ["supervisor", "manager", "owner"].includes(role);
+  const isEmployee = ["worker", "procurement", "supervisor", "manager", "owner"].includes(role);
+  const isCompanyBuyer = ["procurement", "manager", "owner"].includes(role);
   const routes: HubRoute[] =
     role === "visitor"
       ? ["work", "supplies", "company"]
       : role === "contractor"
-        ? MEMBER_ROUTES
+        ? ["work", "supplies", "company"]
         : MEMBER_ROUTES;
 
   return {
@@ -35,8 +37,19 @@ export function capabilitiesFor(role: FarmRole, surface: "office" | "tablet"): H
     viewFinancials: ["manager", "owner"].includes(role),
     manageStaff: ["manager", "owner"].includes(role),
     manageOperations: isManagement,
-    companyProcurement: ["procurement", "manager", "owner"].includes(role),
-    physicalTransactions: surface === "office" && !["visitor", "contractor"].includes(role),
+    companyProcurement: isCompanyBuyer,
+    physicalTransactions: surface === "office",
+    viewOwnAssignments: isEmployee,
+    viewTeamAssignments: isManagement,
+    createAssignments: isManagement,
+    manageBuyerOrders: ["manager", "owner"].includes(role),
+    browsePublicContracts: role === "visitor" || ["manager", "owner"].includes(role),
+    managePublicContracts: ["manager", "owner"].includes(role),
+    viewActiveContract: role === "contractor",
+    buyPersonalSupplies: true,
+    buyCompanySupplies: isCompanyBuyer,
+    approveProcurement: ["manager", "owner"].includes(role),
+    manageIssuedMaterials: isCompanyBuyer,
   };
 }
 
