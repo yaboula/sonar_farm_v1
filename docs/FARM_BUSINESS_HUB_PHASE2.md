@@ -290,6 +290,11 @@ scrolls to Rows 11–20. Selecting a Row reveals up to 20 Slots across the same
 rectangle. Keyboard focus roves across Rows and Slots with arrows; Enter
 inspects and Escape returns to the parent scope.
 
+Every Row owns an independent authoritative count of 2–20 Slots. Rendering,
+capacity, planning and navigation use stable Slot IDs from that Row rather than
+assuming a rectangular topology. Moving vertically between unequal Rows keeps
+the nearest proportional Slot position.
+
 Layers are `Overview`, `Water`, `Health`, `Growth`, `Readiness`, `Work` and
 `Crop Plan`. Readiness includes spoilage. Critical Slot diagnostics remain
 explicit even when the selected scope is a Row or Field.
@@ -344,6 +349,8 @@ normalized positions only; future world-coordinate resolution stays outside UI.
 - East Field: homogeneous Rows plus the exact Contractor Row D scope.
 - Orchard Annex: empty, Lease Grace Period and planting suspended.
 - Scale Field: technical 20 × 20 fixture used only for topology/keyboard tests.
+- Mixed Topology Field: deterministic 2–20 Slot-per-Row fixture used to verify
+  variable capacity, stable identities and proportional keyboard navigation.
 
 Completion requires role and surface redaction, deterministic aggregation,
 exclusive Crop Plans, stable Work scope, ordered delta/resync tests, all shared

@@ -108,8 +108,16 @@ export function FieldMap({ field, layer, selectedRowId, selectedSlotId, onSelect
     let nextId: string | undefined;
     if (direction === "left") nextId = currentRow?.slotIds[Math.max(0, column - 1)];
     if (direction === "right") nextId = currentRow?.slotIds[Math.min(currentRow.slotIds.length - 1, column + 1)];
-    if (direction === "up") nextId = availableRows[Math.max(0, rowIndex - 1)]?.slotIds[column];
-    if (direction === "down") nextId = availableRows[Math.min(availableRows.length - 1, rowIndex + 1)]?.slotIds[column];
+    if (direction === "up" || direction === "down") {
+      const targetRowIndex = direction === "up" ? Math.max(0, rowIndex - 1) : Math.min(availableRows.length - 1, rowIndex + 1);
+      const targetRow = availableRows[targetRowIndex];
+      if (currentRow && targetRow) {
+        const sourceLastIndex = Math.max(1, currentRow.slotIds.length - 1);
+        const targetLastIndex = Math.max(0, targetRow.slotIds.length - 1);
+        const proportionalColumn = Math.round((Math.max(0, column) / sourceLastIndex) * targetLastIndex);
+        nextId = targetRow.slotIds[proportionalColumn];
+      }
+    }
     const next = field.topology.slots.find((item) => item.id === nextId && item.visible);
     if (next) { onSelectSlot(next.id, next.rowId); focusSlot(next.id); }
   };

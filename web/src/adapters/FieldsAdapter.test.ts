@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { capabilitiesFor } from "../data/fixtures";
-import { createScaleFieldFixture } from "../data/fieldFixtures";
+import { createMixedSlotFieldFixture, createScaleFieldFixture } from "../data/fieldFixtures";
 import type { CropPlan, FieldDetail, FieldsOverviewData, FieldSyncState, HubContextModel } from "../types";
 import { FixtureHubAdapter } from "./FixtureHubAdapter";
 import { applyFieldDelta, createFieldSyncState, projectFieldDelta } from "./fieldSync";
@@ -22,6 +22,16 @@ describe("Fields domain adapter", () => {
     expect(field.topology.slots[399].id).toBe("scale-field:scale-r20:s20");
     expect(field.topology.slots.map((slot) => slot.position)).toEqual(secondProjection.topology.slots.map((slot) => slot.position));
     expect(field.topology.slots.every((slot) => slot.position.x >= 0 && slot.position.x <= 100 && slot.position.y >= 0 && slot.position.y <= 100)).toBe(true);
+  });
+
+  it("supports an independent deterministic 2-to-20 slot topology per Row", () => {
+    const field = createMixedSlotFieldFixture();
+    const counts = field.topology.rows.map((row) => row.slotIds.length);
+    expect(counts).toEqual([2, 7, 20, 4, 13, 6, 18, 3, 11, 9, 5, 16, 8, 14, 10, 19, 12, 17, 15, 2]);
+    expect(field.capacity).toBe(counts.reduce((total, count) => total + count, 0));
+    expect(field.topology.slots).toHaveLength(field.capacity);
+    expect(new Set(field.topology.slots.map((slot) => slot.id)).size).toBe(field.capacity);
+    expect(field.topology.slots.map((slot) => slot.legacyIndex)).toEqual(Array.from({ length: field.capacity }, (_, index) => index + 1));
   });
 
   it("adapts the portfolio landing to role", async () => {

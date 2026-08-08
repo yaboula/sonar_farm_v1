@@ -1,12 +1,19 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import { createScaleFieldFixture } from "../data/fieldFixtures";
+import { createMixedSlotFieldFixture, createScaleFieldFixture } from "../data/fieldFixtures";
 import { FieldMap } from "./FieldMap";
 
 function ScaleMapHarness() {
   const field = createScaleFieldFixture();
   const [row, setRow] = useState<string | undefined>("scale-r01");
+  const [slot, setSlot] = useState<string>();
+  return <FieldMap field={field} layer="overview" selectedRowId={row} selectedSlotId={slot} onSelectRow={setRow} onSelectSlot={(slotId, rowId) => { setSlot(slotId); setRow(rowId); }} />;
+}
+
+function MixedMapHarness() {
+  const field = createMixedSlotFieldFixture();
+  const [row, setRow] = useState<string | undefined>("mixed-r03");
   const [slot, setSlot] = useState<string>();
   return <FieldMap field={field} layer="overview" selectedRowId={row} selectedSlotId={slot} onSelectRow={setRow} onSelectSlot={(slotId, rowId) => { setSlot(slotId); setRow(rowId); }} />;
 }
@@ -30,5 +37,21 @@ describe("FieldMap", () => {
     first.focus();
     fireEvent.keyDown(first, { key: "ArrowRight" });
     await waitFor(() => expect(document.activeElement).toHaveAttribute("data-slot-id", "scale-field:scale-r01:s02"));
+  });
+
+  it("renders each Row's independent slot count and preserves position across unequal Rows", async () => {
+    const { container } = render(<MixedMapHarness />);
+    expect(container.querySelectorAll("[data-slot-id]")).toHaveLength(20);
+
+    const lastOfTwenty = container.querySelector<SVGGElement>('[data-slot-id="mixed-field:mixed-r03:s20"]')!;
+    lastOfTwenty.focus();
+    fireEvent.keyDown(lastOfTwenty, { key: "ArrowUp" });
+    await waitFor(() => expect(document.activeElement).toHaveAttribute("data-slot-id", "mixed-field:mixed-r02:s07"));
+    expect(container.querySelectorAll("[data-slot-id]")).toHaveLength(7);
+
+    const lastOfSeven = container.querySelector<SVGGElement>('[data-slot-id="mixed-field:mixed-r02:s07"]')!;
+    fireEvent.keyDown(lastOfSeven, { key: "ArrowUp" });
+    await waitFor(() => expect(document.activeElement).toHaveAttribute("data-slot-id", "mixed-field:mixed-r01:s02"));
+    expect(container.querySelectorAll("[data-slot-id]")).toHaveLength(2);
   });
 });

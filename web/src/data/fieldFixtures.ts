@@ -12,6 +12,7 @@ import type {
 type RowSeed = {
   id: string;
   label: string;
+  slotCount?: number;
   crop?: string;
   cropLabel?: string;
   occupied: number;
@@ -110,10 +111,18 @@ function makePlant(seed: RowSeed, fieldId: string, rowId: string, column: number
 function buildField(seed: FieldSeed): FieldDetail {
   const slots: FieldSlot[] = [];
   const rowCount = seed.rows.length;
+  let legacyIndex = 0;
 
   const rows: FieldRow[] = seed.rows.map((rowSeed, rowIndex) => {
+    const slotCount = rowSeed.slotCount ?? seed.slotsPerRow;
+    if (!Number.isInteger(slotCount) || slotCount < 2 || slotCount > 20) {
+      throw new Error(`${seed.id}/${rowSeed.id} must define between 2 and 20 slots.`);
+    }
+    if (rowSeed.occupied < 0 || rowSeed.occupied > slotCount) {
+      throw new Error(`${seed.id}/${rowSeed.id} occupied count exceeds its ${slotCount}-slot topology.`);
+    }
     const slotIds: string[] = [];
-    for (let column = 0; column < seed.slotsPerRow; column += 1) {
+    for (let column = 0; column < slotCount; column += 1) {
       const id = `${seed.id}:${rowSeed.id}:s${String(column + 1).padStart(2, "0")}`;
       slotIds.push(id);
       const occupied = column < rowSeed.occupied;
@@ -124,11 +133,11 @@ function buildField(seed: FieldSeed): FieldDetail {
         .map((item) => item.id);
       slots.push({
         id,
-        legacyIndex: (rowIndex * seed.slotsPerRow) + column + 1,
+        legacyIndex: ++legacyIndex,
         rowId: rowSeed.id,
         label: `${rowSeed.label} · Slot ${column + 1}`,
         position: {
-          x: seed.slotsPerRow === 1 ? 50 : 8 + (column * 84) / (seed.slotsPerRow - 1),
+          x: 8 + (column * 84) / (slotCount - 1),
           y: rowCount === 1 ? 50 : 8 + (rowIndex * 84) / (rowCount - 1),
         },
         status: occupied ? "occupied" : planned ? "planned" : "empty",
@@ -141,7 +150,7 @@ function buildField(seed: FieldSeed): FieldDetail {
       });
     }
 
-    const available = seed.slotsPerRow - rowSeed.occupied - (rowSeed.plannedCrop ? seed.slotsPerRow - rowSeed.occupied : 0);
+    const available = slotCount - rowSeed.occupied - (rowSeed.plannedCrop ? slotCount - rowSeed.occupied : 0);
     const rowDiagnostics = seed.diagnostics.filter((item) => item.scopeId === rowSeed.id);
     const criticalCount = rowDiagnostics.filter((item) => item.severity === "critical").length;
     const readyCount = rowSeed.readiness === "ready" ? rowSeed.occupied : 0;
@@ -153,7 +162,7 @@ function buildField(seed: FieldSeed): FieldDetail {
       plannedCrop: rowSeed.plannedCrop,
       cropLabel: rowSeed.cropLabel ?? rowSeed.plannedLabel ?? "Unassigned",
       occupied: rowSeed.occupied,
-      planned: rowSeed.plannedCrop ? seed.slotsPerRow - rowSeed.occupied : 0,
+      planned: rowSeed.plannedCrop ? slotCount - rowSeed.occupied : 0,
       available: Math.max(0, available),
       averageWater: rowSeed.occupied ? rowSeed.water : undefined,
       averageHealth: rowSeed.occupied ? rowSeed.health : undefined,
@@ -193,7 +202,7 @@ function buildField(seed: FieldSeed): FieldDetail {
     restriction: seed.restriction,
     occupied,
     planned,
-    capacity: seed.rows.length * seed.slotsPerRow,
+    capacity: rows.reduce((sum, row) => sum + row.slotIds.length, 0),
     cropSummary: seed.cropSummary,
     attentionCount: seed.diagnostics.length,
     criticalCount,
@@ -429,6 +438,37 @@ export function createScaleFieldFixture(size = 20) {
     slotsPerRow: size,
     rows,
     cropSummary: "Potatoes",
+    nextMilestone: "QA only",
+    diagnostics: [],
+    events: [],
+    linkedWork: [],
+  });
+}
+
+export function createMixedSlotFieldFixture() {
+  const slotCounts = [2, 7, 20, 4, 13, 6, 18, 3, 11, 9, 5, 16, 8, 14, 10, 19, 12, 17, 15, 2];
+  const rows: RowSeed[] = slotCounts.map((slotCount, index) => ({
+    id: `mixed-r${String(index + 1).padStart(2, "0")}`,
+    label: `Row ${index + 1}`,
+    slotCount,
+    crop: "tomato",
+    cropLabel: "Tomatoes",
+    occupied: slotCount,
+    water: 72,
+    health: 96,
+    progress: 52,
+  }));
+  return buildField({
+    id: "mixed-field",
+    name: "Mixed Topology Field",
+    location: "QA topology",
+    status: "active",
+    statusLabel: "Active",
+    ownership: "Company owned",
+    orientation: 0,
+    slotsPerRow: 8,
+    rows,
+    cropSummary: "Tomatoes",
     nextMilestone: "QA only",
     diagnostics: [],
     events: [],

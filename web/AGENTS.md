@@ -23,3 +23,4 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Deep-view actions come from adapter-provided `availableActions`; components do not infer business rules from role labels or status copy.
 - Product selection controls use the reusable `FarmSelect` component. Never expose the operating system's native select popup inside the Sonar Farm product UI.
 - Field operating maps use a fixed 0° Row grid with no zoom or free pan. The map owns a vertical scroll viewport showing 10 Rows at a time; selecting a Row reveals up to 20 Slots across the same fixed-width rectangle.
+- Each Field Row owns an independent, authoritative topology of 2–20 Slots. The UI must use stable Slot IDs and each Row's `slotIds`; it must never assume that adjacent Rows have equal Slot counts.
