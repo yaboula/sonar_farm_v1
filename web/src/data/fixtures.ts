@@ -28,7 +28,7 @@ export function capabilitiesFor(role: FarmRole, surface: "office" | "tablet"): H
     role === "visitor"
       ? ["work", "supplies", "company"]
       : role === "contractor"
-        ? ["work", "supplies", "company"]
+        ? ["fields", "work", "supplies", "company"]
         : MEMBER_ROUTES;
 
   return {
@@ -50,6 +50,16 @@ export function capabilitiesFor(role: FarmRole, surface: "office" | "tablet"): H
     buyCompanySupplies: isCompanyBuyer,
     approveProcurement: ["manager", "owner"].includes(role),
     manageIssuedMaterials: isCompanyBuyer,
+    viewFieldPortfolio: isEmployee || role === "contractor",
+    viewAssignedFieldDetail: isEmployee || role === "contractor",
+    viewTeamFieldDetail: isManagement,
+    viewFieldEconomics: ["manager", "owner"].includes(role),
+    viewFieldMaterialDemand: ["procurement", "supervisor", "manager", "owner"].includes(role),
+    viewFieldHistory: isManagement,
+    createCropPlans: isManagement,
+    createFieldAssignments: isManagement,
+    createFieldContracts: ["manager", "owner"].includes(role),
+    setFieldRoute: isEmployee || role === "contractor",
   };
 }
 

@@ -24,6 +24,9 @@ export type SelectionKind =
   | "assignment"
   | "cargo"
   | "field"
+  | "row"
+  | "slot"
+  | "cropPlan"
   | "buyerOrder"
   | "contract"
   | "supply"
@@ -48,6 +51,16 @@ export interface HubCapabilities {
   buyCompanySupplies: boolean;
   approveProcurement: boolean;
   manageIssuedMaterials: boolean;
+  viewFieldPortfolio: boolean;
+  viewAssignedFieldDetail: boolean;
+  viewTeamFieldDetail: boolean;
+  viewFieldEconomics: boolean;
+  viewFieldMaterialDemand: boolean;
+  viewFieldHistory: boolean;
+  createCropPlans: boolean;
+  createFieldAssignments: boolean;
+  createFieldContracts: boolean;
+  setFieldRoute: boolean;
 }
 
 export interface HubContextModel {
@@ -107,7 +120,11 @@ export type ActionIntent =
   | { type: "purchase.createDraft"; payer: SupplyPayer; lines: PurchaseLineInput[] }
   | { type: "purchase.confirm"; purchaseId: string }
   | { type: "procurement.resolve"; requestId: string; decision: "approve" | "reject" }
-  | { type: "issuedMaterial.transition"; materialId: string; action: "return" | "flag" };
+  | { type: "issuedMaterial.transition"; materialId: string; action: "return" | "flag" }
+  | { type: "cropPlan.create"; input: CropPlanInput }
+  | { type: "cropPlan.update"; planId: string; input: CropPlanInput }
+  | { type: "cropPlan.cancel"; planId: string }
+  | { type: "field.setRoute"; scope: FieldScopeRef };
 
 export type HubViewRequest =
   | { kind: "hub"; route: HubRoute }
@@ -116,7 +133,9 @@ export type HubViewRequest =
   | { kind: "buyerOrderDetail"; orderId: string }
   | { kind: "contractDetail"; contractId: string; mode: "public" | "active" | "progress" | "completion" }
   | { kind: "contractCreate" }
-  | { kind: "purchaseReview"; purchaseId: string };
+  | { kind: "purchaseReview"; purchaseId: string }
+  | { kind: "fieldsOverview" }
+  | { kind: "fieldDetail"; fieldId: string };
 
 export interface HubViewModel<TData = unknown> {
   request: HubViewRequest;
@@ -132,11 +151,16 @@ export interface IntentResult {
   entityId?: string;
   contextUpdate?: { role?: FarmRole };
   receiptId?: string;
+  invalidated?: string[];
+  handoff?: { kind: "route" | "world"; scope: FieldScopeRef };
 }
+
+export type FieldDeltaListener = (delta: FieldDelta) => void;
 
 export interface HubAdapter {
   load<TData>(request: HubViewRequest, context: HubContextModel): Promise<HubViewModel<TData>>;
   dispatch(intent: ActionIntent, context: HubContextModel): Promise<IntentResult>;
+  subscribeField(fieldId: string, afterSequence: number, context: HubContextModel, listener: FieldDeltaListener): () => void;
 }
 
 export interface AssignmentRequirement {
@@ -210,6 +234,218 @@ export interface FieldFixture {
   lease: string;
 }
 
+export type FieldLayer = "overview" | "water" | "health" | "growth" | "readiness" | "work" | "plan";
+export type FieldSeverity = "info" | "warning" | "critical";
+export type FieldOperationalStatus =
+  | "active"
+  | "attention"
+  | "ready"
+  | "empty"
+  | "planting_suspended"
+  | "grace"
+  | "lease_expired"
+  | "inaccessible"
+  | "unavailable";
+export type FieldSlotStatus = "empty" | "planned" | "occupied";
+export type CropPlanStatus = "draft" | "reserved" | "in_execution" | "completed" | "cancelled";
+export type AttentionKind =
+  | "water_low"
+  | "health_loss"
+  | "harvest_ready"
+  | "spoilage_risk"
+  | "planned_empty"
+  | "plan_conflict"
+  | "work_deadline"
+  | "material_shortage"
+  | "access_restriction"
+  | "pest"
+  | "fertilizer"
+  | "pruning"
+  | "tie";
+
+export interface FieldPoint {
+  x: number;
+  y: number;
+}
+
+export interface FieldScopeRef {
+  fieldId: string;
+  rowIds?: string[];
+}
+
+export interface PlantState {
+  id: string;
+  crop: string;
+  cropLabel: string;
+  stage: string;
+  progress: number;
+  water: number;
+  health: number;
+  spoilage: number;
+  plantedAt: string;
+  maturesAt: string;
+  lastCareAt: string;
+  readiness: "growing" | "ready" | "at_risk";
+}
+
+export interface FieldSlot {
+  id: string;
+  legacyIndex: number;
+  rowId: string;
+  label: string;
+  position: FieldPoint;
+  status: FieldSlotStatus;
+  plant?: PlantState;
+  plannedCrop?: string;
+  diagnosticIds: string[];
+  assignmentId?: string;
+  contractId?: string;
+  visible: boolean;
+}
+
+export interface FieldRow {
+  id: string;
+  label: string;
+  order: number;
+  slotIds: string[];
+  plannedCrop?: string;
+  cropLabel: string;
+  occupied: number;
+  planned: number;
+  available: number;
+  averageWater?: number;
+  averageHealth?: number;
+  averageGrowth?: number;
+  readyCount: number;
+  criticalCount: number;
+  status: "empty" | "planned" | "growing" | "attention" | "ready" | "blocked" | "restricted";
+  assignmentIds: string[];
+  contractIds: string[];
+  materialDemand?: string;
+  visibleDetail: boolean;
+}
+
+export interface FieldTopology {
+  fieldId: string;
+  topologyRevision: string;
+  orientation: number;
+  rows: FieldRow[];
+  slots: FieldSlot[];
+  bounds: { width: number; height: number };
+}
+
+export interface FieldDiagnostic {
+  id: string;
+  kind: AttentionKind;
+  severity: FieldSeverity;
+  scope: "field" | "row" | "slot";
+  scopeId: string;
+  title: string;
+  cause: string;
+  evidence: string;
+  window: string;
+  impact: string;
+  recommendedAction: string;
+  availableAction?: "open_assignment" | "create_assignment" | "create_contract" | "set_route";
+}
+
+export interface FieldEvent {
+  id: string;
+  type: "planted" | "watered" | "inspected" | "harvested" | "plan_changed" | "work_linked" | "access_changed" | "restriction_applied";
+  at: string;
+  actor: string;
+  title: string;
+  detail: string;
+  rowId?: string;
+  slotId?: string;
+}
+
+export interface CropPlan {
+  id: string;
+  reference: string;
+  fieldId: string;
+  rowIds: string[];
+  crop: string;
+  cropLabel: string;
+  status: CropPlanStatus;
+  statusLabel: string;
+  eligibleSlots: number;
+  excludedSlots: Array<{ slotId: string; reason: string }>;
+  materialEstimate: string[];
+  linkedAssignmentId?: string;
+  linkedContractId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CropPlanInput {
+  fieldId: string;
+  rowIds: string[];
+  crop: string;
+}
+
+export interface FieldOverview {
+  id: string;
+  name: string;
+  location: string;
+  status: FieldOperationalStatus;
+  statusLabel: string;
+  ownership: string;
+  leaseExpiresAt?: string;
+  restriction?: string;
+  occupied: number;
+  planned: number;
+  capacity: number;
+  cropSummary: string;
+  attentionCount: number;
+  criticalCount: number;
+  activeAssignments: number;
+  materialDemand?: string;
+  nextMilestone: string;
+  yieldForecast?: string;
+  permittedRowIds?: string[];
+}
+
+export interface FieldDetail extends FieldOverview {
+  topology: FieldTopology;
+  diagnostics: FieldDiagnostic[];
+  events: FieldEvent[];
+  cropPlans: CropPlan[];
+  linkedWork: Array<{ id: string; kind: "assignment" | "contract" | "buyer_order"; title: string; status: string; scope: string }>;
+  materialNeeds: Array<{ id: string; item: string; quantity: string; status: string }>;
+  serverTime: string;
+  stateRevision: string;
+  sequence: number;
+  availableActions: Array<"create_plan" | "create_assignment" | "create_contract" | "set_route">;
+}
+
+export interface FieldsOverviewData {
+  fields: FieldOverview[];
+  landing: "attention" | "assignment" | "materials" | "contract";
+  activeScope?: FieldScopeRef;
+  headline: string;
+}
+
+export type FieldDelta =
+  | { kind: "slot_upsert"; fieldId: string; topologyRevision: string; sequence: number; slot: FieldSlot }
+  | { kind: "plan_upsert"; fieldId: string; topologyRevision: string; sequence: number; plan: CropPlan }
+  | { kind: "plan_remove"; fieldId: string; topologyRevision: string; sequence: number; planId: string }
+  | { kind: "invalidate"; fieldId: string; topologyRevision: string; sequence: number; reason: string };
+
+export interface FieldSubscription {
+  fieldId: string;
+  topologyRevision: string;
+  afterSequence: number;
+}
+
+export interface FieldSyncState {
+  topologyRevision: string;
+  sequence: number;
+  slots: Record<string, FieldSlot>;
+  plans: Record<string, CropPlan>;
+  resyncRequired: boolean;
+}
+
 export interface WorkFixture {
   id: string;
   type: "assignment" | "buyerOrder" | "contract";
@@ -242,6 +478,8 @@ export interface AssignmentCreateInput {
   payout: number;
   requirement: string;
   materialIds: string[];
+  scopeRef?: FieldScopeRef;
+  sourcePlanId?: string;
 }
 
 export type BuyerOrderStatus = "open" | "accepted" | "planned" | "reserved" | "ready" | "completed" | "rejected";
@@ -316,6 +554,8 @@ export interface ContractCreateInput {
   reward: number;
   requirements: string;
   failureRule: string;
+  scopeRef?: FieldScopeRef;
+  sourcePlanId?: string;
 }
 
 export interface SupplyFixture {

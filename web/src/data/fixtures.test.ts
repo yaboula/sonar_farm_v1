@@ -23,4 +23,13 @@ describe("capabilitiesFor", () => {
     expect(tablet.routes).toEqual(office.routes);
     expect(tablet.physicalTransactions).toBe(false);
   });
+
+  it("grants a Contractor temporary scoped Fields access", () => {
+    const capabilities = capabilitiesFor("contractor", "tablet");
+    expect(capabilities.routes).toContain("fields");
+    expect(capabilities.viewFieldPortfolio).toBe(true);
+    expect(capabilities.viewAssignedFieldDetail).toBe(true);
+    expect(capabilities.createCropPlans).toBe(false);
+    expect(capabilities.viewFieldEconomics).toBe(false);
+  });
 });

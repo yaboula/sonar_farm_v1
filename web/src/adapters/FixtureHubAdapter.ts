@@ -1,5 +1,6 @@
 import { cloneAssignmentFixtures } from "../data/assignmentFixtures";
 import { cloneWorkSupplyFixtures } from "../data/workSupplyFixtures";
+import { FieldFixtureRepository } from "./FieldFixtureRepository";
 import type {
   ActionIntent,
   AssignmentCreateInput,
@@ -10,6 +11,7 @@ import type {
   ContractAction,
   ContractDetail,
   FarmRole,
+  FieldDeltaListener,
   HubAdapter,
   HubContextModel,
   HubViewRequest,
@@ -125,6 +127,7 @@ export class FixtureHubAdapter implements HubAdapter {
   private assignmentSequence = 1062;
   private contractSequence = 84;
   private purchaseSequence = 301;
+  private fields = new FieldFixtureRepository();
 
   constructor(private readonly delayMs = 80) {}
 
@@ -137,6 +140,7 @@ export class FixtureHubAdapter implements HubAdapter {
     this.assignmentSequence = 1062;
     this.contractSequence = 84;
     this.purchaseSequence = 301;
+    this.fields.reset();
   }
 
   private loadWork(context: HubContextModel): WorkQueueData {
@@ -216,6 +220,19 @@ export class FixtureHubAdapter implements HubAdapter {
       return { request, state: "ready", data: data as TData };
     }
 
+    if (request.kind === "fieldsOverview") {
+      const data = this.fields.loadOverview(context);
+      return data
+        ? { request, state: "ready", data: data as TData }
+        : { request, state: "restricted", data: null };
+    }
+
+    if (request.kind === "fieldDetail") {
+      const data = this.fields.loadField(request.fieldId, context);
+      if (data === "restricted") return { request, state: "restricted", data: null };
+      return { request, state: "ready", data: data as TData | null };
+    }
+
     if (request.kind === "assignmentCreate") {
       return context.capabilities.createAssignments
         ? { request, state: "ready", data: { nextReference: `ASG-${this.assignmentSequence}` } as TData }
@@ -287,7 +304,15 @@ export class FixtureHubAdapter implements HubAdapter {
     if (intent.type === "purchase.confirm") return this.confirmPurchase(intent.purchaseId, context);
     if (intent.type === "procurement.resolve") return this.resolveProcurement(intent.requestId, intent.decision, context);
     if (intent.type === "issuedMaterial.transition") return this.transitionIssuedMaterial(intent.materialId, intent.action, context);
+    if (intent.type === "cropPlan.create") return this.fields.createPlan(intent.input, context);
+    if (intent.type === "cropPlan.update") return this.fields.updatePlan(intent.planId, intent.input, context);
+    if (intent.type === "cropPlan.cancel") return this.fields.cancelPlan(intent.planId, context);
+    if (intent.type === "field.setRoute") return this.fields.setRoute(intent.scope, context);
     return { ok: false, message: "This action is unavailable." };
+  }
+
+  subscribeField(fieldId: string, afterSequence: number, context: HubContextModel, listener: FieldDeltaListener) {
+    return this.fields.subscribe(fieldId, afterSequence, context, listener);
   }
 
   private createAssignment(input: AssignmentCreateInput, context: HubContextModel): IntentResult {
