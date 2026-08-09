@@ -1005,6 +1005,7 @@ export interface BusinessSaleListing {
   activeObligations: number;
   saleFee: number;
   sellerProceeds: number;
+  escrowAmount: number;
   expiresAt?: string;
   status: SaleListingStatus;
   buyerConfirmed: boolean;

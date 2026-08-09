@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { ACTOR_BY_ROLE, capabilitiesFor } from "../data/fixtures";
-import type { CompanyCargoData, CompanyHomeData, CompanyIdentityTerms, CompanyLease, CompanyProfile, FarmRole, FieldDetail, FieldsOverviewData, HubContextModel, LedgerEntry, RolePolicy, StaffData, TreasurySnapshot, WarehouseData } from "../types";
+import type { BusinessSaleListing, CompanyCargoData, CompanyHomeData, CompanyIdentityTerms, CompanyLease, CompanyProfile, FarmRole, FieldDetail, FieldsOverviewData, HubContextModel, LedgerEntry, RolePolicy, StaffData, TreasurySnapshot, WarehouseData } from "../types";
 import { FixtureHubAdapter } from "./FixtureHubAdapter";
 
 function context(role: FarmRole, presence: HubContextModel["presence"] = "office", surface: HubContextModel["surface"] = "office"): HubContextModel {
@@ -181,5 +181,51 @@ describe("Company domain adapter", () => {
     expect(profile.data?.company.name).toBe("Valley Harvest Co");
     expect(after.data?.available).toBe(before.data!.available - 2500);
     expect(after.data?.recentEntries[0]).toMatchObject({ type: "rename", amount: 2500 });
+  });
+
+  it("reserves buyer funds and completes ownership without partial Company state", async () => {
+    const owner = context("owner");
+    const buyer = context("visitor", "registry", "tablet");
+    const remoteBuyer = context("visitor", "remote", "tablet");
+    const beforeTreasury = await adapter.load<TreasurySnapshot>({ kind: "companyTreasury" }, owner);
+    const beforeWarehouse = await adapter.load<WarehouseData>({ kind: "companyWarehouse" }, owner);
+    const beforeStaff = await adapter.load<StaffData>({ kind: "companyStaff" }, owner);
+    await adapter.dispatch({ type: "businessSale.saveDraft", askingPrice: 180000 }, owner);
+    expect((await adapter.dispatch({ type: "businessSale.publish", listingId: "sale-001" }, owner)).ok).toBe(true);
+    expect((await adapter.dispatch({ type: "businessSale.reserve", listingId: "sale-001" }, remoteBuyer)).ok).toBe(false);
+    expect((await adapter.dispatch({ type: "businessSale.reserve", listingId: "sale-001" }, buyer)).ok).toBe(true);
+    const reserved = await adapter.load<BusinessSaleListing>({ kind: "companyPublicSale" }, buyer);
+    expect(reserved.data).toMatchObject({ status: "reserved", buyerId: buyer.actorId, escrowAmount: 180000 });
+    expect((await adapter.dispatch({ type: "businessSale.reserve", listingId: "sale-001" }, { ...buyer, actorId: "actor-cameron" })).ok).toBe(false);
+    expect((await adapter.dispatch({ type: "businessSale.confirm", listingId: "sale-001", party: "buyer" }, buyer)).ok).toBe(true);
+    const transferred = await adapter.dispatch({ type: "businessSale.confirm", listingId: "sale-001", party: "seller" }, { ...owner, presence: "registry" });
+    const buyerAsOwner = { ...owner, actorId: buyer.actorId };
+    const afterTreasury = await adapter.load<TreasurySnapshot>({ kind: "companyTreasury" }, buyerAsOwner);
+    const afterWarehouse = await adapter.load<WarehouseData>({ kind: "companyWarehouse" }, buyerAsOwner);
+    const afterStaff = await adapter.load<StaffData>({ kind: "companyStaff" }, buyerAsOwner);
+    const listing = await adapter.load<BusinessSaleListing>({ kind: "companyBusinessSale" }, buyerAsOwner);
+    expect(transferred).toMatchObject({ ok: true, contextUpdate: { role: "visitor" } });
+    expect(listing.data).toMatchObject({ status: "completed", escrowAmount: 0, buyerId: buyer.actorId });
+    expect(afterTreasury.data?.available).toBe(beforeTreasury.data?.available);
+    expect(afterWarehouse.data?.items).toEqual(beforeWarehouse.data?.items);
+    expect(afterStaff.data?.members).toHaveLength(beforeStaff.data!.members.length);
+    expect(afterStaff.data?.members.some((member) => member.id === "staff-elijah")).toBe(false);
+    expect(afterStaff.data?.members.some((member) => member.id === buyer.actorId && member.role === "owner")).toBe(true);
+    const ledger = await adapter.load<LedgerEntry[]>({ kind: "companyLedger" }, buyerAsOwner);
+    expect(ledger.data?.filter((entry) => entry.linkedId === "sale-001")).toHaveLength(2);
+  });
+
+  it("refunds buyer escrow when a material listing change forces revalidation", async () => {
+    const owner = context("owner");
+    const buyer = context("visitor", "registry", "tablet");
+    await adapter.dispatch({ type: "businessSale.publish", listingId: "sale-001" }, owner);
+    await adapter.dispatch({ type: "businessSale.reserve", listingId: "sale-001" }, buyer);
+    await adapter.dispatch({ type: "treasury.contribute", amount: 1000 }, owner);
+    const changed = await adapter.load<BusinessSaleListing>({ kind: "companyBusinessSale" }, owner);
+    expect(changed.data).toMatchObject({ status: "listing_changed", escrowAmount: 0, buyerId: undefined });
+    await adapter.dispatch({ type: "businessSale.cancel", listingId: "sale-001" }, owner);
+    await adapter.dispatch({ type: "businessSale.saveDraft", askingPrice: 180000 }, owner);
+    await adapter.dispatch({ type: "businessSale.publish", listingId: "sale-001" }, owner);
+    expect((await adapter.dispatch({ type: "businessSale.reserve", listingId: "sale-001" }, buyer)).ok).toBe(true);
   });
 });

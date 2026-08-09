@@ -25,7 +25,7 @@ export function useCompanyData<TData>(request: HubViewRequest) {
     const result = await fixtureHubAdapter.dispatch(intent, context);
     setPending(false);
     setNotice(result.message);
-    if (result.contextUpdate?.role) hub.setRole(result.contextUpdate.role);
+    if (result.contextUpdate?.role) hub.transitionRole(result.contextUpdate.role);
     else if (result.contextUpdate?.capabilitiesRevision) hub.refreshCapabilities(result.contextUpdate.capabilitiesRevision);
     if (result.changed) await reload();
     return result;

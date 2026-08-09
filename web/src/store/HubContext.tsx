@@ -19,6 +19,7 @@ import type {
 
 interface HubStore extends HubContextModel {
   setRole: (role: FarmRole) => void;
+  transitionRole: (role: FarmRole) => void;
   setSurface: (surface: HubSurface) => void;
   setPresence: (presence: HubPresence) => void;
   setViewState: (viewState: ViewState) => void;
@@ -29,6 +30,7 @@ interface HubStore extends HubContextModel {
 
 type Action =
   | { type: "role"; value: FarmRole }
+  | { type: "transitionRole"; value: FarmRole }
   | { type: "surface"; value: HubSurface }
   | { type: "presence"; value: HubPresence }
   | { type: "viewState"; value: ViewState }
@@ -54,6 +56,16 @@ function reducer(state: HubContextModel, action: Action): HubContextModel {
       ...state,
       role: action.value,
       actorId: ACTOR_BY_ROLE[action.value],
+      capabilities: fixtureHubAdapter.resolveCapabilities(action.value, state.surface),
+      selectedKind: undefined,
+      selectedId: undefined,
+    };
+  }
+
+  if (action.type === "transitionRole") {
+    return {
+      ...state,
+      role: action.value,
       capabilities: fixtureHubAdapter.resolveCapabilities(action.value, state.surface),
       selectedKind: undefined,
       selectedId: undefined,
@@ -96,6 +108,7 @@ export function HubProvider({ children }: PropsWithChildren) {
     () => ({
       ...state,
       setRole: (role) => dispatch({ type: "role", value: role }),
+      transitionRole: (role) => dispatch({ type: "transitionRole", value: role }),
       setSurface: (surface) => dispatch({ type: "surface", value: surface }),
       setPresence: (presence) => dispatch({ type: "presence", value: presence }),
       setViewState: (viewState) => dispatch({ type: "viewState", value: viewState }),

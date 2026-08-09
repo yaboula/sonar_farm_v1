@@ -1,0 +1,31 @@
+import { ArrowRight, Buildings, CheckCircle, Coins, Handshake, LockKey, ShieldCheck, UsersThree } from "@phosphor-icons/react";
+import { useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { DeepViewShell, DetailCard, FactList, StatusPill } from "../../components/DeepViewShell";
+import { StatePanel } from "../../components/StatePanel";
+import type { OwnershipTransfer } from "../../types";
+import { useCompanyData } from "./useCompanyData";
+
+const money = (value: number) => `$${value.toLocaleString()}`;
+
+export function OwnershipTransferView() {
+  const { listingId = "" } = useParams();
+  const request = useMemo(() => ({ kind: "companyOwnershipTransfer", listingId } as const), [listingId]);
+  const { model, data, notice, pending, act, context } = useCompanyData<OwnershipTransfer>(request);
+  const navigate = useNavigate();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  if (!model || model.state === "loading") return <StatePanel state="loading" />;
+  if (model.state !== "ready" || !data) return <StatePanel state={model.state === "ready" ? "restricted" : model.state} title="Transfer unavailable" body="The listing changed, belongs to another buyer or this character is not an authorized party." actionLabel="Back to Company" onAction={() => navigate(context.role === "visitor" ? "/company/profile" : "/company/sale")} />;
+  const listing = data.listing;
+  const party = context.actorId === listing.buyerId ? "buyer" : "seller";
+  const canConfirm = party === "buyer" ? listing.status === "reserved" && !listing.buyerConfirmed : listing.status === "awaiting_seller" && listing.buyerConfirmed;
+  const confirm = async () => { const result = await act({ type: "businessSale.confirm", listingId, party }); setConfirmOpen(false); if (result.ok && result.contextUpdate?.role) navigate(result.contextUpdate.role === "owner" ? "/company" : "/company/profile"); };
+  return <DeepViewShell eyebrow="Atomic ownership transfer" title="Ownership Transfer Confirmation" subtitle={`${listing.id.toUpperCase()} · ${party === "buyer" ? "Buyer" : "Selling Owner"} authority · Business Registry`} breadcrumb={["Company", "Business Sale", "Transfer"]} backLabel={party === "buyer" ? "Back to Listing" : "Back to Business Sale"} onBack={() => navigate(party === "buyer" ? "/company/business-for-sale" : "/company/sale")} status={<StatusPill tone={listing.status === "completed" ? "success" : "warning"}>{listing.status.replace("_", " ")}</StatusPill>} actionBar={<><div className="domain-action-summary"><span>{party === "buyer" ? `${money(listing.escrowAmount)} in escrow` : `${listing.buyerName} confirmed`}</span><p>{listing.buyerConfirmed ? "Buyer confirmed" : "Buyer confirmation pending"} · {listing.sellerConfirmed ? "Seller confirmed" : "Seller confirmation pending"}</p></div><div className="domain-action-group">{canConfirm ? <button type="button" className="domain-primary-action" onClick={() => setConfirmOpen(true)}><Handshake size={18} />{party === "buyer" ? "Confirm as Buyer" : "Confirm & Transfer"}</button> : null}</div></>}>
+    {notice ? <div className="domain-notice domain-notice--inline">{notice}</div> : null}
+    <div className="transfer-parties"><article className={listing.buyerConfirmed ? "is-confirmed" : ""}><span><small>BUYER</small><strong>{listing.buyerName ?? "Reserved buyer"}</strong><em>{listing.buyerConfirmed ? "Identity confirmed" : "Confirmation required"}</em></span>{listing.buyerConfirmed ? <CheckCircle size={26} /> : <LockKey size={25} />}</article><ArrowRight size={25} /><article className={listing.sellerConfirmed ? "is-confirmed" : ""}><span><small>SELLING OWNER</small><strong>{listing.sellerName ?? "Business Registry"}</strong><em>{listing.sellerConfirmed ? "Identity confirmed" : "Confirmation required"}</em></span>{listing.sellerConfirmed ? <CheckCircle size={26} /> : <LockKey size={25} />}</article></div>
+    <div className="domain-two-column transfer-layout"><div className="domain-card-stack"><DetailCard eyebrow="Complete company" title={data.company.name}><ul className="domain-check-list">{data.assets.map((asset) => <li key={asset}><Buildings size={18} />{asset}</li>)}</ul></DetailCard><DetailCard eyebrow="Continuity" title="People and authority"><p className="domain-emphasis"><UsersThree size={23} />{data.staffContinuity}</p><p className="domain-muted">{data.formerOwnerExit}</p></DetailCard></div><div className="domain-card-stack"><DetailCard eyebrow="Protected settlement" title={money(listing.askingPrice)}><FactList facts={[{ label: "Buyer escrow", value: money(listing.escrowAmount) }, { label: "Registry fee", value: money(listing.saleFee) }, { label: "Seller proceeds", value: money(listing.sellerProceeds) }, { label: "Buyer funds remaining", value: money(data.buyerFunds) }]} /></DetailCard><DetailCard eyebrow="Obligations retained" title="No partial transfer"><ul className="domain-check-list warning">{data.liabilities.map((liability) => <li key={liability}><ShieldCheck size={18} />{liability}</li>)}</ul></DetailCard></div></div>
+    {listing.status === "completed" ? <div className="transfer-complete"><CheckCircle size={27} /><span><strong>Ownership transfer completed</strong><small>{listing.buyerName} is now Owner. Staff, Warehouse and Treasury remained attached to the company.</small></span></div> : null}
+    {confirmOpen ? <ConfirmDialog eyebrow="Final identity confirmation" title={party === "buyer" ? "Confirm purchase from funded escrow?" : `Transfer ownership to ${listing.buyerName}?`} confirmLabel={party === "buyer" ? "Confirm as Buyer" : "Complete Transfer"} pending={pending} onClose={() => setConfirmOpen(false)} onConfirm={() => void confirm()}><FactList facts={[{ label: "Listing", value: `${listing.id.toUpperCase()} · v${listing.version}` }, { label: "Asking price", value: money(listing.askingPrice) }, { label: "Escrow", value: money(listing.escrowAmount) }, { label: "Your party", value: party }, { label: "Required presence", value: "Business Registry" }]} /><p><Coins size={17} /> Funds and ownership commit together. A failed revalidation changes neither.</p></ConfirmDialog> : null}
+  </DeepViewShell>;
+}

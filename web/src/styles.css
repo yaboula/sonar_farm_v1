@@ -2112,6 +2112,40 @@ select:focus-visible {
 .company-identity-banner > i { color: var(--text-muted); font-family: var(--display); font-size: 25px; font-style: normal; text-align: center; }
 .identity-layout { grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr); }
 .identity-validation { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; color: var(--error); font-size: 10px; }
+
+.sale-change-banner { min-height: 52px; display: flex; align-items: center; gap: 10px; margin-bottom: 9px; padding: 8px 10px; border: 1px solid rgba(193, 88, 70, 0.45); color: var(--error); background: rgba(193, 88, 70, 0.06); }
+.sale-change-banner span { display: grid; gap: 1px; }
+.sale-change-banner strong { color: var(--text-primary); font-family: var(--display); font-size: 12px; text-transform: uppercase; }
+.sale-change-banner small { color: var(--text-secondary); font-size: 9px; }
+.sale-value-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 9px; }
+.sale-value-strip > span { min-height: 61px; display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; column-gap: 8px; padding: 8px 10px; border: 1px solid var(--border-subtle); background: rgba(255, 255, 255, 0.018); }
+.sale-value-strip svg { grid-row: 1 / span 2; color: var(--accent); }
+.sale-value-strip small { color: var(--text-muted); font-size: 8px; text-transform: uppercase; }
+.sale-value-strip strong { color: var(--text-primary); font-family: var(--display); font-size: 16px; }
+.sale-layout,
+.sale-review-layout,
+.transfer-layout { grid-template-columns: minmax(0, 1fr) minmax(310px, 0.85fr); }
+.public-sale-hero { min-height: 91px; display: grid; grid-template-columns: 50px minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-bottom: 9px; padding: 11px 14px; border: 1px solid var(--border-accent); background: linear-gradient(100deg, rgba(245, 195, 49, 0.07), rgba(7, 10, 8, 0.8)); }
+.public-sale-hero > svg { color: var(--accent); }
+.public-sale-hero > span { min-width: 0; display: grid; gap: 1px; }
+.public-sale-hero small { color: var(--accent); font-family: var(--display); font-size: 9px; letter-spacing: 0.07em; }
+.public-sale-hero > span strong { color: var(--text-primary); font-family: var(--display); font-size: 26px; text-transform: uppercase; }
+.public-sale-hero p { margin: 2px 0 0; color: var(--text-muted); font-size: 10px; }
+.public-sale-hero > div { display: grid; gap: 1px; padding-left: 16px; border-left: 1px solid var(--border-neutral); text-align: right; }
+.public-sale-hero > div strong { color: var(--text-primary); font-family: var(--display); font-size: 26px; }
+.public-sale-hero > div em { color: var(--text-muted); font-size: 8px; font-style: normal; }
+.transfer-parties { min-height: 80px; display: grid; grid-template-columns: 1fr 34px 1fr; align-items: center; gap: 8px; margin-bottom: 9px; }
+.transfer-parties > svg { justify-self: center; color: var(--accent); }
+.transfer-parties article { min-height: 73px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--border-neutral); color: var(--text-muted); background: rgba(255, 255, 255, 0.018); }
+.transfer-parties article.is-confirmed { border-color: rgba(131, 160, 106, 0.5); color: var(--success); background: rgba(131, 160, 106, 0.05); }
+.transfer-parties article span { display: grid; gap: 1px; }
+.transfer-parties small { color: var(--accent); font-family: var(--display); font-size: 8px; letter-spacing: 0.07em; }
+.transfer-parties strong { color: var(--text-primary); font-size: 13px; }
+.transfer-parties em { color: var(--text-muted); font-size: 9px; font-style: normal; }
+.transfer-complete { min-height: 51px; display: flex; align-items: center; gap: 10px; margin-top: 9px; padding: 8px 10px; border: 1px solid rgba(131, 160, 106, 0.5); color: var(--success); background: rgba(131, 160, 106, 0.055); }
+.transfer-complete span { display: grid; gap: 1px; }
+.transfer-complete strong { color: var(--text-primary); font-family: var(--display); font-size: 12px; text-transform: uppercase; }
+.transfer-complete small { color: var(--text-secondary); font-size: 9px; }
 .company-inline-link { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 12px; padding: 9px 0; border-top: 1px solid var(--border-neutral); color: var(--accent); font-family: var(--display); font-weight: 600; text-transform: uppercase; }
 
 .company-tabbar { display: flex; gap: 4px; margin-bottom: 13px; border-bottom: 1px solid var(--border-neutral); }

@@ -136,11 +136,19 @@ export class CompanyFixtureRepository {
   loadRolePolicies(context: HubContextModel): RolePolicy[] | null { return context.capabilities.manageRolePolicies ? clone(this.state.rolePolicies) : null; }
   loadIdentity(context: HubContextModel) { return context.capabilities.renameCompany ? clone(this.state.identity) : null; }
   loadBusinessSale(context: HubContextModel) { return context.capabilities.sellBusiness ? clone(this.state.listing) : null; }
-  loadPublicSale(context: HubContextModel) { return context.capabilities.buyBusiness && ["published", "reserved", "awaiting_seller"].includes(this.state.listing.status) ? clone(this.state.listing) : null; }
+  loadPublicSale(context: HubContextModel) {
+    if (!context.capabilities.buyBusiness || !["published", "reserved", "awaiting_seller"].includes(this.state.listing.status)) return null;
+    const listing = clone(this.state.listing);
+    if (listing.buyerId !== context.actorId) { listing.buyerId = undefined; listing.buyerName = listing.status === "published" ? undefined : "Reserved buyer"; listing.availableActions = []; }
+    return listing;
+  }
 
   loadTransfer(listingId: string, context: HubContextModel): OwnershipTransfer | null {
     if (!context.capabilities.buyBusiness && !context.capabilities.sellBusiness) return null;
     if (this.state.listing.id !== listingId) return null;
+    if (context.capabilities.buyBusiness && this.state.listing.buyerId !== context.actorId) return null;
+    if (context.capabilities.sellBusiness && this.state.listing.sellerId !== context.actorId) return null;
+    if (!["reserved", "awaiting_seller", "completed"].includes(this.state.listing.status)) return null;
     return { listing: clone(this.state.listing), company: clone(this.state.company), buyerFunds: this.getPersonalBalance(context.actorId), assets: [`Treasury · $${this.state.treasury.available.toLocaleString()}`, `Warehouse · $${this.state.treasury.warehouseValuation.toLocaleString()}`, `${this.state.leases.filter((item) => ["starter", "active", "grace"].includes(item.status)).length} operated Fields`], liabilities: [`Escrow · $${this.state.treasury.escrowReserved.toLocaleString()}`, `Active obligations · $${this.state.listing.activeObligations.toLocaleString()}`, "Existing Buyer Orders and Contracts"], staffContinuity: `${this.state.staff.length} Staff members remain employed`, formerOwnerExit: "The former Owner leaves the company after atomic transfer" };
   }
 
@@ -314,7 +322,7 @@ export class CompanyFixtureRepository {
     if (!context.capabilities.sellBusiness || askingPrice < 10000 || askingPrice > 9999999) return { ok: false, message: "Enter a valid asking price." };
     if (!["draft", "not_listed", "cancelled", "listing_changed"].includes(this.state.listing.status)) return { ok: false, message: "The active listing must be cancelled before editing." };
     if (this.state.listing.status === "not_listed") this.state.listing.id = `sale-${String(this.saleSequence++).padStart(3, "0")}`;
-    Object.assign(this.state.listing, { askingPrice, saleFee: Math.round(askingPrice * 0.05), sellerProceeds: Math.round(askingPrice * 0.95), treasuryIncluded: this.state.treasury.available, warehouseValuation: this.state.treasury.warehouseValuation, staffCount: this.state.staff.length, activeLeases: this.state.leases.filter((item) => ["starter", "active", "grace"].includes(item.status)).length, status: "draft", buyerId: undefined, buyerName: undefined, buyerConfirmed: false, sellerConfirmed: false, availableActions: ["save", "publish"] });
+    Object.assign(this.state.listing, { askingPrice, saleFee: Math.round(askingPrice * 0.05), sellerProceeds: Math.round(askingPrice * 0.95), treasuryIncluded: this.state.treasury.available, warehouseValuation: this.state.treasury.warehouseValuation, staffCount: this.state.staff.length, activeLeases: this.state.leases.filter((item) => ["starter", "active", "grace"].includes(item.status)).length, status: "draft", buyerId: undefined, buyerName: undefined, escrowAmount: 0, buyerConfirmed: false, sellerConfirmed: false, availableActions: ["save", "publish"] });
     return { ok: true, changed: true, entityId: this.state.listing.id, message: "Business Sale draft saved." };
   }
 
@@ -335,7 +343,9 @@ export class CompanyFixtureRepository {
     if (!context.capabilities.buyBusiness || context.presence !== "registry") return { ok: false, closeSurface: true, message: "Continue at the Business Registry." };
     if (this.state.listing.id !== listingId || this.state.listing.status !== "published") return { ok: false, message: "The listing is no longer available." };
     if (this.getPersonalBalance(context.actorId) < this.state.listing.askingPrice) return { ok: false, message: "Personal funds are insufficient for this purchase." };
-    this.state.listing.status = "reserved"; this.state.listing.buyerId = context.actorId; this.state.listing.buyerName = this.actorName(context.actorId); this.state.listing.availableActions = ["confirm_buyer"];
+    this.state.personalBalances[context.actorId] -= this.state.listing.askingPrice;
+    this.state.listing.status = "reserved"; this.state.listing.buyerId = context.actorId; this.state.listing.buyerName = this.actorName(context.actorId); this.state.listing.escrowAmount = this.state.listing.askingPrice; this.state.listing.availableActions = ["confirm_buyer"];
+    this.postLedger({ key: `business-sale:${listingId}:escrow`, type: "business_sale", amount: this.state.listing.askingPrice, direction: "reserve", actorId: context.actorId, actor: this.actorName(context.actorId), source: `${this.actorName(context.actorId)} Personal Funds`, destination: "Business Sale Escrow", linkedKind: "business_sale", linkedId: listingId, status: "escrowed", affectsTreasury: false });
     return { ok: true, changed: true, message: "Listing reserved. Review and confirm the transfer.", invalidated: ["business-sale"] };
   }
 
@@ -344,7 +354,7 @@ export class CompanyFixtureRepository {
     if (listing.id !== listingId || !["reserved", "awaiting_seller"].includes(listing.status)) return { ok: false, message: "The listing changed before confirmation." };
     if (context.presence !== "registry") return { ok: false, closeSurface: true, message: "Complete ownership transfer at the Business Registry." };
     if (party === "buyer") {
-      if (context.actorId !== listing.buyerId || this.getPersonalBalance(context.actorId) < listing.askingPrice) return { ok: false, message: "Buyer identity or personal funds failed revalidation." };
+      if (context.actorId !== listing.buyerId || listing.escrowAmount !== listing.askingPrice) return { ok: false, message: "Buyer identity or escrow failed revalidation." };
       listing.buyerConfirmed = true; listing.status = listing.initialSale ? "locked" : "awaiting_seller"; listing.availableActions = listing.initialSale ? [] : ["confirm_seller"];
     } else {
       if (!context.capabilities.sellBusiness || context.actorId !== listing.sellerId || !listing.buyerConfirmed) return { ok: false, message: "Seller confirmation is not currently authorized." };
@@ -352,14 +362,13 @@ export class CompanyFixtureRepository {
     }
     if (listing.status !== "locked") return { ok: true, changed: true, message: "Buyer confirmed. Awaiting selling Owner.", invalidated: ["business-sale"] };
     const buyerId = listing.buyerId!;
-    this.state.personalBalances[buyerId] -= listing.askingPrice;
     if (listing.sellerId) this.state.personalBalances[listing.sellerId] = (this.state.personalBalances[listing.sellerId] ?? 0) + listing.sellerProceeds;
     const formerOwnerId = this.state.company.ownerId;
     const formerOwner = this.state.staff.find((item) => item.id === formerOwnerId);
     const buyerName = listing.buyerName ?? this.actorName(buyerId);
     if (formerOwner) this.state.staff = this.state.staff.filter((item) => item.id !== formerOwner.id);
     this.state.staff.push({ id: buyerId, name: buyerName, role: "owner", status: "active", joinedAt: now(), lastActivity: now(), companyCargo: 0, issuedMaterials: 0, permissionExceptions: [], unresolvedIssues: [], availableActions: [] });
-    this.state.company.ownerId = buyerId; this.state.company.ownerName = buyerName; this.state.company.status = "operating"; listing.status = "completed";
+    this.state.company.ownerId = buyerId; this.state.company.ownerName = buyerName; this.state.company.status = "operating"; listing.status = "completed"; listing.escrowAmount = 0;
     this.postLedger({ key: `business-sale:${listing.id}:completed`, type: "business_sale", amount: listing.askingPrice, direction: "release", actorId: buyerId, actor: buyerName, source: `${buyerName} Personal Funds`, destination: listing.sellerName ?? "Initial Business Registry", linkedKind: "business_sale", linkedId: listing.id, status: "released", affectsTreasury: false });
     this.bumpCapabilities();
     return { ok: true, changed: true, message: `Ownership transferred to ${buyerName}.`, contextUpdate: { role: context.actorId === buyerId ? "owner" : "visitor" }, invalidated: ["session-context", "company", "staff", "business-sale", "ledger"] };
@@ -381,7 +390,21 @@ export class CompanyFixtureRepository {
   private actorName(actorId: string) { return this.state.staff.find((item) => item.id === actorId)?.name ?? this.state.applications.find((item) => item.applicantId === actorId)?.applicant ?? (actorId === "actor-avery" ? "Avery Cole" : actorId === "actor-cameron" ? "Cameron Price" : "Morgan Hayes"); }
   private headline(context: HubContextModel, modules: CompanyHomeModule[]) { const urgent = modules.find((item) => item.priority === "critical"); return urgent ? urgent.detail : context.role === "visitor" ? "Public opportunities and ownership" : "Business records that need attention"; }
   private bumpCapabilities() { this.state.company.capabilitiesRevision += 1; }
-  private invalidateListing() { if (["published", "reserved", "awaiting_seller"].includes(this.state.listing.status)) { this.state.listing.status = "listing_changed"; this.state.listing.version += 1; this.state.listing.availableActions = ["cancel"]; } }
+  private invalidateListing() {
+    if (!["published", "reserved", "awaiting_seller"].includes(this.state.listing.status)) return;
+    if (this.state.listing.buyerId && this.state.listing.escrowAmount) {
+      const buyerId = this.state.listing.buyerId;
+      const amount = this.state.listing.escrowAmount;
+      this.state.personalBalances[buyerId] = (this.state.personalBalances[buyerId] ?? 0) + amount;
+      this.postLedger({ key: `business-sale:${this.state.listing.id}:refund:v${this.state.listing.version}`, type: "business_sale", amount, direction: "release", actorId: buyerId, actor: this.actorName(buyerId), source: "Business Sale Escrow", destination: `${this.actorName(buyerId)} Personal Funds`, linkedKind: "business_sale", linkedId: this.state.listing.id, status: "refunded", affectsTreasury: false });
+      this.state.listing.escrowAmount = 0;
+      this.state.listing.buyerId = undefined;
+      this.state.listing.buyerName = undefined;
+      this.state.listing.buyerConfirmed = false;
+      this.state.listing.sellerConfirmed = false;
+    }
+    this.state.listing.status = "listing_changed"; this.state.listing.version += 1; this.state.listing.availableActions = ["cancel"];
+  }
 
   private postLedger(input: { key: string; type: LedgerEntry["type"]; amount: number; direction: LedgerEntry["direction"]; actorId: string; actor: string; source: string; destination: string; linkedKind?: string; linkedId?: string; status: LedgerEntry["status"]; affectsTreasury?: boolean }) {
     const existing = this.state.ledger.find((item) => item.idempotencyKey === input.key);
