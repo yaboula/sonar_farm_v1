@@ -19,6 +19,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
 - Añadidas pruebas Lua, frontend, shell, CI, packaging y QA visual a 720p, 1080p
   y ultrawide.
 
+### Changed — Crop Inspection Pulse Rail visual pass
+
+- Reforzada la jerarquía de Growth, Health, condiciones y referencias de tiempo
+  con valores grandes y peso 700, incluido el breakpoint de 1280×720.
+- Ajustadas transparencia, curvas monotónicas, escala adaptativa basada en datos,
+  glow, área real y forecast discontinuo para acercar el HUD a la referencia.
+- El frontend de producción ahora arranca vacío y el build rechaza cualquier
+  fixture compilado; solo `inspection:open` autoritativo puede mostrar datos.
+
 ## [0.3.0] - 2026-08-09
 
 ### Added — Supplies Runtime, Warehouse e Items V2

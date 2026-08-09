@@ -59,15 +59,27 @@ export function MetricChart({ metric, samples, start, now, end, lastCareAt }: {
   const width = 180;
   const height = 40;
   const duration = Math.max(1, end - start);
+  const values = samples.map((sample) => Math.max(0, Math.min(100, sample[metric.key])));
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const center = (rawMin + rawMax) * 0.5;
+  const desiredSpan = Math.min(100, Math.max(18, rawMax - rawMin + 8));
+  let domainMin = metric.enabled ? center - desiredSpan * 0.5 : 0;
+  let domainMax = metric.enabled ? center + desiredSpan * 0.5 : 100;
+  if (domainMin < 0) { domainMax -= domainMin; domainMin = 0; }
+  if (domainMax > 100) { domainMin -= domainMax - 100; domainMax = 100; }
+  domainMin = Math.max(0, domainMin);
+  const domainSpan = Math.max(1, domainMax - domainMin);
+  const yFor = (value: number) => height - ((value - domainMin) / domainSpan) * (height - 8) - 4;
   const points = (items: InspectionSample[]) => items.map((sample) => ({
     x: ((sample.at - start) / duration) * width,
-    y: height - Math.max(0, Math.min(100, sample[metric.key])) / 100 * (height - 4) - 2,
+    y: yFor(Math.max(0, Math.min(100, sample[metric.key]))),
   }));
   const current = samples.find((sample) => sample.phase === "now") ?? samples[0];
   const history = points(samples.filter((sample) => sample.phase !== "forecast"));
   const forecast = points(current ? [current, ...samples.filter((sample) => sample.phase === "forecast")] : []);
   const nowX = ((now - start) / duration) * width;
-  const currentY = current ? height - Math.max(0, Math.min(100, current[metric.key])) / 100 * (height - 4) - 2 : height / 2;
+  const currentY = current ? yFor(Math.max(0, Math.min(100, current[metric.key]))) : height / 2;
   const protectionX = metric.protectionUntil && metric.protectionUntil > now && metric.protectionUntil < end
     ? ((metric.protectionUntil - start) / duration) * width
     : undefined;
@@ -75,6 +87,11 @@ export function MetricChart({ metric, samples, start, now, end, lastCareAt }: {
   const careX = lastCareAt >= start && lastCareAt <= now
     ? ((lastCareAt - start) / duration) * width
     : undefined;
+  const historyPath = history.length > 1 ? monotonePath(history) : "";
+  const forecastPath = forecast.length > 1 ? monotonePath(forecast) : "";
+  const historyArea = historyPath
+    ? `${historyPath} L ${history[history.length - 1].x.toFixed(2)} ${height} L ${history[0].x.toFixed(2)} ${height} Z`
+    : "";
 
   return <svg className="metric-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${metric.label} trend`}>
     <title>{`${metric.label}: solid history, current marker, dashed no-care forecast`}</title>
@@ -82,8 +99,12 @@ export function MetricChart({ metric, samples, start, now, end, lastCareAt }: {
     {careX !== undefined ? <line className="chart-care" x1={careX} y1="0" x2={careX} y2={height} /> : null}
     <line className="chart-now" x1={nowX} y1="0" x2={nowX} y2={height} />
     {protectionX !== undefined ? <line className="chart-protection" x1={protectionX} y1="0" x2={protectionX} y2={height} /> : null}
-    {history.length > 1 ? <path d={monotonePath(history)} fill="none" stroke={color} strokeWidth="2.2" /> : null}
-    {forecast.length > 1 ? <path d={monotonePath(forecast)} fill="none" stroke={color} strokeWidth="1.7" strokeDasharray="4 4" opacity=".68" /> : null}
-    <circle cx={nowX} cy={currentY} r="3.4" fill="#12150f" stroke={color} strokeWidth="2" />
+    {historyArea ? <path className="chart-area" d={historyArea} fill={color} /> : null}
+    {historyPath ? <path className="chart-glow" d={historyPath} fill="none" stroke={color} /> : null}
+    {historyPath ? <path className="chart-history" d={historyPath} fill="none" stroke={color} /> : null}
+    {forecastPath ? <path className="chart-glow chart-glow--forecast" d={forecastPath} fill="none" stroke={color} /> : null}
+    {forecastPath ? <path className="chart-forecast" d={forecastPath} fill="none" stroke={color} /> : null}
+    <circle className="chart-marker-glow" cx={nowX} cy={currentY} r="6" fill={color} />
+    <circle cx={nowX} cy={currentY} r="4" fill="#11140f" stroke={color} strokeWidth="2.2" />
   </svg>;
 }

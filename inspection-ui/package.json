@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && npm run verify:production",
     "typecheck": "tsc -b --pretty false",
     "lint": "oxlint src",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify:production": "node scripts/verify-production-build.mjs"
   },
   "dependencies": {
     "@fontsource/barlow-condensed": "^5.3.0",

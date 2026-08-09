@@ -4,8 +4,18 @@ import { App } from "./App";
 import { inspectionFixture } from "./fixture";
 
 describe("Crop Inspection Pulse Rail", () => {
+  function open(payload = inspectionFixture()) {
+    fireEvent(window, new MessageEvent("message", { data: { type: "inspection:open", payload } }));
+  }
+
+  it("renders nothing until an authoritative open payload arrives", () => {
+    render(<App />);
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
+  });
+
   it("renders real metrics, temporal references and a non-interactive recommendation", () => {
     render(<App />);
+    open();
     expect(screen.getByRole("article", { name: /Tomato crop inspection/i })).toBeInTheDocument();
     expect(screen.getByText("WEEDS → FASTER WATER LOSS")).toBeInTheDocument();
     expect(screen.getByText("REMOVE WEEDS")).toBeInTheDocument();
@@ -15,6 +25,7 @@ describe("Crop Inspection Pulse Rail", () => {
 
   it("merges lightweight updates without losing the last curve series", () => {
     render(<App />);
+    open();
     const next = inspectionFixture(2_000_000_000);
     next.health = 72;
     next.series = undefined;
@@ -25,6 +36,7 @@ describe("Crop Inspection Pulse Rail", () => {
 
   it("closes on an inspection close message", () => {
     render(<App />);
+    open();
     fireEvent(window, new MessageEvent("message", { data: { type: "inspection:close", payload: { reason: "distance" } } }));
     expect(screen.queryByRole("article")).not.toBeInTheDocument();
   });

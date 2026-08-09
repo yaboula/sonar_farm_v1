@@ -2,7 +2,8 @@ import type { InspectionPayloadV1, InspectionSample } from "./types";
 
 export function inspectionFixture(now = Math.floor(Date.now() / 1000)): InspectionPayloadV1 {
   const samples: InspectionSample[] = [];
-  for (let offset = -600; offset <= 600; offset += 30) {
+  const historySeconds = 252;
+  const addSample = (offset: number) => {
     samples.push({
       at: now + offset,
       phase: offset < 0 ? "history" : offset === 0 ? "now" : "forecast",
@@ -13,6 +14,10 @@ export function inspectionFixture(now = Math.floor(Date.now() / 1000)): Inspecti
       weeds: 38 + offset / 600 * 10,
       pests: 12 + offset / 600 * 5,
     });
+  };
+  addSample(-historySeconds);
+  for (let offset = -240; offset <= 600; offset += 30) {
+    addSample(offset);
   }
   return {
     version: 1,
@@ -27,7 +32,7 @@ export function inspectionFixture(now = Math.floor(Date.now() / 1000)): Inspecti
       { key: "weeds", label: "Weeds", value: 38, enabled: true, status: "elevated" },
       { key: "pests", label: "Pests", value: 12, enabled: true, status: "low" },
     ],
-    series: { historyStart: now - 600, now, forecastEnd: now + 600, samples },
+    series: { historyStart: now - historySeconds, now, forecastEnd: now + 600, samples },
     diagnosis: { cause: "weeds", severity: 38, headline: "WEEDS → FASTER WATER LOSS", recommendation: "REMOVE WEEDS" },
     layout: { leftInset: 335, rightInset: 18 },
   };

@@ -1,7 +1,6 @@
 import { Bug, Clock, Drop, Leaf, Plant, ShieldCheck } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { cropImages } from "./cropImages";
-import { inspectionFixture } from "./fixture";
 import { MetricChart } from "./MetricChart";
 import type { InspectionMessage, InspectionMetric, InspectionPayloadV1, MetricKey } from "./types";
 
@@ -39,7 +38,7 @@ function Metric({ metric, payload }: { metric: InspectionMetric; payload: Inspec
 }
 
 export function App() {
-  const [payload, setPayload] = useState<InspectionPayloadV1 | null>(() => import.meta.env.DEV ? inspectionFixture() : null);
+  const [payload, setPayload] = useState<InspectionPayloadV1 | null>(null);
 
   useEffect(() => {
     const receive = (event: MessageEvent<InspectionMessage>) => {
@@ -81,10 +80,10 @@ export function App() {
       <section className="recommendation"><span>Recommended action</span><strong>{payload.diagnosis.recommendation}</strong><small>Use ox_target to perform care</small></section>
 
       <footer>
-        <span><Clock size={13} />LAST CARE {duration(historySeconds)} AGO</span>
-        <span>NOW {clock(payload.timing.serverNow)}</span>
-        <strong>{timeCopy}</strong>
-        <span>+{duration(payload.timing.forecastSeconds)} · NO CARE FORECAST</span>
+        <span className="footer-time footer-time--care"><Clock size={15} /><small>LAST CARE</small><strong>{duration(historySeconds)} AGO</strong></span>
+        <span className="footer-time"><small>NOW</small><strong>{clock(payload.timing.serverNow)}</strong></span>
+        <span className="footer-time footer-time--ready"><small>MATURITY</small><strong>{timeCopy}</strong></span>
+        <span className="footer-time footer-time--forecast"><small>WINDOW</small><strong>+{duration(payload.timing.forecastSeconds)} · NO CARE FORECAST</strong></span>
         <kbd>BACKSPACE</kbd><span>CLOSE</span>
       </footer>
     </article>
