@@ -44,6 +44,7 @@ export class CompanyFixtureRepository {
   getProcurementBudget() { return this.state.treasury.procurementBudget; }
   getPersonalBalance(actorId: string) { return this.state.personalBalances[actorId] ?? 0; }
   getCapabilitiesRevision() { return this.state.company.capabilitiesRevision; }
+  getLeaseSnapshot(leaseId: string) { return clone(this.state.leases.find((item) => item.id === leaseId)); }
   debitPersonal(actorId: string, amount: number) {
     if (amount <= 0 || this.getPersonalBalance(actorId) < amount) return false;
     this.state.personalBalances[actorId] -= amount;

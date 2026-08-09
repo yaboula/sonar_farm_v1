@@ -445,6 +445,36 @@ export function createScaleFieldFixture(size = 20) {
   });
 }
 
+export function createLeasedFieldFixture(fieldId: string, name: string, location: string, capacity: number) {
+  const rowCount = Math.max(1, Math.ceil(capacity / 8));
+  const rows: RowSeed[] = Array.from({ length: rowCount }, (_, index) => ({
+    id: `${fieldId}-r${String(index + 1).padStart(2, "0")}`,
+    label: `Row ${index + 1}`,
+    cropLabel: "Unassigned",
+    occupied: 0,
+    slotCount: Math.min(8, Math.max(2, capacity - index * 8)),
+    water: 0,
+    health: 0,
+    progress: 0,
+  }));
+  return buildField({
+    id: fieldId,
+    name,
+    location,
+    status: "empty",
+    statusLabel: "Lease Active",
+    ownership: "Lease · newly activated",
+    orientation: 0,
+    slotsPerRow: 8,
+    rows,
+    cropSummary: "Unassigned · available for planning",
+    nextMilestone: "Create the first Crop Plan",
+    diagnostics: [],
+    events: [event(`evt-${fieldId}-lease`, "access_changed", "Just now", "Farm Service", "Lease access activated", "The Field is now available for planning.")],
+    linkedWork: [],
+  });
+}
+
 export function createMixedSlotFieldFixture() {
   const slotCounts = [2, 7, 20, 4, 13, 6, 18, 3, 11, 9, 5, 16, 8, 14, 10, 19, 12, 17, 15, 2];
   const rows: RowSeed[] = slotCounts.map((slotCount, index) => ({

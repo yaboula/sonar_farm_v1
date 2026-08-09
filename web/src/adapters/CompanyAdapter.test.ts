@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { ACTOR_BY_ROLE, capabilitiesFor } from "../data/fixtures";
-import type { CompanyCargoData, CompanyHomeData, FarmRole, HubContextModel, LedgerEntry, StaffData, TreasurySnapshot, WarehouseData } from "../types";
+import type { CompanyCargoData, CompanyHomeData, CompanyLease, FarmRole, FieldDetail, FieldsOverviewData, HubContextModel, LedgerEntry, StaffData, TreasurySnapshot, WarehouseData } from "../types";
 import { FixtureHubAdapter } from "./FixtureHubAdapter";
 
 function context(role: FarmRole, presence: HubContextModel["presence"] = "office", surface: HubContextModel["surface"] = "office"): HubContextModel {
@@ -124,5 +124,29 @@ describe("Company domain adapter", () => {
     const ledger = await adapter.load<LedgerEntry[]>({ kind: "companyLedger" }, procurement);
     expect(ledger.data?.length).toBeGreaterThan(0);
     expect(ledger.data?.every((entry) => entry.type === "purchase" && entry.actorId === procurement.actorId)).toBe(true);
+  });
+
+  it("resolves a Lease Grace Period in Treasury, Ledger and Fields together", async () => {
+    const owner = context("owner");
+    const before = await adapter.load<TreasurySnapshot>({ kind: "companyTreasury" }, owner);
+    const paid = await adapter.dispatch({ type: "lease.transition", leaseId: "lease-orchard", action: "pay" }, owner);
+    const lease = await adapter.load<CompanyLease>({ kind: "companyLeaseDetail", leaseId: "lease-orchard" }, owner);
+    const field = await adapter.load<FieldDetail>({ kind: "fieldDetail", fieldId: "orchard-annex" }, owner);
+    const after = await adapter.load<TreasurySnapshot>({ kind: "companyTreasury" }, owner);
+    expect(paid.ok).toBe(true);
+    expect(lease.data).toMatchObject({ status: "active", restriction: undefined });
+    expect(field.data).toMatchObject({ status: "empty", restriction: undefined });
+    expect(after.data?.available).toBe(before.data!.available - 1800);
+    expect(after.data?.recentEntries[0]).toMatchObject({ type: "lease", linkedId: "lease-orchard" });
+  });
+
+  it("adds newly leased land to Fields and removes access when a Lease ends", async () => {
+    const owner = context("owner");
+    expect((await adapter.dispatch({ type: "lease.transition", leaseId: "lease-riverside", action: "start" }, owner)).ok).toBe(true);
+    const portfolio = await adapter.load<FieldsOverviewData>({ kind: "fieldsOverview" }, owner);
+    expect(portfolio.data?.fields.some((field) => field.id === "riverside-patch" && field.capacity === 120)).toBe(true);
+    expect((await adapter.dispatch({ type: "lease.transition", leaseId: "lease-east", action: "end" }, owner)).ok).toBe(true);
+    const east = await adapter.load<FieldDetail>({ kind: "fieldDetail", fieldId: "east-field" }, owner);
+    expect(east.data).toMatchObject({ status: "inaccessible", availableActions: [] });
   });
 });

@@ -390,7 +390,12 @@ export class FixtureHubAdapter implements HubAdapter {
     if (intent.type === "staffInvitation.accept") return this.company.acceptInvitation(intent.invitationId, context);
     if (intent.type === "staff.transition") return this.company.transitionStaff(intent.memberId, intent.action, intent.role, context);
     if (intent.type === "treasury.contribute") return this.company.contribute(intent.amount, context);
-    if (intent.type === "lease.transition") return this.company.transitionLease(intent.leaseId, intent.action, context);
+    if (intent.type === "lease.transition") {
+      const result = this.company.transitionLease(intent.leaseId, intent.action, context);
+      const lease = result.ok ? this.company.getLeaseSnapshot(intent.leaseId) : undefined;
+      if (lease) this.fields.applyLeaseState(lease);
+      return result;
+    }
     if (intent.type === "rolePolicy.save") return this.company.savePolicy(intent.role, intent.permissions, intent.transactionLimit, context);
     if (intent.type === "rolePolicy.reset") return this.company.resetPolicy(intent.role, context);
     if (intent.type === "company.rename") return this.company.rename(intent.name, context);

@@ -2037,6 +2037,48 @@ select:focus-visible {
 .ledger-route { min-height: 58px; display: grid; grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr); align-items: center; gap: 7px; padding: 8px; border: 1px solid var(--border-subtle); color: var(--accent); font-size: 10px; }
 .ledger-route span { color: var(--text-muted); }
 .ledger-route strong { color: var(--text-primary); font-weight: 600; }
+
+.lease-summary-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 0.75fr)) minmax(250px, 1.35fr); gap: 6px; margin-bottom: 9px; }
+.lease-summary-strip > span,
+.lease-summary-strip > button { min-height: 54px; display: flex; align-items: center; gap: 9px; padding: 7px 10px; border: 1px solid var(--border-subtle); color: var(--text-secondary); background: rgba(255, 255, 255, 0.018); }
+.lease-summary-strip > span { display: grid; gap: 1px; }
+.lease-summary-strip > span strong { color: var(--text-primary); font-family: var(--display); font-size: 19px; line-height: 1; }
+.lease-summary-strip small { color: var(--text-muted); font-size: 9px; }
+.lease-summary-strip > button { border-color: rgba(193, 88, 70, 0.42); color: var(--error); text-align: left; cursor: pointer; }
+.lease-summary-strip > button:hover { background: rgba(193, 88, 70, 0.08); }
+.lease-summary-strip > button span { min-width: 0; flex: 1; display: grid; gap: 1px; }
+.lease-summary-strip > button strong { color: var(--text-primary); font-size: 11px; }
+.company-list-toolbar { display: flex; align-items: end; gap: 12px; margin-bottom: 9px; }
+.company-list-toolbar .farm-select { width: 190px; }
+.company-list-toolbar > p { margin: 0 0 7px; color: var(--text-muted); font-size: 10px; }
+.lease-card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.lease-card-grid > button { min-height: 148px; display: grid; align-content: start; gap: 8px; padding: 11px; border: 1px solid var(--border-subtle); color: var(--text-secondary); background: rgba(255, 255, 255, 0.018); text-align: left; cursor: pointer; }
+.lease-card-grid > button:hover { border-color: var(--border-accent); background: rgba(245, 195, 49, 0.04); }
+.lease-card-grid > button[data-status="grace"] { border-color: rgba(193, 88, 70, 0.42); }
+.lease-card-head { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.lease-card-head > svg { color: var(--accent); }
+.lease-card-head span { min-width: 0; display: grid; gap: 1px; }
+.lease-card-head strong { color: var(--text-primary); font-size: 12px; }
+.lease-card-head small { color: var(--text-muted); font-size: 9px; }
+.lease-card-head em { padding: 3px 5px; border: 1px solid var(--border-neutral); color: var(--text-muted); font-family: var(--display); font-size: 8px; font-style: normal; text-transform: uppercase; }
+[data-status="grace"] .lease-card-head em { color: var(--error); }
+.lease-card-facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; }
+.lease-card-facts span { display: grid; gap: 1px; padding: 5px 7px; border: 1px solid var(--border-subtle); }
+.lease-card-facts b { color: var(--text-primary); font-family: var(--display); font-size: 15px; }
+.lease-card-facts small { overflow: hidden; color: var(--text-muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.lease-card-grid p { overflow: hidden; margin: 0; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.lease-restriction,
+.lease-access { min-height: 25px; display: flex; align-items: center; gap: 6px; padding: 4px 6px; color: var(--error); background: rgba(193, 88, 70, 0.055); font-size: 9px; }
+.lease-access { color: var(--success); background: rgba(131, 160, 106, 0.055); }
+.lease-open { display: flex; align-items: center; justify-content: flex-end; gap: 5px; color: var(--accent); font-family: var(--display); font-size: 9px; text-transform: uppercase; }
+.lease-grace-banner { min-height: 56px; display: flex; align-items: center; gap: 11px; margin-bottom: 9px; padding: 9px 11px; border: 1px solid rgba(193, 88, 70, 0.48); color: var(--error); background: rgba(193, 88, 70, 0.065); }
+.lease-grace-banner span { display: grid; gap: 2px; }
+.lease-grace-banner strong { color: var(--text-primary); font-family: var(--display); font-size: 13px; letter-spacing: 0.035em; text-transform: uppercase; }
+.lease-grace-banner small { color: var(--text-secondary); font-size: 10px; }
+.lease-detail-layout { grid-template-columns: minmax(0, 1fr) minmax(310px, 0.82fr); }
+.lease-crop-list { display: flex; flex-wrap: wrap; gap: 5px; }
+.lease-crop-list span { display: flex; align-items: center; gap: 5px; padding: 5px 7px; border: 1px solid var(--border-neutral); color: var(--text-secondary); font-size: 10px; }
+.lease-crop-list svg { color: var(--success); }
 .company-inline-link { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 12px; padding: 9px 0; border-top: 1px solid var(--border-neutral); color: var(--accent); font-family: var(--display); font-weight: 600; text-transform: uppercase; }
 
 .company-tabbar { display: flex; gap: 4px; margin-bottom: 13px; border-bottom: 1px solid var(--border-neutral); }

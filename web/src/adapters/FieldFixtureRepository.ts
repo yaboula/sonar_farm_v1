@@ -1,4 +1,4 @@
-import { cloneFieldFixtures } from "../data/fieldFixtures";
+import { cloneFieldFixtures, createLeasedFieldFixture } from "../data/fieldFixtures";
 import type {
   CropPlan,
   CropPlanInput,
@@ -50,6 +50,34 @@ export class FieldFixtureRepository {
     this.fields = cloneFieldFixtures();
     this.planSequence = 205;
     this.subscribers.clear();
+  }
+
+  applyLeaseState(lease: { fieldId: string; fieldName: string; location: string; capacity: number; status: string }) {
+    let field = this.fields.find((item) => item.id === lease.fieldId);
+    if (!field && lease.status === "active") {
+      field = createLeasedFieldFixture(lease.fieldId, lease.fieldName, lease.location, lease.capacity);
+      this.fields.push(field);
+      return;
+    }
+    if (!field) return;
+    field.sequence += 1;
+    field.stateRevision = `${field.id}-state-${field.sequence}`;
+    if (lease.status === "active") {
+      field.status = field.occupied ? "attention" : "empty";
+      field.statusLabel = field.occupied ? "Active" : "Lease Active";
+      field.ownership = "Lease · payment current";
+      field.leaseExpiresAt = "23 Aug, 16:32";
+      field.restriction = undefined;
+      field.diagnostics = field.diagnostics.filter((item) => item.kind !== "access_restriction");
+      field.events.unshift({ id: `evt-${field.id}-lease-${field.sequence}`, type: "access_changed", at: "Just now", actor: "Farm Service", title: "Lease access restored", detail: "Planting, care and harvest are authorized again." });
+    } else if (lease.status === "ended" || lease.status === "expired") {
+      field.status = "inaccessible";
+      field.statusLabel = lease.status === "expired" ? "Lease Expired" : "Lease Ended";
+      field.ownership = "No active Lease";
+      field.restriction = "Field access ended · planting, care and harvest unavailable";
+      field.availableActions = [];
+      field.events.unshift({ id: `evt-${field.id}-lease-${field.sequence}`, type: "access_changed", at: "Just now", actor: "Farm Service", title: "Field access ended", detail: "The Company no longer holds an active Lease for this Field." });
+    }
   }
 
   private overviewOf(field: FieldDetail, context: HubContextModel): FieldOverview {
@@ -160,11 +188,12 @@ export class FieldFixtureRepository {
     }
     if (!context.capabilities.viewFieldHistory) safe.events = [];
     const plantingAllowed = !["grace", "planting_suspended", "lease_expired", "inaccessible", "unavailable"].includes(safe.status);
+    const accessAllowed = !["lease_expired", "inaccessible", "unavailable"].includes(safe.status);
     safe.availableActions = [
       ...(context.capabilities.createCropPlans && plantingAllowed ? ["create_plan" as const] : []),
-      ...(context.capabilities.createFieldAssignments ? ["create_assignment" as const] : []),
-      ...(context.capabilities.createFieldContracts ? ["create_contract" as const] : []),
-      ...(context.capabilities.setFieldRoute ? ["set_route" as const] : []),
+      ...(context.capabilities.createFieldAssignments && accessAllowed ? ["create_assignment" as const] : []),
+      ...(context.capabilities.createFieldContracts && accessAllowed ? ["create_contract" as const] : []),
+      ...(context.capabilities.setFieldRoute && accessAllowed ? ["set_route" as const] : []),
     ];
     return safe;
   }
