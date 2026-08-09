@@ -16,18 +16,77 @@ function Physiology.Apply(record, now)
     now = now or Sonar.Time.Now()
     local condition = Physiology.Evaluate(record, now)
 
-    State.Update(record.id, {
-        state = condition.state,
-        data = {
-            water = condition.water,
-            health = condition.health,
-            spoilage = condition.spoilage,
-            -- Advance the care clock so decay is not applied twice.
-            lastCare = now,
-        },
-    })
+    local dataPatch = {
+        water = condition.water,
+        health = condition.health,
+        spoilage = condition.spoilage,
+        -- Advance the care clock so decay is not applied twice.
+        lastCare = now,
+    }
+    if Sonar.Conditions.IsAdvancedCareEnabled() then
+        dataPatch.growthPenaltyHours = condition.growthPenaltyHours
+        dataPatch.waterStressAccumulated = condition.waterStressAccumulated
+        if Sonar.Conditions.IsEnabled(record, 'nutrients') then
+            dataPatch.nutrients = condition.nutrients
+            dataPatch.nutrientStressAccumulated = condition.nutrientStressAccumulated
+            dataPatch.overfertilizeExcess = condition.overfertilizeExcess
+        end
+        if Sonar.Conditions.IsEnabled(record, 'weeds') then
+            dataPatch.weedCover = condition.weedCover
+        end
+        if Sonar.Conditions.IsEnabled(record, 'pests') then
+            dataPatch.pestPressure = condition.pestPressure
+            dataPatch.pestDamageAccumulated = condition.pestDamageAccumulated
+        end
+    end
+
+    State.Update(record.id, { state = condition.state, data = dataPatch })
 
     return condition
+end
+
+---@param record table
+---@param amount number
+---@param burnMultiplier? number
+---@return number nutrients
+---@return number excess
+function Physiology.Fertilize(record, amount, burnMultiplier)
+    local data = record.data or {}
+    local def = Config.Crops and Config.Crops[record.crop_type] or {}
+    local params = def.nutrients or {}
+    local ceiling = tonumber(params.overfertilizeCeiling) or 100
+    local optimalMax = tonumber(params.optimalMax) or ceiling
+    local previous = Utils.Clamp(tonumber(data.nutrients) or 100, 0, ceiling)
+    local nutrients = Utils.Clamp(previous + (amount or 0), 0, ceiling)
+    local newlyExcessive = math.max(0, nutrients - optimalMax) - math.max(0, previous - optimalMax)
+    local excess = math.max(0, newlyExcessive) * (burnMultiplier or 1)
+    local accumulated = Utils.Clamp((tonumber(data.overfertilizeExcess) or 0) + excess, 0, 100)
+    State.Update(record.id, { data = {
+        nutrients = Utils.Round(nutrients, 1),
+        overfertilizeExcess = Utils.Round(accumulated, 2),
+        lastCare = Sonar.Time.Now(),
+    } })
+    return nutrients, accumulated
+end
+
+---@param record table
+---@param amount number
+---@return number weedCover
+function Physiology.Weed(record, amount)
+    local data = record.data or {}
+    local weedCover = Utils.Clamp((tonumber(data.weedCover) or 0) - (amount or 0), 0, 100)
+    State.Update(record.id, { data = { weedCover = Utils.Round(weedCover, 1), lastCare = Sonar.Time.Now() } })
+    return weedCover
+end
+
+---@param record table
+---@param amount number
+---@return number pestPressure
+function Physiology.TreatPests(record, amount)
+    local data = record.data or {}
+    local pressure = Utils.Clamp((tonumber(data.pestPressure) or 0) - (amount or 0), 0, 100)
+    State.Update(record.id, { data = { pestPressure = Utils.Round(pressure, 1), lastCare = Sonar.Time.Now() } })
+    return pressure
 end
 
 --- Water a crop: restore water and record the care for quality purposes.

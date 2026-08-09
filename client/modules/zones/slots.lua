@@ -157,6 +157,73 @@ local function createSphereZone(slot, key)
                     return cond.progress >= 1 or cond.state == CROP_STATE.DEAD
                 end,
             },
+            {
+                name     = ('sonar_farm:fertilize:%s'):format(key),
+                label    = 'Fertilize',
+                icon     = 'fa-solid fa-flask',
+                distance = distance,
+                onSelect = function()
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    if cropId then Actions.Fertilize(cropId) end
+                end,
+                canInteract = function()
+                    if not Sync.IsAvailable() then return false end
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    local crop = cropId and Crops.Get(cropId)
+                    if not crop or not Sonar.Conditions.IsEnabled(crop, 'nutrients')
+                        or crop.state == CROP_STATE.PLANTING or crop.state == CROP_STATE.PLANTING_FAILED then
+                        return false
+                    end
+                    local condition = Crops.Condition(cropId)
+                    local def = Config.Crops[crop.crop_type]
+                    return condition and condition.state ~= CROP_STATE.DEAD
+                        and condition.nutrients < def.nutrients.overfertilizeCeiling
+                end,
+            },
+            {
+                name     = ('sonar_farm:weed:%s'):format(key),
+                label    = 'Remove weeds',
+                icon     = 'fa-solid fa-leaf',
+                distance = distance,
+                onSelect = function()
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    if cropId then Actions.Weed(cropId) end
+                end,
+                canInteract = function()
+                    if not Sync.IsAvailable() then return false end
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    local crop = cropId and Crops.Get(cropId)
+                    if not crop or not Sonar.Conditions.IsEnabled(crop, 'weeds')
+                        or crop.state == CROP_STATE.PLANTING or crop.state == CROP_STATE.PLANTING_FAILED then
+                        return false
+                    end
+                    local condition = Crops.Condition(cropId)
+                    return condition and condition.state ~= CROP_STATE.DEAD
+                        and condition.weedCover >= Config.Farming.AdvancedCare.MinimumWeedCover
+                end,
+            },
+            {
+                name     = ('sonar_farm:treat-pests:%s'):format(key),
+                label    = 'Treat pests',
+                icon     = 'fa-solid fa-bug',
+                distance = distance,
+                onSelect = function()
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    if cropId then Actions.TreatPests(cropId) end
+                end,
+                canInteract = function()
+                    if not Sync.IsAvailable() then return false end
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    local crop = cropId and Crops.Get(cropId)
+                    if not crop or not Sonar.Conditions.IsEnabled(crop, 'pests')
+                        or crop.state == CROP_STATE.PLANTING or crop.state == CROP_STATE.PLANTING_FAILED then
+                        return false
+                    end
+                    local condition = Crops.Condition(cropId)
+                    return condition and condition.state ~= CROP_STATE.DEAD
+                        and condition.pestPressure >= Config.Farming.AdvancedCare.MinimumPestPressure
+                end,
+            },
         },
     })
 end

@@ -5,7 +5,7 @@ lua54 'yes'
 name 'sonar_farm'
 author 'Sonar'
 description 'Scalable, server-authoritative farming platform for FiveM (QB-Core + ox).'
-version '0.1.0'
+version '0.2.0'
 repository 'https://github.com/yaboula/sonar_farm_v1.git'
 
 -- Hard dependencies. The Bridge auto-detects the framework at runtime.
@@ -26,6 +26,7 @@ shared_scripts {
     'shared/constants.lua',
     'shared/utils.lua',
     'shared/time.lua',
+    'shared/conditions.lua',
     -- Growth and physiology are shared so the client can predict what it renders
     -- with the exact same formula the server validates with.
     'shared/growth.lua',
@@ -64,6 +65,7 @@ server_scripts {
     'server/modules/minigames/sessions.lua',
     'server/modules/farming/plant.lua',
     'server/modules/farming/care.lua',
+    'server/modules/farming/cultivation.lua',
     'server/modules/farming/harvest.lua',
     'server/modules/debug/commands.lua',
     'server/main.lua',

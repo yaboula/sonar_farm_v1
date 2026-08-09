@@ -61,13 +61,18 @@ lib.callback.register(CALLBACKS.HARVEST, function(source, payload)
         local permission = Validation.CanHarvest(source, record)
         if not permission.ok then return reject(permission.reason) end
 
+        local advanced = Sonar.Conditions.IsAdvancedCareEnabled()
         local score = Quality.Request(source, ACTIONS.HARVEST, record)
+        local plantingQuality = record.data and (record.data.plantingQuality
+            or (advanced and record.data.plantScore))
         local quality = Quality.Resolve(score, condition, {
             theft = permission.theft,
-            plantingQuality = record.data and record.data.plantingQuality,
+            plantingQuality = plantingQuality,
         })
-        local units = Quality.Yield(record, quality)
-        local metadata = Quality.Metadata(record, quality)
+        local productionScore = Quality.ResolveProduction(record, condition, quality)
+        local defect = Quality.DominantDefect(record, condition)
+        local units = Quality.Yield(record, productionScore)
+        local metadata = Quality.Metadata(record, quality, productionScore, defect)
 
         if not Bridge.Inventory.CanCarry(source, def.productItem, units) then
             return reject(REJECT.INVENTORY_FULL)
@@ -95,6 +100,8 @@ lib.callback.register(CALLBACKS.HARVEST, function(source, payload)
             owner = record.owner,
             source = source,
             quality = quality,
+            productionScore = advanced and productionScore or nil,
+            defect = advanced and defect or nil,
             units = units,
             theft = permission.theft,
             xp = def.xpReward,
@@ -108,6 +115,8 @@ lib.callback.register(CALLBACKS.HARVEST, function(source, payload)
                 item = def.productItem,
                 units = units,
                 quality = quality,
+                productionScore = advanced and productionScore or nil,
+                defect = advanced and defect or nil,
                 tier = metadata.tier,
                 tierLabel = metadata.label,
                 theft = permission.theft,

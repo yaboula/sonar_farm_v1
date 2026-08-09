@@ -154,7 +154,10 @@ con `slot = NULL` (siguen creciendo y se pueden cosechar; no ocupan surco).
 2. Copia las entradas de dentro de la tabla a `ox_inventory/data/items.lua`, dentro de la tabla que ese fichero retorna.
 3. `restart ox_inventory`.
 
-Items necesarios: `carrot_seed`, `potato_seed`, `lettuce_seed`, `tomato_seed`, `carrot`, `potato`, `lettuce`, `tomato`, `watering_can`.
+Items necesarios: `carrot_seed`, `potato_seed`, `lettuce_seed`,
+`tomato_seedling`, `carrot`, `potato`, `lettuce`, `tomato`, `watering_can`.
+Para Advanced Care añade `fertilizer_organic`, `fertilizer_chemical`,
+`hand_hoe`, `pest_spray_organic` y `pest_spray_chemical`.
 
 **Importante (Etapa 4):** las semillas llevan `client.export = 'sonar_farm.useSeed'`.
 Eso es lo que permite plantar **usando el item**, que es el gesto que el jugador
@@ -169,6 +172,26 @@ Para darte material de prueba:
 /giveitem <id> carrot_seed 10
 /giveitem <id> watering_can 1
 ```
+
+---
+
+### Activar Advanced Crop Care
+
+1. Copia los cinco objetos adicionales de inventario.
+2. Mantén un backup de DB; no hay migración SQL porque el estado nuevo vive en
+   `farming_crops.data`.
+3. Cambia `Config.Features.AdvancedCare = true`.
+4. Revisa `Config.Farming.ConditionEffects`: el global solo puede desactivar.
+   Cada `conditionEffects` de cultivo puede estrechar ese conjunto.
+5. Reinicia `sonar_farm` y confirma que la validación de config termina sin
+   errores antes de abrir farming a jugadores.
+
+Tomato trae malas hierbas y plagas desactivadas como ejemplo de gating por
+cultivo; Carrot, Potato y Lettuce ejercitan el modelo completo.
+
+Para rollback, vuelve a `AdvancedCare = false` y reinicia. Los campos JSON ya
+persistidos quedan ignorados y los payloads/targets regresan al contrato
+anterior; no es necesario limpiar datos.
 
 ---
 
@@ -262,6 +285,21 @@ alcance de cualquier surco, avisa y no planta.
 12. Mueve al jugador a un routing bucket distinto de `0`: el servidor debe
     cancelar la suscripción, ordenar limpieza y rechazar farming con
     `wrong_instance`. Al volver a `0`, debe resuscribirse.
+
+### Prueba de Advanced Crop Care
+
+1. Activa el feature y entrega fertilizantes, `hand_hoe` y sprays al jugador.
+2. Planta Carrot y usa **Inspect**: deben aparecer nutrientes, malas hierbas y
+   plagas. En Tomato, malas hierbas/plagas no deben aparecer.
+3. Deja avanzar el tiempo: malas hierbas aceleran pérdida de agua/nutrientes y
+   las plagas aparecen después del onset configurado.
+4. **Fertilize** aumenta nutrientes. Fertilizar por encima del óptimo debe elevar
+   `overfertilizeExcess`; al techo devuelve `nutrients_saturated`.
+5. **Remove weeds** requiere `hand_hoe`; **Treat pests** consume un spray.
+6. Compara dos cosechas: plagas deben bajar `productionScore`; estrés/quemadura
+   deben bajar calidad y aparecer como `defect` en metadata.
+7. Desactiva el feature y reinicia: desaparecen targets/campos y el farming
+   anterior funciona sin cambios.
 
 ### Prueba de rendimiento
 

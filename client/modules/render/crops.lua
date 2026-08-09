@@ -53,6 +53,14 @@ local function toRecord(payload)
             water = payload.water,
             health = payload.health,
             lastCare = payload.lastCare,
+            nutrients = payload.nutrients,
+            weedCover = payload.weedCover,
+            pestPressure = payload.pestPressure,
+            growthPenaltyHours = payload.growthPenaltyHours,
+            waterStressAccumulated = payload.waterStressAccumulated,
+            nutrientStressAccumulated = payload.nutrientStressAccumulated,
+            pestDamageAccumulated = payload.pestDamageAccumulated,
+            overfertilizeExcess = payload.overfertilizeExcess,
         },
     }
 end

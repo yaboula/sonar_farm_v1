@@ -30,6 +30,12 @@ local function nonEmptyString(errors, path, value)
     end
 end
 
+local function range(errors, path, value, minimum, maximum)
+    if not finite(value) or value < minimum or value > maximum then
+        errors[#errors + 1] = ('%s must be within %s..%s.'):format(path, minimum, maximum)
+    end
+end
+
 local function validateFramework(errors)
     local supported = { auto = true, ['qb-core'] = true, esx = true, qbox = true }
     if not supported[Config.Framework] then
@@ -116,6 +122,70 @@ local function validateCrops(errors)
                 or yield.min < 1
                 or yield.max < yield.min then
                 errors[#errors + 1] = path .. '.yield must define 1 <= min <= max.'
+            end
+
+            if crop.nutrients ~= nil then
+                if type(crop.nutrients) ~= 'table' then
+                    errors[#errors + 1] = path .. '.nutrients must be a table.'
+                else
+                    positive(errors, path .. '.nutrients.decayPerHour', crop.nutrients.decayPerHour, true)
+                    range(errors, path .. '.nutrients.optimalMin', crop.nutrients.optimalMin, 0, 100)
+                    range(errors, path .. '.nutrients.optimalMax', crop.nutrients.optimalMax, 0, 100)
+                    range(errors, path .. '.nutrients.overfertilizeCeiling', crop.nutrients.overfertilizeCeiling, 0, 100)
+                    if finite(crop.nutrients.optimalMin) and finite(crop.nutrients.optimalMax)
+                        and crop.nutrients.optimalMin >= crop.nutrients.optimalMax then
+                        errors[#errors + 1] = path .. '.nutrients requires optimalMin < optimalMax.'
+                    end
+                    if finite(crop.nutrients.optimalMax) and finite(crop.nutrients.overfertilizeCeiling)
+                        and crop.nutrients.optimalMax >= crop.nutrients.overfertilizeCeiling then
+                        errors[#errors + 1] = path .. '.nutrients requires optimalMax < overfertilizeCeiling.'
+                    end
+                end
+            end
+
+            if crop.weeds ~= nil then
+                if type(crop.weeds) ~= 'table' then
+                    errors[#errors + 1] = path .. '.weeds must be a table.'
+                else
+                    positive(errors, path .. '.weeds.growthPerHour', crop.weeds.growthPerHour, true)
+                    range(errors, path .. '.weeds.resistance', crop.weeds.resistance, 0, 1)
+                end
+            end
+
+            if crop.pests ~= nil then
+                if type(crop.pests) ~= 'table' then
+                    errors[#errors + 1] = path .. '.pests must be a table.'
+                else
+                    positive(errors, path .. '.pests.onsetHours', crop.pests.onsetHours, true)
+                    range(errors, path .. '.pests.susceptibility', crop.pests.susceptibility, 0, 1)
+                end
+            end
+
+            if crop.criticalWindow ~= nil then
+                if type(crop.criticalWindow) ~= 'table' then
+                    errors[#errors + 1] = path .. '.criticalWindow must be a table.'
+                else
+                    range(errors, path .. '.criticalWindow.from', crop.criticalWindow.from, 0, 1)
+                    range(errors, path .. '.criticalWindow.to', crop.criticalWindow.to, 0, 1)
+                    if finite(crop.criticalWindow.from) and finite(crop.criticalWindow.to)
+                        and crop.criticalWindow.from >= crop.criticalWindow.to then
+                        errors[#errors + 1] = path .. '.criticalWindow requires from < to.'
+                    end
+                end
+            end
+
+            if crop.conditionEffects ~= nil then
+                if type(crop.conditionEffects) ~= 'table' then
+                    errors[#errors + 1] = path .. '.conditionEffects must be a table.'
+                else
+                    for key, value in pairs(crop.conditionEffects) do
+                        if key ~= 'nutrients' and key ~= 'weeds' and key ~= 'pests' then
+                            errors[#errors + 1] = ('%s.conditionEffects.%s is unsupported.'):format(path, tostring(key))
+                        elseif type(value) ~= 'boolean' then
+                            errors[#errors + 1] = ('%s.conditionEffects.%s must be boolean.'):format(path, key)
+                        end
+                    end
+                end
             end
         end
     end
@@ -254,6 +324,18 @@ function ConfigValidation.Validate()
     positive(errors, 'Config.Render.TargetDistance', Config.Render and Config.Render.TargetDistance, false)
     positive(errors, 'Config.Render.MaxProps', Config.Render and Config.Render.MaxProps, false)
 
+    for _, key in ipairs({ 'Nutrients', 'Weeds', 'Pests' }) do
+        if type(Config.Farming and Config.Farming.ConditionEffects
+            and Config.Farming.ConditionEffects[key]) ~= 'boolean' then
+            errors[#errors + 1] = ('Config.Farming.ConditionEffects.%s must be boolean.'):format(key)
+        end
+    end
+    local advanced = Config.Farming and Config.Farming.AdvancedCare
+    positive(errors, 'Config.Farming.AdvancedCare.WaterDeficitThreshold', advanced and advanced.WaterDeficitThreshold, true)
+    positive(errors, 'Config.Farming.AdvancedCare.CriticalStressMultiplier', advanced and advanced.CriticalStressMultiplier, false)
+    positive(errors, 'Config.Farming.AdvancedCare.MinimumWeedCover', advanced and advanced.MinimumWeedCover, true)
+    positive(errors, 'Config.Farming.AdvancedCare.MinimumPestPressure', advanced and advanced.MinimumPestPressure, true)
+
     if Config.Render and Config.Security
         and finite(Config.Render.TargetDistance)
         and finite(Config.Security.MaxInteractDistance)
@@ -272,6 +354,7 @@ function ConfigValidation.Validate()
     if not finite(plantingInfluence) or plantingInfluence < 0 or plantingInfluence > 1 then
         errors[#errors + 1] = 'Config.Quality.PlantingInfluence must be within 0..1.'
     end
+    range(errors, 'Config.Quality.DefectWeight', Config.Quality and Config.Quality.DefectWeight, 0, 1)
 
     if type(Config.Security and Config.Security.AllowedRoutingBuckets) ~= 'table'
         or #Config.Security.AllowedRoutingBuckets == 0 then

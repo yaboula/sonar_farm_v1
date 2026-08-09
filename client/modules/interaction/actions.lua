@@ -22,6 +22,9 @@ local PLACEHOLDER_DURATION = {
     plant = 2500,
     water = 2000,
     harvest = 3000,
+    fertilize = 2200,
+    weed = 2500,
+    treat_pest = 2200,
 }
 
 local MESSAGES = {
@@ -38,7 +41,7 @@ local MESSAGES = {
     [REJECT.SLOT_OCCUPIED] = 'Something is already growing there.',
     [REJECT.UNKNOWN_CROP] = 'Unknown crop type.',
     [REJECT.MISSING_SEED] = 'You do not have the required planting stock.',
-    [REJECT.MISSING_TOOL] = 'You need a watering can.',
+    [REJECT.MISSING_TOOL] = 'You do not have the required tool or treatment.',
     [REJECT.CROP_NOT_FOUND] = 'That crop is no longer there.',
     [REJECT.CROP_NOT_MATURE] = 'This crop is not ready to harvest.',
     [REJECT.CROP_DEAD] = 'This crop is dead.',
@@ -47,6 +50,10 @@ local MESSAGES = {
     [REJECT.INVENTORY_FULL] = 'Your inventory is full.',
     [REJECT.ALREADY_IN_PROGRESS] = 'Someone is already working on this plot.',
     [REJECT.ALREADY_WATERED] = 'This crop does not need water yet.',
+    [REJECT.NUTRIENTS_SATURATED] = 'This crop cannot absorb more nutrients.',
+    [REJECT.NO_WEEDS_DETECTED] = 'There are not enough weeds to remove.',
+    [REJECT.NO_PEST_DETECTED] = 'No meaningful pest pressure was detected.',
+    [REJECT.CONDITION_DISABLED] = 'That crop condition is not enabled.',
     [REJECT.MINIGAME_REQUIRED] = 'This crop must be planted by hand.',
     [REJECT.MINIGAME_DISABLED] = 'Planting practice is temporarily unavailable.',
     [REJECT.MINIGAME_SESSION_NOT_FOUND] = 'That planting session is no longer active.',
@@ -64,6 +71,9 @@ local STALE_CACHE_REASONS = {
     [REJECT.CROP_NOT_MATURE] = true,
     [REJECT.CROP_DEAD] = true,
     [REJECT.ALREADY_WATERED] = true,
+    [REJECT.NUTRIENTS_SATURATED] = true,
+    [REJECT.NO_WEEDS_DETECTED] = true,
+    [REJECT.NO_PEST_DETECTED] = true,
     [REJECT.SLOT_OCCUPIED] = true,
 }
 
@@ -174,6 +184,27 @@ function Actions.Water(cropId)
         :format(response.data.water, response.data.health), NOTIFY.SUCCESS)
 end
 
+function Actions.Fertilize(cropId)
+    if not cropId or not placeholderProgress('Fertilizing...', 'fertilize') then return end
+    local response = lib.callback.await(CALLBACKS.FERTILIZE, false, { cropId = cropId })
+    if not response or not response.ok then return handleRejection(response) end
+    Bridge.Notify(('Fertilized. Nutrients %s%%.'):format(response.data.nutrients), NOTIFY.SUCCESS)
+end
+
+function Actions.Weed(cropId)
+    if not cropId or not placeholderProgress('Removing weeds...', 'weed') then return end
+    local response = lib.callback.await(CALLBACKS.WEED, false, { cropId = cropId })
+    if not response or not response.ok then return handleRejection(response) end
+    Bridge.Notify(('Weeded. Cover %s%%.'):format(response.data.weedCover), NOTIFY.SUCCESS)
+end
+
+function Actions.TreatPests(cropId)
+    if not cropId or not placeholderProgress('Treating pests...', 'treat_pest') then return end
+    local response = lib.callback.await(CALLBACKS.TREAT_PEST, false, { cropId = cropId })
+    if not response or not response.ok then return handleRejection(response) end
+    Bridge.Notify(('Treated. Pest pressure %s%%.'):format(response.data.pestPressure), NOTIFY.SUCCESS)
+end
+
 --- Harvest a crop.
 ---@param cropId string
 function Actions.Harvest(cropId)
@@ -189,8 +220,11 @@ function Actions.Harvest(cropId)
     end
 
     local data = response.data
-    Bridge.Notify(('Harvested %d x %s (%s, quality %s).')
-        :format(data.units, data.cropType, data.tierLabel, data.quality), NOTIFY.SUCCESS)
+    local detail = Config.Features.AdvancedCare
+        and (', production %s, defect %s'):format(data.productionScore, data.defect)
+        or ''
+    Bridge.Notify(('Harvested %d x %s (%s, quality %s%s).')
+        :format(data.units, data.cropType, data.tierLabel, data.quality, detail), NOTIFY.SUCCESS)
 
     Slots.RefreshProps()
 end

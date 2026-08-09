@@ -6,6 +6,37 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-09
+
+### Added — Advanced Crop Care
+
+- Añadido un modelo causal opcional y autoritativo de nutrientes, malas hierbas
+  y plagas, con gating global y por cultivo, trayectorias compartidas y
+  acumuladores persistentes dentro de `record.data`.
+- El déficit sostenido de agua/nutrientes puede ralentizar el crecimiento; la
+  ventana crítica de cada cultivo amplifica el impacto histórico.
+- Añadidas las acciones `fertilize`, `weed` y `treatPest`, nuevos objetos de
+  inventario, targets condicionados, sincronización e inspección del estado.
+- Separadas producción y calidad en cosecha, incluyendo `productionScore` y un
+  defecto dominante visible en metadata cuando Advanced Care está habilitado.
+- El sistema se distribuye con `Config.Features.AdvancedCare = false`; apagado
+  conserva el comportamiento y los payloads anteriores.
+
+### Added — Releases
+
+- La versión del recurso se centraliza en `VERSION` y se valida contra
+  `fxmanifest.lua` y `CHANGELOG.md` desde CI.
+- Nuevo workflow por tags `vX.Y.Z` que verifica, prueba, construye la NUI,
+  empaqueta el recurso limpio y publica la GitHub Release.
+- Documentado que el contrato frontend `1.0.0` tiene versionado independiente
+  del recurso FiveM.
+
+### Fixed — Persistencia
+
+- Los lotes de `State.Flush` ya no se consideran guardados cuando
+  `MySQL.transaction.await` devuelve `false`; el estado dirty se conserva para
+  reintento y una regresión cubre explícitamente ese contrato de `oxmysql`.
+
 ### Closed — Farm Business Hub Frontend V1
 
 - Congelado el contrato frontend `1.0.0`: canvas 1440×810, 35 rutas, siete

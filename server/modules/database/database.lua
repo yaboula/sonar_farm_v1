@@ -323,12 +323,13 @@ function Database.UpsertCrops(rows)
             queries[#queries + 1] = { query = UPSERT_SQL, values = serializeRow(row) }
         end
 
-        local ok, err = pcall(function()
-            MySQL.transaction.await(queries)
+        local ok, transactionResult = pcall(function()
+            return MySQL.transaction.await(queries)
         end)
 
-        if not ok then
-            Logger.Warn(('UpsertCrops chunk failed (%d rows): %s'):format(#piece, tostring(err)), 'db')
+        if not ok or transactionResult ~= true then
+            Logger.Warn(('UpsertCrops chunk failed (%d rows): %s')
+                :format(#piece, ok and 'transaction returned false' or tostring(transactionResult)), 'db')
             return false
         end
     end

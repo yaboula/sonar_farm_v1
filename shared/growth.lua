@@ -61,11 +61,19 @@ function Growth.Evaluate(record, now)
     end
 
     local elapsed = math.max(0, now - (record.planted_at or now))
+    local effectiveElapsed = elapsed
+    if Sonar.Conditions and Sonar.Conditions.IsAdvancedCareEnabled() then
+        local data = record.data or {}
+        local pending = Sonar.Conditions.Evaluate(record, now)
+        local penaltyHours = math.max(0, tonumber(data.growthPenaltyHours) or 0)
+            + math.max(0, tonumber(pending.growthPenaltyHoursDelta) or 0)
+        effectiveElapsed = math.max(0, elapsed - penaltyHours * 3600)
+    end
     local growthTime = record.growth_time or 0
 
     local progress
     if growthTime > 0 then
-        progress = Sonar.Utils.Clamp(elapsed / growthTime, 0, 1)
+        progress = Sonar.Utils.Clamp(effectiveElapsed / growthTime, 0, 1)
     else
         progress = 1
     end
@@ -82,10 +90,14 @@ function Growth.Evaluate(record, now)
         state = CROP_STATE.PLANTED
     end
 
-    return {
+    local result = {
         elapsed = elapsed,
         progress = progress,
         stageIndex = stageIndex,
         state = state,
     }
+    if Sonar.Conditions and Sonar.Conditions.IsAdvancedCareEnabled() then
+        result.effectiveElapsed = effectiveElapsed
+    end
+    return result
 end

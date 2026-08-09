@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua 5.4
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4 zip
+      - name: Verify release contract
+        run: |
+          lua5.4 scripts/check_version.lua
+          test "$GITHUB_REF_NAME" = "v$(cat VERSION)"
+      - name: Run Lua gates
+        run: |
+          find . -name '*.lua' -not -path './.git/*' -print0 | xargs -0 -n1 luac5.4 -p
+          lua5.4 tests/run.lua
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: minigames-ui/package-lock.json
+      - name: Build and test minigame NUI
+        working-directory: minigames-ui
+        run: |
+          npm ci
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run build
+      - name: Package FiveM resource
+        run: |
+          mkdir -p release/sonar_farm/minigames-ui
+          cp -R bridge client config data database docs inventory_images server shared release/sonar_farm/
+          cp -R minigames-ui/dist release/sonar_farm/minigames-ui/dist
+          cp fxmanifest.lua README.md CHANGELOG.md VERSION release/sonar_farm/
+          cd release
+          zip -qr "sonar_farm-$(cat ../VERSION).zip" sonar_farm
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "release/sonar_farm-$(cat VERSION).zip" --verify-tag --generate-notes --title "sonar_farm $(cat VERSION)"

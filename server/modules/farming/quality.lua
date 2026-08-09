@@ -92,6 +92,15 @@ function Quality.Resolve(score, condition, opts)
     -- Spoilage is a direct multiplier: produce left rotting loses value.
     quality = quality * (1 - Utils.Clamp((condition.spoilage or 0) / 100, 0, 1))
 
+    if Sonar.Conditions.IsAdvancedCareEnabled() then
+        local waterDefect = tonumber(condition.waterStressAccumulated) or 0
+        local nutrientDefect = (tonumber(condition.nutrientStressAccumulated) or 0)
+            + (tonumber(condition.overfertilizeExcess) or 0)
+        local pestDefect = tonumber(condition.pestDamageAccumulated) or 0
+        local defectScore = Utils.Clamp(math.max(waterDefect, nutrientDefect, pestDefect), 0, 100)
+        quality = quality * (1 - defectScore / 100 * Utils.Clamp(cfg.DefectWeight or 0, 0, 1))
+    end
+
     -- Mechanized work trades quality for scale (Stage 9+).
     if opts.mechanized then
         quality = math.min(quality, cfg.MechanizedCap)
@@ -103,6 +112,45 @@ function Quality.Resolve(score, condition, opts)
     end
 
     return Utils.Round(Utils.Clamp(quality, 0, 100), 1)
+end
+
+---@param record table
+---@param condition table
+---@param fallbackQuality? number original quality used while Advanced Care is disabled
+---@return number productionScore
+function Quality.ResolveProduction(record, condition, fallbackQuality)
+    if not Sonar.Conditions.IsAdvancedCareEnabled() then
+        return Utils.Clamp(fallbackQuality or 100, 0, 100)
+    end
+    local weights = Config.Quality.ProductionWeights or {}
+    local nutrientStress = tonumber(condition.nutrientStressAccumulated) or 0
+    local pestDamage = tonumber(condition.pestDamageAccumulated) or 0
+    local score = 100
+        - nutrientStress * (tonumber(weights.nutrientStress) or 0)
+        - pestDamage * (tonumber(weights.pestDamage) or 0)
+    return Utils.Round(Utils.Clamp(score, 0, 100), 1)
+end
+
+---@param record table
+---@param condition? table
+---@return string defect
+function Quality.DominantDefect(record, condition)
+    if not Sonar.Conditions.IsAdvancedCareEnabled() then return 'none' end
+    condition = condition or record.data or {}
+    local values = {
+        { key = 'water_stress', value = tonumber(condition.waterStressAccumulated) or 0 },
+        {
+            key = 'nutrient_burn',
+            value = (tonumber(condition.nutrientStressAccumulated) or 0)
+                + (tonumber(condition.overfertilizeExcess) or 0),
+        },
+        { key = 'pest_damage', value = tonumber(condition.pestDamageAccumulated) or 0 },
+    }
+    local winner, highest = 'none', 0
+    for _, entry in ipairs(values) do
+        if entry.value > highest then winner, highest = entry.key, entry.value end
+    end
+    return winner
 end
 
 --- Yield units for a harvest, scaled by final quality.
@@ -126,13 +174,18 @@ end
 ---@param record table
 ---@param quality number
 ---@return table metadata
-function Quality.Metadata(record, quality)
+function Quality.Metadata(record, quality, productionScore, defect)
     local tier = Utils.QualityTier(quality)
-    return {
+    local metadata = {
         quality = quality,
         tier = tier.key,
         label = tier.label,
         crop = record.crop_type,
         harvestedAt = os.time(),
     }
+    if Sonar.Conditions.IsAdvancedCareEnabled() then
+        metadata.productionScore = productionScore
+        metadata.defect = defect or 'none'
+    end
+    return metadata
 end

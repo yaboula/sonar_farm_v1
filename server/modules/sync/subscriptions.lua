@@ -96,7 +96,7 @@ end
 local function renderPayload(record, identifier)
     local data = record.data or {}
 
-    return {
+    local payload = {
         id = record.id,
         cropType = record.crop_type,
         zone = record.zone,
@@ -114,6 +114,23 @@ local function renderPayload(record, identifier)
         lastCare = data.lastCare,
         isMine = (record.owner == nil) or (record.owner == identifier),
     }
+    if Sonar.Conditions.IsAdvancedCareEnabled() then
+        payload.growthPenaltyHours = data.growthPenaltyHours
+        payload.waterStressAccumulated = data.waterStressAccumulated
+        if Sonar.Conditions.IsEnabled(record, 'nutrients') then
+            payload.nutrients = data.nutrients
+            payload.nutrientStressAccumulated = data.nutrientStressAccumulated
+            payload.overfertilizeExcess = data.overfertilizeExcess
+        end
+        if Sonar.Conditions.IsEnabled(record, 'weeds') then
+            payload.weedCover = data.weedCover
+        end
+        if Sonar.Conditions.IsEnabled(record, 'pests') then
+            payload.pestPressure = data.pestPressure
+            payload.pestDamageAccumulated = data.pestDamageAccumulated
+        end
+    end
+    return payload
 end
 
 -- ---------------------------------------------------------------------------

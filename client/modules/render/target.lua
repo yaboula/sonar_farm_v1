@@ -9,6 +9,35 @@ Target = Target or {}
 
 local CROP_STATE = Sonar.Constants.CROP_STATE
 
+local function dominantRisk(condition)
+    local risks = {
+        water_stress = tonumber(condition.waterStressAccumulated) or 0,
+        nutrient_burn = (tonumber(condition.nutrientStressAccumulated) or 0)
+            + (tonumber(condition.overfertilizeExcess) or 0),
+        pest_damage = tonumber(condition.pestDamageAccumulated) or 0,
+    }
+    local winner, highest = 'none', 0
+    for key, value in pairs(risks) do
+        if value > highest then winner, highest = key, value end
+    end
+    return winner:gsub('_', ' ')
+end
+
+local function advancedSummary(record, condition)
+    if not Sonar.Conditions.IsAdvancedCareEnabled() then return '' end
+    local parts = {}
+    if Sonar.Conditions.IsEnabled(record, 'nutrients') then
+        parts[#parts + 1] = ('nutrients %d%%'):format(math.floor(condition.nutrients or 0))
+    end
+    if Sonar.Conditions.IsEnabled(record, 'weeds') then
+        parts[#parts + 1] = ('weeds %d%%'):format(math.floor(condition.weedCover or 0))
+    end
+    if Sonar.Conditions.IsEnabled(record, 'pests') then
+        parts[#parts + 1] = ('pests %d%%'):format(math.floor(condition.pestPressure or 0))
+    end
+    return #parts > 0 and (' ' .. table.concat(parts, ', ') .. '.') or ''
+end
+
 --- Human-readable condition summary for the inspect option.
 ---@param cropId string
 ---@return string
@@ -29,11 +58,16 @@ function Target.Describe(cropId)
     end
 
     if condition.progress >= 1 then
-        return ('%s: ready to harvest. Health %d%%.'):format(label, math.floor(condition.health))
+        local risk = Sonar.Conditions.IsAdvancedCareEnabled()
+            and (' Dominant defect risk: %s.'):format(dominantRisk(condition))
+            or ''
+        return ('%s: ready to harvest. Health %d%%.%s%s')
+            :format(label, math.floor(condition.health), advancedSummary(record, condition), risk)
     end
 
-    return ('%s: %d%% grown. Water %d%%, health %d%%.')
-        :format(label, math.floor(condition.progress * 100), math.floor(condition.water), math.floor(condition.health))
+    return ('%s: %d%% grown. Water %d%%, health %d%%.%s')
+        :format(label, math.floor(condition.progress * 100), math.floor(condition.water),
+            math.floor(condition.health), advancedSummary(record, condition))
 end
 
 --- Optional helper kept for compatibility.

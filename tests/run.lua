@@ -56,6 +56,7 @@ dofile('config/minigames.lua')
 dofile('shared/constants.lua')
 dofile('shared/utils.lua')
 dofile('shared/time.lua')
+dofile('shared/conditions.lua')
 dofile('shared/growth.lua')
 dofile('shared/physiology.lua')
 dofile('shared/zones.lua')
@@ -89,6 +90,17 @@ test('malformed crop config reports an error instead of crashing validation', fu
     assert(#errors > 0, 'malformed crop must be rejected')
 
     Config.Crops.carrot.stages[1] = stage
+end)
+
+test('advanced care config rejects malformed bounds and overrides', function()
+    local window = Config.Crops.carrot.criticalWindow
+    local effects = Config.Crops.carrot.conditionEffects
+    Config.Crops.carrot.criticalWindow = { from = 0.8, to = 0.2 }
+    Config.Crops.carrot.conditionEffects = { pests = 'yes', weather = true }
+    local errors = Sonar.ConfigValidation.Validate()
+    assert(#errors >= 3, 'window, boolean and unsupported override errors expected')
+    Config.Crops.carrot.criticalWindow = window
+    Config.Crops.carrot.conditionEffects = effects
 end)
 
 test('zone grids and explicit slots resolve', function()
@@ -134,6 +146,76 @@ test('incomplete planting never progresses or dries out', function()
     equal(condition.state, Sonar.Constants.CROP_STATE.PLANTING_FAILED, 'incomplete state')
     equal(condition.progress, 0, 'incomplete progress')
     equal(condition.health, 100, 'incomplete health')
+end)
+
+test('advanced condition gating respects global and per-crop ceilings', function()
+    local enabled = Config.Features.AdvancedCare
+    Config.Features.AdvancedCare = true
+    equal(Sonar.Conditions.IsEnabled('carrot', 'nutrients'), true, 'configured crop inherits global gate')
+    equal(Sonar.Conditions.IsEnabled('tomato', 'weeds'), false, 'crop override narrows global gate')
+    local global = Config.Farming.ConditionEffects.Pests
+    Config.Farming.ConditionEffects.Pests = false
+    equal(Sonar.Conditions.IsEnabled('carrot', 'pests'), false, 'global off and crop unset stays off')
+    local override = Config.Crops.carrot.conditionEffects
+    Config.Crops.carrot.conditionEffects = { pests = true }
+    equal(Sonar.Conditions.IsEnabled('carrot', 'pests'), false, 'crop cannot widen global gate')
+    Config.Crops.carrot.conditionEffects = override
+    Config.Farming.ConditionEffects.Pests = global
+    Config.Features.AdvancedCare = enabled
+end)
+
+test('advanced trajectories are causal and old records stay compatible', function()
+    local enabled = Config.Features.AdvancedCare
+    Config.Features.AdvancedCare = true
+    local base = {
+        crop_type = 'carrot', planted_at = 1000, growth_time = 7200,
+        data = { water = 100, health = 100, lastCare = 1000 },
+    }
+    local old = Sonar.Conditions.Evaluate(base, 4600)
+    assert(old.nutrients < 100, 'missing nutrient state defaults safely then decays')
+    assert(old.weedCover > 0, 'missing weed state defaults safely then grows')
+
+    local clean = {
+        crop_type = 'carrot', planted_at = 1000, growth_time = 7200,
+        data = { water = 100, nutrients = 100, weedCover = 0, pestPressure = 0, lastCare = 1000 },
+    }
+    local weedy = {
+        crop_type = 'carrot', planted_at = 1000, growth_time = 7200,
+        data = { water = 100, nutrients = 100, weedCover = 70, pestPressure = 0, lastCare = 1000 },
+    }
+    local cleanResult = Sonar.Conditions.Evaluate(clean, 4600)
+    local weedyResult = Sonar.Conditions.Evaluate(weedy, 4600)
+    assert(weedyResult.water < cleanResult.water, 'weeds accelerate water loss')
+    assert(weedyResult.nutrients < cleanResult.nutrients, 'weeds accelerate nutrient loss')
+    assert(weedyResult.pestPressure > cleanResult.pestPressure, 'weeds accelerate pest pressure')
+    Config.Features.AdvancedCare = enabled
+end)
+
+test('sustained deficits slow growth and critical windows amplify stress', function()
+    local enabled = Config.Features.AdvancedCare
+    Config.Features.AdvancedCare = true
+    local stressed = {
+        crop_type = 'carrot', planted_at = 1000, growth_time = 3600,
+        data = { water = 0, nutrients = 0, weedCover = 0, pestPressure = 0, lastCare = 1000 },
+    }
+    assert(Growth.Evaluate(stressed, 4600).progress < 1, 'deficit penalty stretches maturation')
+
+    local outside = {
+        crop_type = 'carrot', planted_at = 0, growth_time = 10000,
+        data = { water = 0, nutrients = 0, weedCover = 0, pestPressure = 0, lastCare = 100 },
+    }
+    local inside = {
+        crop_type = 'carrot', planted_at = 0, growth_time = 10000,
+        data = { water = 0, nutrients = 0, weedCover = 0, pestPressure = 0, lastCare = 4000 },
+    }
+    local outsideResult = Sonar.Conditions.Evaluate(outside, 1100)
+    local insideResult = Sonar.Conditions.Evaluate(inside, 5000)
+    assert(insideResult.waterStressDelta > outsideResult.waterStressDelta, 'critical window weights equal stress more')
+    Config.Features.AdvancedCare = false
+    local originalGrowth = Growth.Evaluate(stressed, 4600)
+    equal(originalGrowth.progress, 1, 'disabled feature preserves original growth')
+    equal(originalGrowth.effectiveElapsed, nil, 'disabled feature preserves original response shape')
+    Config.Features.AdvancedCare = enabled
 end)
 
 test('tomato planting traces are bounded and scored deterministically', function()
@@ -227,6 +309,26 @@ test('validated planting quality contributes to final harvest quality', function
     assert(strongPlanting > poorPlanting, 'planting quality must remain economically meaningful')
 end)
 
+test('production and quality respond independently with visible defects', function()
+    local enabled = Config.Features.AdvancedCare
+    Config.Features.AdvancedCare = true
+    local record = { crop_type = 'carrot', data = {} }
+    local waterDamaged = {
+        health = 100, spoilage = 0, waterStressAccumulated = 80,
+        nutrientStressAccumulated = 0, pestDamageAccumulated = 0, overfertilizeExcess = 0,
+    }
+    local pestDamaged = {
+        health = 100, spoilage = 0, waterStressAccumulated = 0,
+        nutrientStressAccumulated = 0, pestDamageAccumulated = 80, overfertilizeExcess = 0,
+    }
+    equal(Quality.ResolveProduction(record, waterDamaged, 0), 100, 'water stress does not reduce quantity directly')
+    assert(Quality.ResolveProduction(record, pestDamaged, 0) < 100, 'pests reduce production')
+    equal(Quality.DominantDefect(record, waterDamaged), 'water_stress', 'water defect')
+    equal(Quality.DominantDefect(record, pestDamaged), 'pest_damage', 'pest defect')
+    assert(Quality.Resolve(100, waterDamaged) < 100, 'water history still reduces quality')
+    Config.Features.AdvancedCare = enabled
+end)
+
 Database = {
     LoadAllCrops = function() return {} end,
     UpsertCrops = function() return true end,
@@ -234,6 +336,7 @@ Database = {
 }
 
 dofile('server/modules/state/state.lua')
+dofile('server/modules/farming/physiology.lua')
 
 test('state keeps cell, owner and slot indexes consistent', function()
     Sonar.Utils.SeedRandom(1234, 5678)
@@ -258,6 +361,25 @@ test('state keeps cell, owner and slot indexes consistent', function()
     State.Remove(id)
     equal(State.Count(), 0, 'crop removed')
     equal(State.SlotOccupant('grapeseed_east', 1), nil, 'slot released')
+end)
+
+test('advanced care mutators settle weeds pests and overfertilize consequences', function()
+    local enabled = Config.Features.AdvancedCare
+    Config.Features.AdvancedCare = true
+    local id, record = State.Add({
+        crop_type = 'carrot', owner = 'owner-a', zone = 'grapeseed_east', slot = 2,
+        pos_x = 2237.0, pos_y = 5031.0, pos_z = 44.2, planted_at = Sonar.Time.Now(),
+        growth_time = 900,
+        data = { water = 100, health = 100, nutrients = 75, weedCover = 80,
+            pestPressure = 70, lastCare = Sonar.Time.Now() },
+    })
+    local nutrients, excess = Physiology.Fertilize(record, 30, 1)
+    equal(nutrients, 100, 'fertilizer respects crop ceiling')
+    assert(excess > 0, 'overfertilizing creates a durable consequence')
+    assert(Physiology.Weed(record, 70) < 80, 'weeding removes cover')
+    assert(Physiology.TreatPests(record, 45) < 70, 'treatment reduces pressure')
+    State.Remove(id)
+    Config.Features.AdvancedCare = enabled
 end)
 
 test('state load fails closed on database errors', function()
@@ -359,7 +481,7 @@ test('rate limit scopes are independent and refill lazily', function()
     equal(Security.Consume(1, 1, 'subscribe'), true, 'subscription refilled')
 end)
 
-test('database serializes nullable slots without nil parameter holes', function()
+test('database serializes nullable slots and reports failed transactions', function()
     local captured
     MySQL = {
         transaction = {
@@ -388,6 +510,22 @@ test('database serializes nullable slots without nil parameter holes', function(
     assert(captured[1].query:find('NULLIF%(%?, 0%)'), 'numeric NULLIF placeholder')
     equal(captured[1].values[5], 0, 'slot sentinel')
     equal(#captured[1].values, 14, 'dense parameter array')
+
+    MySQL.transaction.await = function()
+        return false
+    end
+    equal(Database.UpsertCrops({
+        {
+            id = '00000000-0000-4000-8000-000000000003',
+            crop_type = 'carrot',
+            cell = '1:1',
+            pos_x = 1,
+            pos_y = 2,
+            pos_z = 3,
+            planted_at = 1000,
+            growth_time = 900,
+        },
+    }), false, 'failed transaction is reported')
 end)
 
 test('database rejects an empty but incompatible schema', function()

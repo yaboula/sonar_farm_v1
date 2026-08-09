@@ -37,6 +37,7 @@ sonar_farm/
       state/     Hot-state en RAM + crecimiento por timestamp
       security/  Rate limiting y validacion anti-exploit
       farming/   Acciones autoritativas: plant, care, harvest
+                  + cultivation opcional (fertilize, weed, treat pests)
       minigames/ Sesiones, checkpoints y scoring autoritativo
       logger/    Logging por niveles con conectores
   client/        Motor visual, interaccion y herramientas de administracion
@@ -63,7 +64,8 @@ El esquema de base de datos se crea solo al arrancar (`Config.Database.AutoCreat
 
 ## Estado del proyecto
 
-Etapas 1–4 estabilizadas y primer corte vertical de la Etapa 5 implementado.
+Etapas 1–4 estabilizadas, primer corte vertical de la Etapa 5 implementado y
+Advanced Crop Care disponible como rollout opt-in.
 Ver [docs/DECISIONES.md](docs/DECISIONES.md) para la vision completa,
 [docs/API.md](docs/API.md) para el contrato actual y [CHANGELOG.md](CHANGELOG.md)
 para el historial.
@@ -73,6 +75,7 @@ para el historial.
 - [x] Etapa 3 — Logica de servidor autoritativa (plantar / cuidar / cosechar)
 - [x] Etapa 4 — Motor visual (streaming/culling + ox_target)
 - [~] Etapa 5 — Motor de minijuegos (Tomato Initial Planting)
+- [x] Advanced Crop Care — modelo causal opcional (`AdvancedCare = false`)
 - [ ] ... (ver docs/DECISIONES.md)
 
 Tomato se planta como trasplante mediante el minijuego de cuatro pasos
@@ -80,6 +83,15 @@ Prepare → Place → Cover → Water. La NUI solo captura interaccion; el servi
 reserva el slot, valida checkpoints, recalcula calidad y consume
 `tomato_seedling` al confirmar. Water/Harvest conservan barras placeholder hasta
 sus respectivos cortes de Etapa 5.
+
+Advanced Crop Care añade nutrientes, malas hierbas y plagas con crecimiento,
+producción, calidad y defectos causalmente separados. Se entrega desactivado por
+defecto para preservar exactamente el farming estabilizado; activación y objetos
+necesarios se documentan en [docs/RUNBOOK.md](docs/RUNBOOK.md).
+
+La versión actual del recurso se encuentra en `VERSION`. El contrato frontend
+mantiene versionado independiente; el proceso de tags y paquetes está en
+[docs/RELEASING.md](docs/RELEASING.md).
 
 **Requisito de la Etapa 4:** los props de plantas (`bzzz_plants_*`) viven en su propio recurso de streaming, que debe estar iniciado. Si falta, el cliente avisa por consola con el nombre exacto del modelo y usa un respaldo. Ver [docs/RUNBOOK.md](docs/RUNBOOK.md).
 

@@ -128,4 +128,44 @@ return {
         close = true,
         description = 'Used to water growing crops and keep them healthy.',
     },
+
+    ['fertilizer_organic'] = {
+        label = 'Organic Fertilizer',
+        weight = 350,
+        stack = true,
+        close = true,
+        description = 'A gentle nutrient treatment with a low risk of burning crops.',
+    },
+
+    ['fertilizer_chemical'] = {
+        label = 'Concentrated Fertilizer',
+        weight = 250,
+        stack = true,
+        close = true,
+        description = 'Fast nutrient recovery that can burn an already-fed crop.',
+    },
+
+    ['hand_hoe'] = {
+        label = 'Hand Hoe',
+        weight = 900,
+        stack = false,
+        close = true,
+        description = 'A field tool for removing weeds without disturbing the crop.',
+    },
+
+    ['pest_spray_organic'] = {
+        label = 'Organic Pest Spray',
+        weight = 300,
+        stack = true,
+        close = true,
+        description = 'A moderate crop-safe treatment for active pest pressure.',
+    },
+
+    ['pest_spray_chemical'] = {
+        label = 'Concentrated Pest Spray',
+        weight = 300,
+        stack = true,
+        close = true,
+        description = 'A strong treatment for severe pest pressure.',
+    },
 }

@@ -65,6 +65,7 @@ Config.Locale = 'en'
 -- ---------------------------------------------------------------------------
 Config.Features = {
     Minigames = true,      -- Stage 5: authoritative tomato planting enabled
+    AdvancedCare = false,  -- Causal nutrients/weeds/pests model; opt-in rollout
     Machinery = false,     -- Stage 9+: not implemented
     Progression = false,   -- Stage 7: not implemented
     Economy = false,       -- Stage 8: not implemented
@@ -115,6 +116,9 @@ Config.Cooldowns = {
     plant = 1000,
     water = 500,
     harvest = 1000,
+    fertilize = 750,
+    weed = 750,
+    treat_pest = 750,
 }
 
 -- ---------------------------------------------------------------------------
@@ -139,6 +143,41 @@ Config.Farming = {
     -- Tools required per action (ox_inventory item names).
     Tools = {
         water = 'watering_can',
+        weed = 'hand_hoe',
+    },
+    ConditionEffects = {
+        Nutrients = true,
+        Weeds = true,
+        Pests = true,
+    },
+    AdvancedCare = {
+        WaterDeficitThreshold = 35,
+        CriticalStressMultiplier = 1.75,
+        WeedWaterCompetition = 0.65,
+        WeedNutrientCompetition = 0.8,
+        PestWeedAcceleration = 1.0,
+        PestGrowthPerHour = 18,
+        PestDamagePerHour = 16,
+        NutrientHealthLossPerHour = 8,
+        GrowthPenaltyPerDeficitHour = {
+            water = 0.35,
+            nutrients = 0.45,
+        },
+        StressPerDeficitHour = {
+            water = 12,
+            nutrients = 14,
+        },
+        Fertilizers = {
+            fertilizer_organic = { amount = 28, burnMultiplier = 0.35 },
+            fertilizer_chemical = { amount = 45, burnMultiplier = 1.0 },
+        },
+        PestTreatments = {
+            pest_spray_organic = { reduction = 45 },
+            pest_spray_chemical = { reduction = 75 },
+        },
+        WeedRemoval = 70,
+        MinimumWeedCover = 8,
+        MinimumPestPressure = 8,
     },
     -- A minigame is cancelled when the ped loses at least this much health
     -- during one active interaction. Death always cancels regardless.
@@ -159,6 +198,11 @@ Config.Quality = {
     CareWeight = 0.4,
     -- Share of the skill component inherited from authoritative planting.
     PlantingInfluence = 0.3,
+    DefectWeight = 0.45,
+    ProductionWeights = {
+        nutrientStress = 0.55,
+        pestDamage = 0.8,
+    },
 }
 
 -- ---------------------------------------------------------------------------

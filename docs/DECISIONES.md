@@ -145,6 +145,40 @@
 
 ---
 
+## Decisiones de Advanced Crop Care
+
+- **Rollout opt-in:** se distribuye detrás de
+  `Config.Features.AdvancedCare = false`. Desactivado no altera payloads,
+  persistencia, targets ni resultados del farming estabilizado.
+- **Causalidad histórica:** agua, nutrientes, malas hierbas y plagas producen
+  acumuladores persistentes. La cosecha nunca juzga el cultivo por una única
+  fotografía instantánea.
+- **Crecimiento dependiente del cuidado:** el déficit sostenido de agua o
+  nutrientes acumula horas de penalización y retrasa la maduración. Esta decisión
+  reemplaza explícitamente la regla anterior de crecimiento independiente.
+- **Gating de dos niveles:** el switch global es un techo; un cultivo solo puede
+  desactivar una condición adicional, nunca reactivar una condición globalmente
+  deshabilitada. Agua permanece obligatoria.
+- **Ventana crítica:** cada cultivo define un rango de progreso donde el estrés
+  pesa más, sin crear ticks ni estado temporal adicional.
+- **Producción y calidad independientes:** plagas/déficit nutritivo controlan
+  cantidad; salud, cuidado, spoilage y defectos históricos controlan calidad. La
+  metadata identifica el defecto dominante.
+- **Compatibilidad de datos:** todos los campos nuevos viven en el JSON `data` y
+  tienen defaults neutrales. No existe migración SQL.
+
+## Decisiones de release
+
+- La versión SemVer del recurso vive en `VERSION` y debe coincidir con
+  `fxmanifest.lua` y una sección del changelog.
+- La versión `1.0.0` del frontend es un contrato independiente; no representa la
+  versión del recurso FiveM.
+- Las releases se producen exclusivamente desde tags `vX.Y.Z` sobre commits que
+  han pasado CI. El workflow recompila la NUI y publica un ZIP reproducible.
+- El desarrollo de módulos sale de `main` y se integra mediante ramas dedicadas.
+
+---
+
 ## Decisiones de la Etapa 3 (implementación)
 
 Tomadas al construir la lógica autoritativa. Se documentan porque condicionan las etapas siguientes.

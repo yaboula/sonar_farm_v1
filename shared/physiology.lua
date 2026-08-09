@@ -68,28 +68,41 @@ function Physiology.Evaluate(record, now)
     local params, spoilagePerHour = paramsFor(record)
     local lastCare = tonumber(data.lastCare) or record.planted_at or now
     local hours = math.max(0, now - lastCare) / 3600
+    local advanced = Sonar.Conditions and Sonar.Conditions.IsAdvancedCareEnabled()
+    local trajectory = advanced and Sonar.Conditions.Evaluate(record, now) or nil
 
     if hours > 0 then
-        local newWater = Utils.Clamp(water - (params.decayPerHour * hours), 0, 100)
+        local newWater = advanced and trajectory.water
+            or Utils.Clamp(water - (params.decayPerHour * hours), 0, 100)
 
         -- Health only drops during the portion of time the crop spent dry.
         local hoursUntilDry = (params.decayPerHour > 0) and (water / params.decayPerHour) or math.huge
-        local dryHours = math.max(0, hours - hoursUntilDry)
+        local dryHours = advanced and trajectory.waterDryHours or math.max(0, hours - hoursUntilDry)
         if dryHours > 0 then
             local tolerance = Utils.Clamp(params.droughtTolerance or 0.5, 0, 0.95)
             health = Utils.Clamp(health - (dryHours * MAX_HEALTH_LOSS_PER_HOUR * (1 - tolerance)), 0, 100)
         end
 
         water = newWater
+
+        if advanced then
+            local cfg = Config.Farming.AdvancedCare or {}
+            local nutrientLoss = trajectory.nutrientDeficitHours
+                * (tonumber(cfg.NutrientHealthLossPerHour) or 0)
+            health = Utils.Clamp(health - nutrientLoss - trajectory.pestDamageDelta, 0, 100)
+        end
     end
 
-    -- Growth is independent of care: a neglected crop still ripens, it just
-    -- ripens badly.
+    -- Advanced Care subtracts persisted and pending stress penalties. With the
+    -- feature disabled this remains the original care-independent formula.
     local growth = Growth.Evaluate(record, now)
 
     -- Spoilage accrues only after maturity.
     if growth.progress >= 1 then
-        local matureAt = (record.planted_at or now) + (record.growth_time or 0)
+        local penaltySeconds = advanced
+            and ((tonumber(data.growthPenaltyHours) or 0) + trajectory.growthPenaltyHoursDelta) * 3600
+            or 0
+        local matureAt = (record.planted_at or now) + (record.growth_time or 0) + penaltySeconds
         local matureHours = math.max(0, now - matureAt) / 3600
         spoilage = Utils.Clamp(matureHours * spoilagePerHour, 0, 100)
     end
@@ -103,7 +116,7 @@ function Physiology.Evaluate(record, now)
         state = growth.state
     end
 
-    return {
+    local result = {
         water = Utils.Round(water, 1),
         health = Utils.Round(health, 1),
         spoilage = Utils.Round(spoilage, 1),
@@ -111,4 +124,32 @@ function Physiology.Evaluate(record, now)
         progress = growth.progress,
         stageIndex = growth.stageIndex,
     }
+    if advanced then
+        result.nutrients = trajectory.nutrients and Utils.Round(trajectory.nutrients, 1) or nil
+        result.weedCover = trajectory.weedCover and Utils.Round(trajectory.weedCover, 1) or nil
+        result.pestPressure = trajectory.pestPressure and Utils.Round(trajectory.pestPressure, 1) or nil
+        result.growthPenaltyHours = Utils.Round(
+            math.max(0, tonumber(data.growthPenaltyHours) or 0) + trajectory.growthPenaltyHoursDelta,
+            4
+        )
+        result.waterStressAccumulated = Utils.Round(Utils.Clamp(
+            (tonumber(data.waterStressAccumulated) or 0) + trajectory.waterStressDelta,
+            0,
+            100
+        ), 2)
+        result.nutrientStressAccumulated = trajectory.enabled.nutrients and Utils.Round(Utils.Clamp(
+            (tonumber(data.nutrientStressAccumulated) or 0) + trajectory.nutrientStressDelta,
+            0,
+            100
+        ), 2) or nil
+        result.pestDamageAccumulated = trajectory.enabled.pests and Utils.Round(Utils.Clamp(
+            (tonumber(data.pestDamageAccumulated) or 0) + trajectory.pestDamageDelta,
+            0,
+            100
+        ), 2) or nil
+        result.overfertilizeExcess = trajectory.enabled.nutrients
+            and Utils.Round(Utils.Clamp(tonumber(data.overfertilizeExcess) or 0, 0, 100), 2)
+            or nil
+    end
+    return result
 end

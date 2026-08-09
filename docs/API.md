@@ -222,6 +222,32 @@ cosecha de un vecino sin darle ningún derecho sobre el producto.
 
 ---
 
+### Advanced Care: `fertilize`, `weed`, `treatPest`
+
+Estos callbacks solo están activos con `Config.Features.AdvancedCare = true` y
+cuando la condición está habilitada globalmente y para el cultivo. Comparten el
+mismo pipeline autoritativo de distancia, permisos, rate limit, cooldown y lock
+que `water`.
+
+```lua
+lib.callback.await('sonar_farm:fertilize', false, { cropId = cropId })
+lib.callback.await('sonar_farm:weed', false, { cropId = cropId })
+lib.callback.await('sonar_farm:treatPest', false, { cropId = cropId })
+```
+
+`fertilize` consume primero fertilizante orgánico y después químico según lo
+disponible; permite superar el rango óptimo y registra quemadura acumulada, pero
+rechaza el techo de saturación. `weed` requiere `hand_hoe` sin consumirlo.
+`treatPest` consume primero tratamiento orgánico y después químico.
+
+**Respuestas:** nutrientes restantes, cobertura de malas hierbas o presión de
+plagas, respectivamente.
+
+**Rechazos específicos:** `condition_disabled`, `nutrients_saturated`,
+`no_weeds_detected`, `no_pest_detected`, `missing_tool`.
+
+---
+
 ### `sonar_farm:harvest`
 
 Cosecha un cultivo maduro y entrega el producto con metadata de calidad.
@@ -245,6 +271,8 @@ local response = lib.callback.await('sonar_farm:harvest', false, {
         item = 'carrot',
         units = 4,
         quality = 86.4,        -- 0..100
+        productionScore = 72,  -- solo con Advanced Care
+        defect = 'pest_damage',-- solo con Advanced Care
         tier = 'fine',
         tierLabel = 'Fine',
         theft = false,
@@ -358,6 +386,10 @@ Definidos en `Sonar.Constants.REJECT`. El cliente los traduce a texto.
 | `inventory_full`        | Sin espacio                                  |
 | `already_in_progress`   | Otro jugador está actuando sobre ese cultivo |
 | `already_watered`       | Todavía no necesita agua                     |
+| `nutrients_saturated`   | El cultivo alcanzó su techo de nutrientes    |
+| `no_weeds_detected`     | Cobertura insuficiente para desherbar        |
+| `no_pest_detected`      | Presión insuficiente para tratar             |
+| `condition_disabled`    | Condición desactivada por feature/cultivo    |
 | `internal_error`        | Fallo inesperado                             |
 
 ---
@@ -379,6 +411,9 @@ end)
 | `sonar_farm:cropPlanted`    | Cultivo plantado   | `cropId`, `cropType`, `zone`, `slot`, `owner`, `source` |
 | `sonar_farm:cropWatered`    | Cultivo regado     | `cropId`, `cropType`, `owner`, `source`          |
 | `sonar_farm:cropHarvested`  | Cultivo cosechado  | `+ quality`, `units`, `theft`, `xp`              |
+| `sonar_farm:cropFertilized` | Cultivo fertilizado | `item`, `nutrients`, `overfertilizeExcess`     |
+| `sonar_farm:cropWeeded`     | Malas hierbas retiradas | `weedCover`                                  |
+| `sonar_farm:cropTreated`    | Plaga tratada      | `item`, `pestPressure`                           |
 
 Los deltas de render (`sonar_farm:cropSync`, `sonar_farm:cropRemove`) **no** son API
 pública: son el transporte interno del motor visual y pueden cambiar. Los eventos de
@@ -418,12 +453,14 @@ roto nunca bloquea la cosecha.
 ```
 base     = score * ScoreWeight + health * CareWeight
 calidad  = base * (1 - spoilage/100)
+calidad  = calidad * (1 - defectoHistorico * DefectWeight) -- Advanced Care
 calidad  = min(calidad, MechanizedCap)              -- solo trabajo mecanizado
 calidad  = calidad * (1 - TheftQualityPenalty)      -- solo si es robo
 ```
 
-El rendimiento interpola entre `yield.min` y `yield.max` según la calidad, con
-un mínimo de 1 unidad.
+Con Advanced Care, el rendimiento interpola desde un `productionScore`
+independiente gobernado por déficit nutritivo y daño de plagas. Sin el feature,
+sigue interpolando desde calidad exactamente como antes.
 
 ---
 
@@ -436,6 +473,8 @@ un mínimo de 1 unidad.
 | `Config.Farming.TheftQualityPenalty` | `0.3`   | Calidad perdida al cosechar ajeno               |
 | `Config.Farming.MaxCropsPerPlayer`   | `25`    | Cultivos activos simultáneos por jugador        |
 | `Config.Farming.WaterRefillThreshold`| `95`    | Agua por encima de la cual no se puede regar    |
+| `Config.Features.AdvancedCare`       | `false` | Activa el modelo causal completo                 |
+| `Config.Farming.ConditionEffects`    | `true`  | Techo global por nutrientes/malas hierbas/plagas|
 | `Config.Security.MaxInteractDistance`| `3.0`   | Distancia máxima de interacción (m)             |
 | `Config.Security.MaxSpeedMps`        | `60.0`  | Velocidad implícita que se considera sospechosa |
 | `Config.Security.AllowedRoutingBuckets` | `{ 0 }` | Instancias donde se permite farming público  |

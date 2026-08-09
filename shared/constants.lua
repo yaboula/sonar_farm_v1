@@ -54,6 +54,9 @@ Constants.ACTIONS = {
     PLANT = 'plant',
     WATER = 'water',
     HARVEST = 'harvest',
+    FERTILIZE = 'fertilize',
+    WEED = 'weed',
+    TREAT_PEST = 'treat_pest',
 }
 
 -- ox_lib callback names (client intent -> authoritative server handler).
@@ -61,6 +64,9 @@ Constants.CALLBACKS = {
     PLANT = 'sonar_farm:plant',
     WATER = 'sonar_farm:water',
     HARVEST = 'sonar_farm:harvest',
+    FERTILIZE = 'sonar_farm:fertilize',
+    WEED = 'sonar_farm:weed',
+    TREAT_PEST = 'sonar_farm:treatPest',
     MINIGAME_BEGIN = 'sonar_farm:minigame:begin',
     MINIGAME_CHECKPOINT = 'sonar_farm:minigame:checkpoint',
     MINIGAME_CANCEL = 'sonar_farm:minigame:cancel',
@@ -86,6 +92,9 @@ Constants.PUBLIC_EVENTS = {
     CROP_PLANTED = 'sonar_farm:cropPlanted',
     CROP_WATERED = 'sonar_farm:cropWatered',
     CROP_HARVESTED = 'sonar_farm:cropHarvested',
+    CROP_FERTILIZED = 'sonar_farm:cropFertilized',
+    CROP_WEEDED = 'sonar_farm:cropWeeded',
+    CROP_TREATED = 'sonar_farm:cropTreated',
 }
 
 -- Machine-readable rejection reasons returned by server handlers. The client
@@ -115,6 +124,10 @@ Constants.REJECT = {
     INVENTORY_FULL = 'inventory_full',
     ALREADY_IN_PROGRESS = 'already_in_progress',
     ALREADY_WATERED = 'already_watered',
+    NUTRIENTS_SATURATED = 'nutrients_saturated',
+    NO_WEEDS_DETECTED = 'no_weeds_detected',
+    NO_PEST_DETECTED = 'no_pest_detected',
+    CONDITION_DISABLED = 'condition_disabled',
     MINIGAME_REQUIRED = 'minigame_required',
     MINIGAME_DISABLED = 'minigame_disabled',
     MINIGAME_SESSION_NOT_FOUND = 'minigame_session_not_found',
