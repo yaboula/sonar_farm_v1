@@ -253,6 +253,37 @@ describe("Farm Business Hub", () => {
     expect(screen.getByText(/No funds or stock changed/)).toBeInTheDocument();
   });
 
+  it("keeps future Supplies areas disabled and uses Company Treasury without a selector", async () => {
+    const user = userEvent.setup();
+    renderApp("/supplies?area=procurement");
+
+    expect(await screen.findByRole("heading", { name: "Supplies" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Company Procurement.*Coming Soon/i })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: /Issued Materials.*Coming Soon/i })).toBeDisabled();
+    expect(screen.getByText("Company Treasury")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Purchase Payer" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: "Category" }));
+    await user.click(screen.getByRole("option", { name: "Fertilizer" }));
+    expect(screen.getByRole("heading", { name: "Organic Fertilizer" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Tomato Seedling" })).not.toBeInTheDocument();
+  });
+
+  it("compacts a long purchase draft while preserving clear line prices", async () => {
+    const user = userEvent.setup();
+    renderApp("/supplies");
+
+    for (const name of ["Carrot Seeds", "Potato Seeds", "Lettuce Seeds", "Tomato Seedling", "Field Watering Can"]) {
+      await user.click(await screen.findByRole("button", { name: `Add ${name}` }));
+    }
+
+    const draft = screen.getByText("5 lines").closest(".supply-inspector");
+    expect(draft).not.toBeNull();
+    expect(within(draft as HTMLElement).getByText("+1 more selected item")).toBeInTheDocument();
+    expect(within(draft as HTMLElement).getByText("$24")).toBeInTheDocument();
+    expect(within(draft as HTMLElement).getByText("$28")).toBeInTheDocument();
+  });
+
   it("renders every Owner Company deep view without an empty module", async () => {
     const routes = [
       ["/company/profile", "Grapeseed Farm Co."],
