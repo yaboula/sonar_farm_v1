@@ -10,17 +10,7 @@ Target = Target or {}
 local CROP_STATE = Sonar.Constants.CROP_STATE
 
 local function dominantRisk(condition)
-    local risks = {
-        water_stress = tonumber(condition.waterStressAccumulated) or 0,
-        nutrient_burn = (tonumber(condition.nutrientStressAccumulated) or 0)
-            + (tonumber(condition.overfertilizeExcess) or 0),
-        pest_damage = tonumber(condition.pestDamageAccumulated) or 0,
-    }
-    local winner, highest = 'none', 0
-    for key, value in pairs(risks) do
-        if value > highest then winner, highest = key, value end
-    end
-    return winner:gsub('_', ' ')
+    return Sonar.Conditions.DominantDefect(condition):gsub('_', ' ')
 end
 
 local function advancedSummary(record, condition)

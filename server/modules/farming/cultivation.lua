@@ -66,7 +66,12 @@ lib.callback.register(CALLBACKS.FERTILIZE, function(source, payload)
         local ceiling = def.nutrients.overfertilizeCeiling
         if condition.nutrients >= ceiling then return reject(REJECT.NUTRIENTS_SATURATED) end
 
-        local effect = Config.Farming.AdvancedCare.Fertilizers[item]
+        local effects = Config.Farming.AdvancedCare.Fertilizers
+        local effect = type(effects) == 'table' and effects[item] or nil
+        if type(effect) ~= 'table' or type(effect.amount) ~= 'number'
+            or type(effect.burnMultiplier) ~= 'number' then
+            return reject(REJECT.CONDITION_DISABLED)
+        end
         if not Bridge.Inventory.RemoveItem(source, item, 1) then return reject(REJECT.MISSING_TOOL) end
 
         local nutrients, excess = Physiology.Fertilize(record, effect.amount, effect.burnMultiplier)
@@ -90,6 +95,7 @@ lib.callback.register(CALLBACKS.WEED, function(source, payload)
         if not valid then return invalid end
         local cfg = Config.Farming.AdvancedCare
         local tool = Config.Farming.Tools.weed
+        if type(tool) ~= 'string' or tool == '' then return reject(REJECT.CONDITION_DISABLED) end
         if not Validation.HasItem(source, tool, REJECT.MISSING_TOOL).ok then return reject(REJECT.MISSING_TOOL) end
 
         local condition = Physiology.Apply(record)
@@ -122,7 +128,10 @@ lib.callback.register(CALLBACKS.TREAT_PEST, function(source, payload)
         if condition.state == CROP_STATE.DEAD then return reject(REJECT.CROP_DEAD) end
         if condition.pestPressure < cfg.MinimumPestPressure then return reject(REJECT.NO_PEST_DETECTED) end
 
-        local effect = cfg.PestTreatments[item]
+        local effect = type(cfg.PestTreatments) == 'table' and cfg.PestTreatments[item] or nil
+        if type(effect) ~= 'table' or type(effect.reduction) ~= 'number' then
+            return reject(REJECT.CONDITION_DISABLED)
+        end
         if not Bridge.Inventory.RemoveItem(source, item, 1) then return reject(REJECT.MISSING_TOOL) end
 
         local pestPressure = Physiology.TreatPests(record, effect.reduction)

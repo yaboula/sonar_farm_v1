@@ -137,20 +137,7 @@ end
 function Quality.DominantDefect(record, condition)
     if not Sonar.Conditions.IsAdvancedCareEnabled() then return 'none' end
     condition = condition or record.data or {}
-    local values = {
-        { key = 'water_stress', value = tonumber(condition.waterStressAccumulated) or 0 },
-        {
-            key = 'nutrient_burn',
-            value = (tonumber(condition.nutrientStressAccumulated) or 0)
-                + (tonumber(condition.overfertilizeExcess) or 0),
-        },
-        { key = 'pest_damage', value = tonumber(condition.pestDamageAccumulated) or 0 },
-    }
-    local winner, highest = 'none', 0
-    for _, entry in ipairs(values) do
-        if entry.value > highest then winner, highest = entry.key, entry.value end
-    end
-    return winner
+    return Sonar.Conditions.DominantDefect(condition)
 end
 
 --- Yield units for a harvest, scaled by final quality.

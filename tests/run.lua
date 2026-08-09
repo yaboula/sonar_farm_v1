@@ -103,6 +103,38 @@ test('advanced care config rejects malformed bounds and overrides', function()
     Config.Crops.carrot.conditionEffects = effects
 end)
 
+test('advanced care config rejects incomplete operational effects', function()
+    local advanced = Config.Farming.AdvancedCare
+    local fertilizer = advanced.Fertilizers.fertilizer_organic
+    local treatment = advanced.PestTreatments.pest_spray_chemical
+    local weedTool = Config.Farming.Tools.weed
+    local weedRemoval = advanced.WeedRemoval
+    local waterPenalty = advanced.GrowthPenaltyPerDeficitHour.water
+    local nutrientPenalty = advanced.GrowthPenaltyPerDeficitHour.nutrients
+
+    advanced.Fertilizers.fertilizer_organic = nil
+    advanced.PestTreatments.pest_spray_chemical = nil
+    Config.Farming.Tools.weed = nil
+    advanced.WeedRemoval = 0
+    advanced.GrowthPenaltyPerDeficitHour.water = 0.7
+    advanced.GrowthPenaltyPerDeficitHour.nutrients = 0.6
+
+    local errors = Sonar.ConfigValidation.Validate()
+    local report = table.concat(errors, '\n')
+    assert(report:find('Fertilizers.fertilizer_organic', 1, true), 'missing fertilizer effect rejected')
+    assert(report:find('PestTreatments.pest_spray_chemical', 1, true), 'missing treatment effect rejected')
+    assert(report:find('Config.Farming.Tools.weed', 1, true), 'missing weed tool rejected')
+    assert(report:find('AdvancedCare.WeedRemoval', 1, true), 'ineffective weed removal rejected')
+    assert(report:find('sum to at most 1', 1, true), 'growth rates that can reverse progress rejected')
+
+    advanced.Fertilizers.fertilizer_organic = fertilizer
+    advanced.PestTreatments.pest_spray_chemical = treatment
+    Config.Farming.Tools.weed = weedTool
+    advanced.WeedRemoval = weedRemoval
+    advanced.GrowthPenaltyPerDeficitHour.water = waterPenalty
+    advanced.GrowthPenaltyPerDeficitHour.nutrients = nutrientPenalty
+end)
+
 test('zone grids and explicit slots resolve', function()
     equal(Sonar.Zones.Count('grapeseed_east'), 40, 'east slot count')
     equal(Sonar.Zones.Count('grapeseed_south'), 24, 'south slot count')
@@ -218,6 +250,48 @@ test('sustained deficits slow growth and critical windows amplify stress', funct
     Config.Features.AdvancedCare = enabled
 end)
 
+test('neglect never reverses growth and critical windows follow effective progress', function()
+    local enabled = Config.Features.AdvancedCare
+    Config.Features.AdvancedCare = true
+    local delayed = {
+        crop_type = 'carrot', planted_at = 0, growth_time = 3600,
+        data = { water = 0, nutrients = 0, weedCover = 0, pestPressure = 0,
+            growthPenaltyHours = 0, lastCare = 0 },
+    }
+
+    local previous = 0
+    for now = 300, 7200, 300 do
+        local progress = Growth.Evaluate(delayed, now).progress
+        assert(progress + 1e-9 >= previous, ('growth reversed at %d seconds'):format(now))
+        previous = progress
+    end
+    assert(previous > 0, 'neglect may stop growth but cannot erase completed growth')
+
+    local rates = Config.Farming.AdvancedCare.GrowthPenaltyPerDeficitHour
+    local waterRate, nutrientRate = rates.water, rates.nutrients
+    rates.water, rates.nutrients = 2, 3
+    previous = 0
+    for now = 300, 7200, 300 do
+        local progress = Growth.Evaluate(delayed, now).progress
+        assert(progress + 1e-9 >= previous, ('runtime safety failed at %d seconds'):format(now))
+        previous = progress
+    end
+    rates.water, rates.nutrients = waterRate, nutrientRate
+
+    local nominallyInside = Sonar.Conditions.Evaluate(delayed, 1800)
+    equal(nominallyInside.criticalFactor, 1, 'wall-clock critical window ignored before biological stage')
+
+    local biologicallyInside = {
+        crop_type = 'carrot', planted_at = 0, growth_time = 3600,
+        data = { water = 0, nutrients = 0, weedCover = 0, pestPressure = 0,
+            growthPenaltyHours = 1.4, lastCare = 6300 },
+    }
+    local actualWindow = Sonar.Conditions.Evaluate(biologicallyInside, 7200)
+    equal(actualWindow.criticalFactor, Config.Farming.AdvancedCare.CriticalStressMultiplier,
+        'delayed crop receives critical stress only at effective critical progress')
+    Config.Features.AdvancedCare = enabled
+end)
+
 test('tomato planting traces are bounded and scored deterministically', function()
     local cfg = Config.Minigames.Plant.tomato
     local prepare = { durationMs = 4000, samples = {} }
@@ -325,6 +399,12 @@ test('production and quality respond independently with visible defects', functi
     assert(Quality.ResolveProduction(record, pestDamaged, 0) < 100, 'pests reduce production')
     equal(Quality.DominantDefect(record, waterDamaged), 'water_stress', 'water defect')
     equal(Quality.DominantDefect(record, pestDamaged), 'pest_damage', 'pest defect')
+    local tied = {
+        waterStressAccumulated = 100, nutrientStressAccumulated = 100,
+        pestDamageAccumulated = 100, overfertilizeExcess = 0,
+    }
+    equal(Sonar.Conditions.DominantDefect(tied), 'water_stress', 'shared tie order is stable')
+    equal(Quality.DominantDefect(record, tied), 'water_stress', 'harvest uses shared tie order')
     assert(Quality.Resolve(100, waterDamaged) < 100, 'water history still reduces quality')
     Config.Features.AdvancedCare = enabled
 end)

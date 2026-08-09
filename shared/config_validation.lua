@@ -288,6 +288,102 @@ local function validateMinigames(errors)
     end
 end
 
+local function validateAdvancedCare(errors)
+    local farming = Config.Farming
+    if type(farming) ~= 'table' then
+        errors[#errors + 1] = 'Config.Farming must be a table.'
+        return
+    end
+
+    if type(farming.ConditionEffects) ~= 'table' then
+        errors[#errors + 1] = 'Config.Farming.ConditionEffects must be a table.'
+    else
+        for _, key in ipairs({ 'Nutrients', 'Weeds', 'Pests' }) do
+            if type(farming.ConditionEffects[key]) ~= 'boolean' then
+                errors[#errors + 1] = ('Config.Farming.ConditionEffects.%s must be boolean.'):format(key)
+            end
+        end
+    end
+
+    nonEmptyString(errors, 'Config.Farming.Tools.weed', farming.Tools and farming.Tools.weed)
+    for _, action in ipairs({ 'fertilize', 'weed', 'treat_pest' }) do
+        positive(errors, ('Config.Cooldowns.%s'):format(action), Config.Cooldowns and Config.Cooldowns[action], false)
+    end
+
+    local advanced = farming.AdvancedCare
+    if type(advanced) ~= 'table' then
+        errors[#errors + 1] = 'Config.Farming.AdvancedCare must be a table.'
+        return
+    end
+
+    range(errors, 'Config.Farming.AdvancedCare.WaterDeficitThreshold', advanced.WaterDeficitThreshold, 0, 100)
+    if not finite(advanced.CriticalStressMultiplier) or advanced.CriticalStressMultiplier < 1 then
+        errors[#errors + 1] = 'Config.Farming.AdvancedCare.CriticalStressMultiplier must be at least 1.'
+    end
+    for _, key in ipairs({
+        'WeedWaterCompetition', 'WeedNutrientCompetition', 'PestWeedAcceleration',
+        'PestGrowthPerHour', 'PestDamagePerHour', 'NutrientHealthLossPerHour',
+    }) do
+        positive(errors, ('Config.Farming.AdvancedCare.%s'):format(key), advanced[key], true)
+    end
+    range(errors, 'Config.Farming.AdvancedCare.MinimumWeedCover', advanced.MinimumWeedCover, 0, 100)
+    range(errors, 'Config.Farming.AdvancedCare.MinimumPestPressure', advanced.MinimumPestPressure, 0, 100)
+    if not finite(advanced.WeedRemoval) or advanced.WeedRemoval <= 0 or advanced.WeedRemoval > 100 then
+        errors[#errors + 1] = 'Config.Farming.AdvancedCare.WeedRemoval must be within 0..100 and greater than 0.'
+    end
+
+    local penalties = advanced.GrowthPenaltyPerDeficitHour
+    if type(penalties) ~= 'table' then
+        errors[#errors + 1] = 'Config.Farming.AdvancedCare.GrowthPenaltyPerDeficitHour must be a table.'
+    else
+        range(errors, 'Config.Farming.AdvancedCare.GrowthPenaltyPerDeficitHour.water', penalties.water, 0, 1)
+        range(errors, 'Config.Farming.AdvancedCare.GrowthPenaltyPerDeficitHour.nutrients', penalties.nutrients, 0, 1)
+        if finite(penalties.water) and finite(penalties.nutrients)
+            and penalties.water + penalties.nutrients > 1 then
+            errors[#errors + 1] = 'Config.Farming.AdvancedCare growth penalty rates must sum to at most 1.'
+        end
+    end
+
+    local stress = advanced.StressPerDeficitHour
+    if type(stress) ~= 'table' then
+        errors[#errors + 1] = 'Config.Farming.AdvancedCare.StressPerDeficitHour must be a table.'
+    else
+        positive(errors, 'Config.Farming.AdvancedCare.StressPerDeficitHour.water', stress.water, true)
+        positive(errors, 'Config.Farming.AdvancedCare.StressPerDeficitHour.nutrients', stress.nutrients, true)
+    end
+
+    local fertilizers = advanced.Fertilizers
+    if type(fertilizers) ~= 'table' then
+        errors[#errors + 1] = 'Config.Farming.AdvancedCare.Fertilizers must be a table.'
+    else
+        for _, item in ipairs({ 'fertilizer_organic', 'fertilizer_chemical' }) do
+            local effect = fertilizers[item]
+            local path = ('Config.Farming.AdvancedCare.Fertilizers.%s'):format(item)
+            if type(effect) ~= 'table' then
+                errors[#errors + 1] = path .. ' must be a table.'
+            else
+                positive(errors, path .. '.amount', effect.amount, false)
+                positive(errors, path .. '.burnMultiplier', effect.burnMultiplier, true)
+            end
+        end
+    end
+
+    local treatments = advanced.PestTreatments
+    if type(treatments) ~= 'table' then
+        errors[#errors + 1] = 'Config.Farming.AdvancedCare.PestTreatments must be a table.'
+    else
+        for _, item in ipairs({ 'pest_spray_organic', 'pest_spray_chemical' }) do
+            local effect = treatments[item]
+            local path = ('Config.Farming.AdvancedCare.PestTreatments.%s'):format(item)
+            if type(effect) ~= 'table' then
+                errors[#errors + 1] = path .. ' must be a table.'
+            elseif not finite(effect.reduction) or effect.reduction <= 0 or effect.reduction > 100 then
+                errors[#errors + 1] = path .. '.reduction must be within 0..100 and greater than 0.'
+            end
+        end
+    end
+end
+
 local function validateSection(errors, name, fn, ...)
     local ok, err = pcall(fn, errors, ...)
     if not ok then
@@ -302,6 +398,7 @@ function ConfigValidation.Validate()
     validateSection(errors, 'Crop', validateCrops)
     validateSection(errors, 'Zone', validateZones, warnings)
     validateSection(errors, 'Minigame', validateMinigames)
+    validateSection(errors, 'AdvancedCare', validateAdvancedCare)
 
     nonEmptyString(errors, 'Config.Admin.Ace', Config.Admin and Config.Admin.Ace)
     positive(errors, 'Config.SaveInterval', Config.SaveInterval, false)
@@ -323,18 +420,6 @@ function ConfigValidation.Validate()
     positive(errors, 'Config.Render.Radius', Config.Render and Config.Render.Radius, false)
     positive(errors, 'Config.Render.TargetDistance', Config.Render and Config.Render.TargetDistance, false)
     positive(errors, 'Config.Render.MaxProps', Config.Render and Config.Render.MaxProps, false)
-
-    for _, key in ipairs({ 'Nutrients', 'Weeds', 'Pests' }) do
-        if type(Config.Farming and Config.Farming.ConditionEffects
-            and Config.Farming.ConditionEffects[key]) ~= 'boolean' then
-            errors[#errors + 1] = ('Config.Farming.ConditionEffects.%s must be boolean.'):format(key)
-        end
-    end
-    local advanced = Config.Farming and Config.Farming.AdvancedCare
-    positive(errors, 'Config.Farming.AdvancedCare.WaterDeficitThreshold', advanced and advanced.WaterDeficitThreshold, true)
-    positive(errors, 'Config.Farming.AdvancedCare.CriticalStressMultiplier', advanced and advanced.CriticalStressMultiplier, false)
-    positive(errors, 'Config.Farming.AdvancedCare.MinimumWeedCover', advanced and advanced.MinimumWeedCover, true)
-    positive(errors, 'Config.Farming.AdvancedCare.MinimumPestPressure', advanced and advanced.MinimumPestPressure, true)
 
     if Config.Render and Config.Security
         and finite(Config.Render.TargetDistance)

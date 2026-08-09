@@ -21,6 +21,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
   defecto dominante visible en metadata cuando Advanced Care está habilitado.
 - El sistema se distribuye con `Config.Features.AdvancedCare = false`; apagado
   conserva el comportamiento y los payloads anteriores.
+- La penalización de crecimiento puede detener, pero nunca invertir, el
+  progreso; la ventana crítica sigue el progreso biológico efectivo de los
+  cultivos retrasados. La configuración operativa se valida antes de aceptar
+  herramientas o consumir tratamientos.
 
 ### Added — Releases
 

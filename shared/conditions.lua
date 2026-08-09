@@ -34,7 +34,7 @@ local function belowThresholdHours(startValue, decayPerHour, hours, threshold)
     return crossing >= hours and 0 or hours - math.max(0, crossing)
 end
 
-local function criticalFactor(record, fromTime, toTime)
+local function criticalFactor(record, fromTime, toTime, pendingPenaltyHours)
     local def = definitionFor(record)
     local window = def and def.criticalWindow
     local multiplier = tonumber(advancedConfig().CriticalStressMultiplier) or 1
@@ -44,10 +44,24 @@ local function criticalFactor(record, fromTime, toTime)
     local growthTime = tonumber(record.growth_time) or 0
     if growthTime <= 0 then return 1 end
 
-    local criticalFrom = plantedAt + growthTime * window.from
-    local criticalTo = plantedAt + growthTime * window.to
-    local overlap = math.max(0, math.min(toTime, criticalTo) - math.max(fromTime, criticalFrom))
-    local fraction = overlap / (toTime - fromTime)
+    -- Critical windows belong to the crop's biological progress, not to wall
+    -- clock time. Persisted and pending slowdown therefore shift the window
+    -- together with the crop instead of letting stress amplification expire
+    -- before a delayed crop actually reaches that stage.
+    local persistedPenalty = math.max(0, tonumber(record.data and record.data.growthPenaltyHours) or 0) * 3600
+    local pendingPenalty = math.max(0, tonumber(pendingPenaltyHours) or 0) * 3600
+    local effectiveFrom = math.max(0, fromTime - plantedAt - persistedPenalty)
+    local effectiveTo = math.max(effectiveFrom, toTime - plantedAt - persistedPenalty - pendingPenalty)
+    local criticalFrom = growthTime * window.from
+    local criticalTo = growthTime * window.to
+    local effectiveDistance = effectiveTo - effectiveFrom
+
+    if effectiveDistance <= 0 then
+        return effectiveFrom >= criticalFrom and effectiveFrom < criticalTo and multiplier or 1
+    end
+
+    local overlap = math.max(0, math.min(effectiveTo, criticalTo) - math.max(effectiveFrom, criticalFrom))
+    local fraction = overlap / effectiveDistance
     return 1 + fraction * (multiplier - 1)
 end
 
@@ -136,14 +150,23 @@ function Conditions.Evaluate(record, now)
     local pestPressure = pestsEnabled and Utils.Clamp(pestStart + pestGrowth * pestHours, 0, 100) or nil
     local averagePests = pestsEnabled and (pestStart + pestPressure) * 0.5 or 0
 
-    local stressFactor = criticalFactor(record, lastCare, now)
+    local penaltyRates = cfg.GrowthPenaltyPerDeficitHour or {}
+    local waterPenaltyRate = math.max(0, tonumber(penaltyRates.water) or 0)
+    local nutrientPenaltyRate = math.max(0, tonumber(penaltyRates.nutrients) or 0)
+    local rateScale = math.max(1, waterPenaltyRate + nutrientPenaltyRate)
+    local rawGrowthPenalty = (waterDeficitHours * waterPenaltyRate
+        + nutrientDeficitHours * nutrientPenaltyRate) / rateScale
+    -- A crop may stop growing under extreme neglect, but its biological clock
+    -- must never run backwards. Config validation also enforces a combined
+    -- rate <= 1; runtime normalization also protects hot-mutated config.
+    local growthPenalty = Utils.Clamp(rawGrowthPenalty, 0, hours)
+    local stressFactor = criticalFactor(record, lastCare, now, growthPenalty)
     local weightedWaterDeficit = waterDeficitHours * stressFactor
     local weightedNutrientDeficit = nutrientDeficitHours * stressFactor
     local pestDamageDelta = pestsEnabled
         and pestHours * averagePests / 100 * (tonumber(cfg.PestDamagePerHour) or 0) * stressFactor
         or 0
 
-    local penaltyRates = cfg.GrowthPenaltyPerDeficitHour or {}
     local stressRates = cfg.StressPerDeficitHour or {}
 
     return {
@@ -156,8 +179,7 @@ function Conditions.Evaluate(record, now)
         nutrientDeficitHours = nutrientDeficitHours,
         weedCover = weedCover,
         pestPressure = pestPressure,
-        growthPenaltyHoursDelta = weightedWaterDeficit * (tonumber(penaltyRates.water) or 0)
-            + weightedNutrientDeficit * (tonumber(penaltyRates.nutrients) or 0),
+        growthPenaltyHoursDelta = growthPenalty,
         waterStressDelta = weightedWaterDeficit * (tonumber(stressRates.water) or 0),
         nutrientStressDelta = weightedNutrientDeficit * (tonumber(stressRates.nutrients) or 0),
         pestDamageDelta = pestDamageDelta,
@@ -168,6 +190,26 @@ function Conditions.Evaluate(record, now)
             pests = pestsEnabled,
         },
     }
+end
+
+---@param condition? table
+---@return string defect
+function Conditions.DominantDefect(condition)
+    condition = condition or {}
+    local risks = {
+        { key = 'water_stress', value = tonumber(condition.waterStressAccumulated) or 0 },
+        {
+            key = 'nutrient_burn',
+            value = (tonumber(condition.nutrientStressAccumulated) or 0)
+                + (tonumber(condition.overfertilizeExcess) or 0),
+        },
+        { key = 'pest_damage', value = tonumber(condition.pestDamageAccumulated) or 0 },
+    }
+    local winner, highest = 'none', 0
+    for _, entry in ipairs(risks) do
+        if entry.value > highest then winner, highest = entry.key, entry.value end
+    end
+    return winner
 end
 
 Sonar.Conditions = Conditions

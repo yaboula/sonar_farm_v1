@@ -155,12 +155,15 @@
   fotografía instantánea.
 - **Crecimiento dependiente del cuidado:** el déficit sostenido de agua o
   nutrientes acumula horas de penalización y retrasa la maduración. Esta decisión
-  reemplaza explícitamente la regla anterior de crecimiento independiente.
+  reemplaza explícitamente la regla anterior de crecimiento independiente. La
+  tasa combinada está limitada a `<= 1`: el abandono puede detener el reloj
+  biológico, pero nunca hacerlo retroceder.
 - **Gating de dos niveles:** el switch global es un techo; un cultivo solo puede
   desactivar una condición adicional, nunca reactivar una condición globalmente
   deshabilitada. Agua permanece obligatoria.
-- **Ventana crítica:** cada cultivo define un rango de progreso donde el estrés
-  pesa más, sin crear ticks ni estado temporal adicional.
+- **Ventana crítica:** cada cultivo define un rango de progreso efectivo donde
+  el estrés pesa más. Las penalizaciones ya acumuladas desplazan esa ventana
+  junto con el cultivo, sin crear ticks ni estado temporal adicional.
 - **Producción y calidad independientes:** plagas/déficit nutritivo controlan
   cantidad; salud, cuidado, spoilage y defectos históricos controlan calidad. La
   metadata identifica el defecto dominante.
