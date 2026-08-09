@@ -130,6 +130,14 @@ export class FixtureHubAdapter implements HubAdapter {
 
   constructor(private readonly delayMs = 80) {}
 
+  resolveCapabilities(role: FarmRole, surface: HubContextModel["surface"]) {
+    return this.company.resolveCapabilities(role, surface);
+  }
+
+  private effectiveContext(context: HubContextModel): HubContextModel {
+    return { ...context, capabilitiesRevision: this.company.getCapabilitiesRevision(), capabilities: this.resolveCapabilities(context.role, context.surface) };
+  }
+
   reset() {
     this.assignments = cloneAssignmentFixtures();
     this.workSupplies = cloneWorkSupplyFixtures();
@@ -206,6 +214,7 @@ export class FixtureHubAdapter implements HubAdapter {
 
   async load<TData>(request: HubViewRequest, context: HubContextModel): Promise<HubViewModel<TData>> {
     await wait(this.delayMs);
+    context = this.effectiveContext(context);
     if (context.viewState !== "ready") return { request, state: context.viewState, data: null };
 
     if (request.kind === "hub") {
@@ -361,6 +370,7 @@ export class FixtureHubAdapter implements HubAdapter {
 
   async dispatch(intent: ActionIntent, context: HubContextModel): Promise<IntentResult> {
     await wait(this.delayMs);
+    context = this.effectiveContext(context);
 
     if (intent.type === "assignment.create") return this.createAssignment(intent.input, context);
     if (intent.type.startsWith("assignment.")) return this.dispatchAssignment(intent as AssignmentMutationIntent, context);

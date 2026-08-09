@@ -215,7 +215,7 @@ export interface IntentResult {
   changed?: boolean;
   closeSurface?: boolean;
   entityId?: string;
-  contextUpdate?: { role?: FarmRole };
+  contextUpdate?: { role?: FarmRole; capabilitiesRevision?: number };
   receiptId?: string;
   invalidated?: string[];
   handoff?: { kind: "route" | "world"; scope: FieldScopeRef };

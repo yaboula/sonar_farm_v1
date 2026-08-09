@@ -1,4 +1,4 @@
-import { ACTOR_BY_ROLE } from "../data/fixtures";
+import { ACTOR_BY_ROLE, capabilitiesFor } from "../data/fixtures";
 import { createCompanyFixtureState, type CompanyFixtureState } from "../data/companyFixtures";
 import type {
   CompanyCargoData,
@@ -8,6 +8,8 @@ import type {
   CompanyProfile,
   FarmRole,
   HubContextModel,
+  HubCapabilities,
+  HubSurface,
   IntentResult,
   JobApplicationInput,
   LedgerEntry,
@@ -44,6 +46,15 @@ export class CompanyFixtureRepository {
   getProcurementBudget() { return this.state.treasury.procurementBudget; }
   getPersonalBalance(actorId: string) { return this.state.personalBalances[actorId] ?? 0; }
   getCapabilitiesRevision() { return this.state.company.capabilitiesRevision; }
+  resolveCapabilities(role: FarmRole, surface: HubSurface): HubCapabilities {
+    const capabilities = capabilitiesFor(role, surface);
+    const policy = this.state.rolePolicies.find((item) => item.role === role);
+    if (!policy || role === "owner") return capabilities;
+    for (const permission of policy.permissions) {
+      if (permission.id in capabilities) (capabilities as unknown as Record<string, unknown>)[permission.id] = permission.enabled;
+    }
+    return capabilities;
+  }
   getLeaseSnapshot(leaseId: string) { return clone(this.state.leases.find((item) => item.id === leaseId)); }
   debitPersonal(actorId: string, amount: number) {
     if (amount <= 0 || this.getPersonalBalance(actorId) < amount) return false;
@@ -274,7 +285,7 @@ export class CompanyFixtureRepository {
     policy.permissions.forEach((item) => { if (!item.locked) item.enabled = permissions.includes(item.id); });
     policy.transactionLimit = transactionLimit; policy.pendingChanges = 0;
     this.bumpCapabilities();
-    return { ok: true, changed: true, message: `${role} policy saved.`, invalidated: ["session-context", "role-policies"] };
+    return { ok: true, changed: true, message: `${role} policy saved.`, contextUpdate: { capabilitiesRevision: this.getCapabilitiesRevision() }, invalidated: ["session-context", "role-policies"] };
   }
 
   resetPolicy(role: FarmRole, context: HubContextModel): IntentResult {
@@ -283,7 +294,7 @@ export class CompanyFixtureRepository {
     const index = this.state.rolePolicies.findIndex((item) => item.role === role);
     if (!base || index < 0) return { ok: false, message: "Role policy not found." };
     this.state.rolePolicies[index] = base; this.bumpCapabilities();
-    return { ok: true, changed: true, message: `${role} restored to default.`, invalidated: ["session-context", "role-policies"] };
+    return { ok: true, changed: true, message: `${role} restored to default.`, contextUpdate: { capabilitiesRevision: this.getCapabilitiesRevision() }, invalidated: ["session-context", "role-policies"] };
   }
 
   rename(name: string, context: HubContextModel): IntentResult {

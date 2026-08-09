@@ -27,6 +27,8 @@ import { TreasuryView } from "./views/company/TreasuryView";
 import { LedgerView } from "./views/company/LedgerView";
 import { LeasesView } from "./views/company/LeasesView";
 import { LeaseDetailView } from "./views/company/LeaseDetailView";
+import { RolePoliciesView } from "./views/company/RolePoliciesView";
+import { CompanyIdentityView } from "./views/company/CompanyIdentityView";
 
 const PATH_TO_ROUTE: Record<string, HubRoute> = {
   "/today": "today",
@@ -70,6 +72,8 @@ export function App() {
         <Route path="/company/ledger" element={<LedgerView />} />
         <Route path="/company/leases" element={<LeasesView />} />
         <Route path="/company/leases/:leaseId" element={<LeaseDetailView />} />
+        <Route path="/company/roles" element={<RolePoliciesView />} />
+        <Route path="/company/identity" element={<CompanyIdentityView />} />
         <Route path="/work/assignments/:assignmentId" element={<AssignmentDetailView />} />
         <Route path="/work/assignments/new" element={<WorkCreateView kind="assignment" />} />
         <Route path="/work/orders/:orderId" element={<BuyerOrderDetailView />} />

@@ -26,6 +26,7 @@ export function useCompanyData<TData>(request: HubViewRequest) {
     setPending(false);
     setNotice(result.message);
     if (result.contextUpdate?.role) hub.setRole(result.contextUpdate.role);
+    else if (result.contextUpdate?.capabilitiesRevision) hub.refreshCapabilities(result.contextUpdate.capabilitiesRevision);
     if (result.changed) await reload();
     return result;
   }, [context, hub, reload]);

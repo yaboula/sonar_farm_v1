@@ -2079,6 +2079,39 @@ select:focus-visible {
 .lease-crop-list { display: flex; flex-wrap: wrap; gap: 5px; }
 .lease-crop-list span { display: flex; align-items: center; gap: 5px; padding: 5px 7px; border: 1px solid var(--border-neutral); color: var(--text-secondary); font-size: 10px; }
 .lease-crop-list svg { color: var(--success); }
+
+.role-policy-layout { display: grid; grid-template-columns: 214px minmax(0, 1fr) 280px; align-items: start; gap: 9px; }
+.role-policy-rail { display: grid; gap: 4px; }
+.role-policy-rail button { min-height: 48px; display: grid; grid-template-columns: 21px minmax(0, 1fr) 15px; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid var(--border-subtle); color: var(--text-muted); background: rgba(255, 255, 255, 0.018); text-align: left; cursor: pointer; }
+.role-policy-rail button:hover,
+.role-policy-rail button.is-selected { border-color: var(--border-accent); color: var(--accent); background: rgba(245, 195, 49, 0.05); }
+.role-policy-rail span { min-width: 0; display: grid; gap: 1px; }
+.role-policy-rail strong { color: var(--text-primary); font-family: var(--display); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+.role-policy-rail small { overflow: hidden; color: var(--text-muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.role-permission-list { display: grid; gap: 5px; }
+.role-permission-list button { min-height: 44px; display: grid; grid-template-columns: 18px minmax(0, 1fr) 16px; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--border-subtle); color: var(--text-muted); background: rgba(255, 255, 255, 0.018); text-align: left; }
+.role-permission-list button:not(:disabled) { cursor: pointer; }
+.role-permission-list button:not(:disabled):hover,
+.role-permission-list button.is-enabled { border-color: rgba(245, 195, 49, 0.32); }
+.role-permission-list button:disabled { opacity: 0.68; }
+.role-permission-list button > i { width: 17px; height: 17px; display: grid; place-items: center; border: 1px solid var(--border-neutral); color: var(--carbon-950); background: transparent; }
+.role-permission-list button.is-enabled > i { border-color: var(--accent); background: var(--accent); }
+.role-permission-list span { min-width: 0; display: grid; gap: 1px; }
+.role-permission-list strong { color: var(--text-primary); font-size: 10px; }
+.role-permission-list small { color: var(--text-muted); font-size: 8px; text-transform: capitalize; }
+.role-policy-warning { display: flex; align-items: center; gap: 9px; padding: 9px; border: 1px solid rgba(193, 88, 70, 0.35); color: var(--error); background: rgba(193, 88, 70, 0.055); }
+.role-policy-warning span { display: grid; gap: 1px; }
+.role-policy-warning strong { color: var(--text-primary); font-size: 10px; text-transform: uppercase; }
+.role-policy-warning small { color: var(--text-muted); font-size: 9px; line-height: 1.3; }
+.company-identity-banner { min-height: 82px; display: grid; grid-template-columns: 1fr 34px 1fr; align-items: center; gap: 12px; margin-bottom: 9px; padding: 10px 15px; border: 1px solid var(--border-neutral); background: linear-gradient(90deg, rgba(255, 255, 255, 0.018), rgba(245, 195, 49, 0.04), rgba(255, 255, 255, 0.018)); }
+.company-identity-banner > span { display: grid; gap: 1px; }
+.company-identity-banner > span:last-child { text-align: right; }
+.company-identity-banner small { color: var(--accent); font-family: var(--display); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; }
+.company-identity-banner strong { color: var(--text-primary); font-family: var(--display); font-size: 23px; text-transform: uppercase; }
+.company-identity-banner em { color: var(--text-muted); font-size: 9px; font-style: normal; }
+.company-identity-banner > i { color: var(--text-muted); font-family: var(--display); font-size: 25px; font-style: normal; text-align: center; }
+.identity-layout { grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr); }
+.identity-validation { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; color: var(--error); font-size: 10px; }
 .company-inline-link { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 12px; padding: 9px 0; border-top: 1px solid var(--border-neutral); color: var(--accent); font-family: var(--display); font-weight: 600; text-transform: uppercase; }
 
 .company-tabbar { display: flex; gap: 4px; margin-bottom: 13px; border-bottom: 1px solid var(--border-neutral); }

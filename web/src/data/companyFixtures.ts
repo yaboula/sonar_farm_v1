@@ -41,26 +41,14 @@ export interface CompanyFixtureState {
 }
 
 const policies: RolePolicy[] = [
-  ["visitor", 0, ["View public profile", "Apply for work", "Buy listed business"]],
-  ["contractor", 1, ["View contract cargo", "Access contracted Field"]],
-  ["worker", 2, ["View own Assignments", "View own Company Cargo"]],
-  ["procurement", 1, ["Buy Company supplies", "View purchase ledger"]],
-  ["supervisor", 1, ["Create Assignments", "View team operations"]],
-  ["manager", 1, ["Manage Staff", "Manage Warehouse", "Manage Leases", "View Treasury"]],
-  ["owner", 1, ["Manage role policies", "Rename company", "Sell business"]],
-].map(([role, memberCount, labels]) => ({
-  role: role as RolePolicy["role"],
-  memberCount: memberCount as number,
-  permissions: (labels as string[]).map((label, index) => ({
-    id: `${role}-permission-${index + 1}`,
-    group: role === "owner" ? "ownership" : role === "manager" ? "people" : role === "procurement" ? "finance" : "operations",
-    label,
-    enabled: true,
-    locked: role === "owner" && index === 0,
-  })),
-  transactionLimit: role === "procurement" ? 1500 : role === "manager" ? 5000 : undefined,
-  pendingChanges: 0,
-}));
+  { role: "visitor", memberCount: 0, permissions: [{ id: "viewCompanyProfile", group: "operations", label: "View public profile", enabled: true, locked: true }, { id: "buyPersonalSupplies", group: "finance", label: "Buy personal supplies", enabled: true, locked: true }, { id: "buyBusiness", group: "ownership", label: "Buy listed business", enabled: true }], pendingChanges: 0 },
+  { role: "contractor", memberCount: 1, permissions: [{ id: "viewOwnCompanyCargo", group: "operations", label: "View contract cargo", enabled: true }, { id: "viewFieldPortfolio", group: "operations", label: "Access contracted Field", enabled: true }, { id: "setFieldRoute", group: "operations", label: "Set route to contract scope", enabled: true }], pendingChanges: 0 },
+  { role: "worker", memberCount: 2, permissions: [{ id: "viewOwnAssignments", group: "operations", label: "View own Assignments", enabled: true }, { id: "viewOwnCompanyCargo", group: "operations", label: "View own Company Cargo", enabled: true }, { id: "setFieldRoute", group: "operations", label: "Set route to assigned scope", enabled: true }], pendingChanges: 0 },
+  { role: "procurement", memberCount: 1, permissions: [{ id: "buyCompanySupplies", group: "finance", label: "Buy Company supplies", enabled: true }, { id: "viewProcurementLedger", group: "finance", label: "View own purchase ledger", enabled: true }, { id: "viewFieldMaterialDemand", group: "operations", label: "View Field material demand", enabled: true }], transactionLimit: 1500, pendingChanges: 0 },
+  { role: "supervisor", memberCount: 1, permissions: [{ id: "createAssignments", group: "operations", label: "Create Assignments", enabled: true }, { id: "viewTeamCompanyCargo", group: "operations", label: "View team Company Cargo", enabled: true }, { id: "viewWarehouse", group: "operations", label: "View Warehouse", enabled: true }, { id: "viewLeases", group: "finance", label: "View Field restrictions", enabled: true }], pendingChanges: 0 },
+  { role: "manager", memberCount: 1, permissions: [{ id: "viewStaff", group: "people", label: "Manage Staff records", enabled: true }, { id: "reviewApplications", group: "people", label: "Review Job Applications", enabled: true }, { id: "inviteStaff", group: "people", label: "Invite Staff", enabled: true }, { id: "manageWarehouse", group: "operations", label: "Manage Warehouse", enabled: true }, { id: "viewTreasury", group: "finance", label: "View Treasury", enabled: true }, { id: "viewCompanyLedger", group: "finance", label: "View Company Ledger", enabled: true }, { id: "manageLeases", group: "finance", label: "Manage Leases", enabled: true }], transactionLimit: 5000, pendingChanges: 0 },
+  { role: "owner", memberCount: 1, permissions: [{ id: "manageRolePolicies", group: "ownership", label: "Manage role policies", enabled: true, locked: true }, { id: "renameCompany", group: "ownership", label: "Rename Company", enabled: true, locked: true }, { id: "sellBusiness", group: "ownership", label: "Sell business", enabled: true, locked: true }, { id: "contributeTreasury", group: "finance", label: "Contribute personal funds", enabled: true, locked: true }], pendingChanges: 0 },
+];
 
 export function createCompanyFixtureState(): CompanyFixtureState {
   return {
@@ -132,7 +120,7 @@ export function createCompanyFixtureState(): CompanyFixtureState {
       { id: "lease-orchard", fieldId: "orchard-annex", fieldName: "Orchard Annex", location: "Grapeseed · Annex gate", status: "grace", recurringPrice: 1800, billing: "Every 14 days", nextPayment: "Overdue", graceDeadline: "Tomorrow, 11:30", capacity: 64, allowedCrops: ["Tomato", "Potato", "Carrot"], activeCrops: "Empty · prepared soil", linkedWork: [], restriction: "Planting suspended · care and harvest remain permitted", availableActions: ["pay", "end", "open_field"] },
       { id: "lease-riverside", fieldId: "riverside-patch", fieldName: "Riverside Patch", location: "Alamo Sea · South track", status: "available", recurringPrice: 2400, billing: "Every 14 days", capacity: 120, allowedCrops: ["Lettuce", "Potato", "Carrot"], activeCrops: "Not leased", linkedWork: [], availableActions: ["start"] },
     ],
-    rolePolicies: policies,
+    rolePolicies: structuredClone(policies),
     identity: { currentName: "Grapeseed Farm Co.", originalName: "Grapeseed Farm Co.", lastRenamedAt: undefined, renameCost: 2500, cooldownEndsAt: undefined, namingRules: ["3–28 characters", "Letters, numbers, spaces, apostrophes and hyphens", "No protected public-service names"], available: true },
     ledger: [
       { id: "txn-410", idempotencyKey: "buyer-order:bo-198:payment", type: "buyer_order", amount: 3240, direction: "credit", actorId: "system-buyer", actor: "County Produce Depot", at: "Today, 13:05", source: "County Produce Depot", destination: "Grapeseed Farm Co. Treasury", linkedKind: "buyer_order", linkedId: "bo-198", status: "completed", balanceAfter: 24680 },

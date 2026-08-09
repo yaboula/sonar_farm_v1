@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { ACTOR_BY_ROLE, capabilitiesFor } from "../data/fixtures";
-import type { CompanyCargoData, CompanyHomeData, CompanyLease, FarmRole, FieldDetail, FieldsOverviewData, HubContextModel, LedgerEntry, StaffData, TreasurySnapshot, WarehouseData } from "../types";
+import type { CompanyCargoData, CompanyHomeData, CompanyIdentityTerms, CompanyLease, CompanyProfile, FarmRole, FieldDetail, FieldsOverviewData, HubContextModel, LedgerEntry, RolePolicy, StaffData, TreasurySnapshot, WarehouseData } from "../types";
 import { FixtureHubAdapter } from "./FixtureHubAdapter";
 
 function context(role: FarmRole, presence: HubContextModel["presence"] = "office", surface: HubContextModel["surface"] = "office"): HubContextModel {
@@ -148,5 +148,38 @@ describe("Company domain adapter", () => {
     expect((await adapter.dispatch({ type: "lease.transition", leaseId: "lease-east", action: "end" }, owner)).ok).toBe(true);
     const east = await adapter.load<FieldDetail>({ kind: "fieldDetail", fieldId: "east-field" }, owner);
     expect(east.data).toMatchObject({ status: "inaccessible", availableActions: [] });
+  });
+
+  it("applies role policy losses to stale open contexts and can restore defaults", async () => {
+    const owner = context("owner");
+    const manager = context("manager");
+    const policies = await adapter.load<RolePolicy[]>({ kind: "companyRolePolicies" }, owner);
+    const managerPolicy = policies.data!.find((item) => item.role === "manager")!;
+    const remaining = managerPolicy.permissions.filter((item) => item.id !== "viewTreasury").map((item) => item.id);
+    const saved = await adapter.dispatch({ type: "rolePolicy.save", role: "manager", permissions: remaining, transactionLimit: 5000 }, owner);
+    expect(saved.contextUpdate?.capabilitiesRevision).toBeGreaterThan(1);
+    expect(adapter.resolveCapabilities("manager", "office").viewTreasury).toBe(false);
+    expect((await adapter.load({ kind: "companyTreasury" }, manager)).state).toBe("restricted");
+    await adapter.dispatch({ type: "rolePolicy.reset", role: "manager" }, owner);
+    expect((await adapter.load({ kind: "companyTreasury" }, manager)).state).toBe("ready");
+    expect((await adapter.dispatch({ type: "rolePolicy.save", role: "owner", permissions: [], transactionLimit: undefined }, owner)).ok).toBe(false);
+  });
+
+  it("renames only from the Owner Office and posts the fee once with cooldown", async () => {
+    const owner = context("owner");
+    const manager = context("manager");
+    const tabletOwner = context("owner", "remote", "tablet");
+    const before = await adapter.load<TreasurySnapshot>({ kind: "companyTreasury" }, owner);
+    expect((await adapter.dispatch({ type: "company.rename", name: "Valley Harvest Co" }, manager)).ok).toBe(false);
+    expect((await adapter.dispatch({ type: "company.rename", name: "Valley Harvest Co" }, tabletOwner)).ok).toBe(false);
+    expect((await adapter.dispatch({ type: "company.rename", name: "Valley Harvest Co" }, owner)).ok).toBe(true);
+    expect((await adapter.dispatch({ type: "company.rename", name: "Second Name" }, owner)).ok).toBe(false);
+    const identity = await adapter.load<CompanyIdentityTerms>({ kind: "companyIdentity" }, owner);
+    const profile = await adapter.load<CompanyProfile>({ kind: "companyProfile" }, owner);
+    const after = await adapter.load<TreasurySnapshot>({ kind: "companyTreasury" }, owner);
+    expect(identity.data).toMatchObject({ currentName: "Valley Harvest Co", available: false });
+    expect(profile.data?.company.name).toBe("Valley Harvest Co");
+    expect(after.data?.available).toBe(before.data!.available - 2500);
+    expect(after.data?.recentEntries[0]).toMatchObject({ type: "rename", amount: 2500 });
   });
 });
