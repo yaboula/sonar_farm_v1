@@ -65,13 +65,14 @@ lib.callback.register(CALLBACKS.PLANT, function(source, payload)
         local limit = Validation.CropLimit(source)
         if not limit.ok then return reject(limit.reason) end
 
-        local seed = Validation.HasItem(source, def.seedItem, REJECT.MISSING_SEED)
-        if not seed.ok then return reject(seed.reason) end
+        local seedCheck = Validation.GetSeedItem(source, def)
+        if not seedCheck.ok then return reject(seedCheck.reason) end
+        local seedItem = seedCheck.item
 
         local score = Quality.Request(source, ACTIONS.PLANT, { crop_type = cropType })
 
         -- Consume the seed only once every check has passed.
-        if not Bridge.Inventory.RemoveItem(source, def.seedItem, 1) then
+        if not Bridge.Inventory.RemoveItem(source, seedItem, 1) then
             return reject(REJECT.MISSING_SEED)
         end
 

@@ -91,9 +91,6 @@ Config.Crops = {
 
     tomato = {
         label = 'Tomato',
-        -- Tomatoes use a transplant for the Stage 5 planting minigame. The
-        -- legacy tomato_seed item remains defined for existing inventories but
-        -- is no longer accepted as a planting input.
         seedItem = 'tomato_seedling',
         legacySeedItem = 'tomato_seed',
         requiresMinigame = true,

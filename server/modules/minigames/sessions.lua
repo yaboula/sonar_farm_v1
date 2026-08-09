@@ -140,8 +140,8 @@ local function createReservation(source, runtime, cropType, zoneKey, slotIndex, 
     local def = Config.Crops and Config.Crops[cropType]
     if not def then return nil, REJECT.UNKNOWN_CROP end
 
-    local item = Validation.HasItem(source, def.seedItem, REJECT.MISSING_SEED)
-    if not item.ok then return nil, item.reason end
+    local seedCheck = Validation.GetSeedItem(source, def)
+    if not seedCheck.ok then return nil, seedCheck.reason end
 
     local acquired, result = Lock.With(slotKey(zoneKey, slotIndex), function()
         local recheck = Validation.Slot(source, zoneKey, slotIndex, cropType)
@@ -152,9 +152,9 @@ local function createReservation(source, runtime, cropType, zoneKey, slotIndex, 
             owner = runtime.identifier,
             zone = zoneKey,
             slot = slotIndex,
-            pos_x = recheck.slot.coords.x,
-            pos_y = recheck.slot.coords.y,
-            pos_z = recheck.slot.coords.z,
+            pos_x = recheck.slot.x,
+            pos_y = recheck.slot.y,
+            pos_z = recheck.slot.z,
             heading = recheck.slot.heading or 0.0,
             planted_at = Sonar.Time.Now(),
             growth_time = def.growthTime,
@@ -233,9 +233,9 @@ local function commit(session)
 
     local def = Config.Crops and Config.Crops[record.crop_type]
     if not def then return nil, REJECT.UNKNOWN_CROP end
-    if not Bridge.Inventory.HasItem(session.source, def.seedItem, 1) then
-        return nil, REJECT.MISSING_SEED
-    end
+    local seedCheck = Validation.GetSeedItem(session.source, def)
+    if not seedCheck.ok then return nil, seedCheck.reason end
+    local seedItem = seedCheck.item
 
     local penalty = math.min(
         session.interruptions * (session.config.interruptionPenalty or 0),
@@ -246,7 +246,7 @@ local function commit(session)
 
     -- This is the only seed mutation in the lifecycle. The session is released
     -- immediately after success, so retries cannot consume a second seedling.
-    if not Bridge.Inventory.RemoveItem(session.source, def.seedItem, 1) then
+    if not Bridge.Inventory.RemoveItem(session.source, seedItem, 1) then
         return nil, REJECT.MISSING_SEED
     end
 
@@ -275,8 +275,8 @@ local function commit(session)
         data = data,
     })
     if not updatedOk then
-        if not Bridge.Inventory.AddItem(session.source, def.seedItem, 1) then
-            Logger.Warn(('Could not refund %s after planting commit failure.'):format(def.seedItem), 'minigame', {
+        if not Bridge.Inventory.AddItem(session.source, seedItem, 1) then
+            Logger.Warn(('Could not refund %s after planting commit failure.'):format(seedItem), 'minigame', {
                 source = session.source,
                 cropId = record.id,
             })
