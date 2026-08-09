@@ -18,6 +18,11 @@ import { CompanyProfileView } from "./views/company/CompanyProfileView";
 import { CompanyCargoView } from "./views/company/CompanyCargoView";
 import { WarehouseView } from "./views/company/WarehouseView";
 import { WholesaleReviewView } from "./views/company/WholesaleReviewView";
+import { StaffView } from "./views/company/StaffView";
+import { StaffMemberView } from "./views/company/StaffMemberView";
+import { ApplicationsView } from "./views/company/ApplicationsView";
+import { ApplicationReviewView } from "./views/company/ApplicationReviewView";
+import { JobApplicationView } from "./views/company/JobApplicationView";
 
 const PATH_TO_ROUTE: Record<string, HubRoute> = {
   "/today": "today",
@@ -52,6 +57,11 @@ export function App() {
         <Route path="/company/cargo" element={<CompanyCargoView />} />
         <Route path="/company/warehouse" element={<WarehouseView />} />
         <Route path="/company/warehouse/wholesale/:saleId/review" element={<WholesaleReviewView />} />
+        <Route path="/company/staff" element={<StaffView />} />
+        <Route path="/company/staff/:memberId" element={<StaffMemberView />} />
+        <Route path="/company/applications" element={<ApplicationsView />} />
+        <Route path="/company/applications/:applicationId" element={<ApplicationReviewView />} />
+        <Route path="/company/jobs/apply" element={<JobApplicationView />} />
         <Route path="/work/assignments/:assignmentId" element={<AssignmentDetailView />} />
         <Route path="/work/assignments/new" element={<WorkCreateView kind="assignment" />} />
         <Route path="/work/orders/:orderId" element={<BuyerOrderDetailView />} />

@@ -1,0 +1,26 @@
+import { CheckCircle, Clock, ShieldCheck, UserCircle, Warning } from "@phosphor-icons/react";
+import { useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { DeepViewShell, DetailCard, FactList, StatusPill } from "../../components/DeepViewShell";
+import { FarmSelect } from "../../components/FarmSelect";
+import { StatePanel } from "../../components/StatePanel";
+import type { FarmRole, StaffApplication } from "../../types";
+import { useCompanyData } from "./useCompanyData";
+
+export function ApplicationReviewView() {
+  const { applicationId = "" } = useParams();
+  const request = useMemo(() => ({ kind: "companyApplicationReview", applicationId } as const), [applicationId]);
+  const { model, data, notice, pending, act, context } = useCompanyData<StaffApplication>(request);
+  const navigate = useNavigate();
+  const [action, setAction] = useState<"interview" | "accept" | "reject">();
+  const [role, setRole] = useState<FarmRole>("worker");
+  if (!model || model.state === "loading") return <StatePanel state="loading" />;
+  if (model.state !== "ready" || !data) return <StatePanel state={model.state === "ready" ? "empty" : model.state} title="Application unavailable" body="The record changed or is outside your review authority." actionLabel="Back to Applications" onAction={() => navigate("/company/applications")} />;
+  const submit = async () => { const result = await act({ type: "staffApplication.transition", applicationId: data.id, action: action!, role: action === "accept" ? role : undefined }); setAction(undefined); if (result.ok && ["accept", "reject"].includes(action!)) navigate("/company/applications"); };
+  return <DeepViewShell eyebrow="Application review" title={data.applicant} subtitle={`${data.id.toUpperCase()} · ${data.preferredWork}`} breadcrumb={["Company", "Applications", data.applicant]} backLabel="Back to Applications" onBack={() => navigate("/company/applications")} status={<StatusPill tone={data.status === "accepted" ? "success" : data.status === "rejected" ? "danger" : "warning"}>{data.status.replace("_", " ")}</StatusPill>} actionBar={<><div className="domain-action-summary"><span>{data.proposedRole} proposed role</span><p>{data.reviewer ? `Reviewed by ${data.reviewer}` : "Awaiting reviewer"}</p></div><div className="domain-action-group">{data.availableActions.includes("interview") ? <button type="button" className="domain-secondary-action" onClick={() => setAction("interview")}>Request Interview</button> : null}{data.availableActions.includes("reject") ? <button type="button" className="domain-secondary-action danger" onClick={() => setAction("reject")}>Reject Application</button> : null}{data.availableActions.includes("accept") ? <button type="button" className="domain-primary-action" onClick={() => setAction("accept")}>Hire Applicant</button> : null}</div></>}>
+    {notice ? <div className="domain-notice domain-notice--inline">{notice}</div> : null}
+    <div className="domain-two-column"><div className="domain-card-stack"><DetailCard eyebrow="Applicant statement" title="Introduction"><p className="domain-emphasis"><UserCircle size={24} />{data.introduction}</p><FactList facts={[{ label: "Availability", value: data.availability }, { label: "Preferred work", value: data.preferredWork }, { label: "Submitted", value: data.submittedAt ?? "Draft" }, { label: "Rules", value: data.rulesAccepted ? "Acknowledged" : "Not acknowledged" }]} /></DetailCard>{data.warning ? <DetailCard eyebrow="Permitted history" title="Public contract note"><p className="domain-emphasis warning"><Warning size={23} />{data.warning}</p></DetailCard> : null}</div><div className="domain-card-stack"><DetailCard eyebrow="Onboarding effects" title={`Hire as ${data.proposedRole}`}><ul className="domain-check-list"><li><CheckCircle size={18} />Company navigation becomes available</li><li><CheckCircle size={18} />Role permissions apply immediately</li><li><CheckCircle size={18} />No personal inventory or funds transfer</li></ul></DetailCard><DetailCard eyebrow="Privacy boundary" title="Farming context only"><p className="domain-emphasis"><ShieldCheck size={23} />No private data outside Sonar Farm is exposed to the reviewer.</p></DetailCard></div></div>
+    {action ? <ConfirmDialog eyebrow="Hiring decision" title={action === "accept" ? "Hire this applicant?" : action === "reject" ? "Reject this application?" : "Request an interview?"} confirmLabel={action === "accept" ? "Hire Applicant" : action === "reject" ? "Reject Application" : "Request Interview"} tone={action === "reject" ? "danger-confirm" : "confirm"} pending={pending} onClose={() => setAction(undefined)} onConfirm={() => void submit()}>{action === "accept" ? <FarmSelect label="Initial Role" value={role} options={(context.role === "owner" ? ["worker", "procurement", "supervisor", "manager"] : ["worker", "procurement"]).map((item) => ({ value: item, label: item, description: item === "worker" ? "Standard onboarding" : "Elevated authority" }))} onChange={(value) => setRole(value as FarmRole)} /> : null}<p><Clock size={17} /> The action revalidates employment state before changing access.</p></ConfirmDialog> : null}
+  </DeepViewShell>;
+}

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { ACTOR_BY_ROLE, capabilitiesFor } from "../data/fixtures";
-import type { CompanyCargoData, CompanyHomeData, FarmRole, HubContextModel, LedgerEntry, TreasurySnapshot, WarehouseData } from "../types";
+import type { CompanyCargoData, CompanyHomeData, FarmRole, HubContextModel, LedgerEntry, StaffData, TreasurySnapshot, WarehouseData } from "../types";
 import { FixtureHubAdapter } from "./FixtureHubAdapter";
 
 function context(role: FarmRole, presence: HubContextModel["presence"] = "office", surface: HubContextModel["surface"] = "office"): HubContextModel {
@@ -71,5 +71,36 @@ describe("Company domain adapter", () => {
     expect(afterTreasury.data!.available).toBe(beforeTreasury.data!.available + 435);
     expect(ledger.data?.filter((item) => item.linkedId === draft.entityId)).toHaveLength(1);
     expect(afterStock.data?.reservations).toEqual(beforeStock.data?.reservations);
+  });
+
+  it("keeps one active Job Application per character and hires it once", async () => {
+    const visitor = context("visitor");
+    const manager = context("manager");
+    const duplicate = await adapter.dispatch({ type: "jobApplication.submit", input: { introduction: "A replacement statement", availability: "Weekends", preferredWork: "Field logistics", rulesAccepted: true } }, visitor);
+    expect(duplicate.ok).toBe(false);
+    const accepted = await adapter.dispatch({ type: "staffApplication.transition", applicationId: "app-morgan", action: "accept", role: "worker" }, manager);
+    const repeated = await adapter.dispatch({ type: "staffApplication.transition", applicationId: "app-morgan", action: "accept", role: "worker" }, manager);
+    const staff = await adapter.load<StaffData>({ kind: "companyStaff" }, manager);
+    expect(accepted.ok).toBe(true);
+    expect(repeated.ok).toBe(false);
+    expect(staff.data?.members.filter((member) => member.id === visitor.actorId)).toHaveLength(1);
+  });
+
+  it("requires the invited candidate to accept before Staff access changes", async () => {
+    const manager = context("manager");
+    const candidate = { ...context("visitor"), actorId: "actor-cameron" };
+    const invited = await adapter.dispatch({ type: "staff.invite", candidateId: "actor-cameron", role: "worker" }, manager);
+    const before = await adapter.load<StaffData>({ kind: "companyStaff" }, manager);
+    const accepted = await adapter.dispatch({ type: "staffInvitation.accept", invitationId: invited.entityId! }, candidate);
+    const after = await adapter.load<StaffData>({ kind: "companyStaff" }, manager);
+    expect(before.data?.members.some((member) => member.id === "actor-cameron")).toBe(false);
+    expect(accepted.contextUpdate?.role).toBe("worker");
+    expect(after.data?.members.some((member) => member.id === "actor-cameron")).toBe(true);
+  });
+
+  it("protects the Owner and blocks removal while Work or custody remains", async () => {
+    const owner = context("owner");
+    expect((await adapter.dispatch({ type: "staff.transition", memberId: "staff-elijah", action: "remove" }, owner)).ok).toBe(false);
+    expect((await adapter.dispatch({ type: "staff.transition", memberId: "staff-noah", action: "remove" }, owner)).message).toMatch(/Resolve active Work/);
   });
 });

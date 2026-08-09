@@ -913,6 +913,11 @@ export interface StaffData {
   assignableRoles: FarmRole[];
 }
 
+export interface CompanyJobData {
+  application?: StaffApplication;
+  invitation?: StaffInvite;
+}
+
 export type LedgerStatus = "completed" | "pending" | "escrowed" | "released" | "refunded" | "reversed" | "failed";
 export interface LedgerEntry {
   id: string;

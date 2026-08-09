@@ -107,7 +107,7 @@ export class CompanyFixtureRepository {
 
   loadApplications(context: HubContextModel) { return context.capabilities.reviewApplications ? clone(this.state.applications) : null; }
   loadApplication(id: string, context: HubContextModel) { return context.capabilities.reviewApplications ? clone(this.state.applications.find((item) => item.id === id) ?? null) : null; }
-  loadOwnApplication(context: HubContextModel) { return context.role === "visitor" ? clone(this.ownApplication(context) ?? null) : null; }
+  loadOwnApplication(context: HubContextModel) { return context.role === "visitor" ? { application: clone(this.ownApplication(context)), invitation: clone(this.state.invitations.find((item) => item.candidateId === context.actorId && item.status === "pending")) } : null; }
 
   loadTreasury(context: HubContextModel): TreasurySnapshot | null {
     if (!context.capabilities.viewTreasury) return null;
