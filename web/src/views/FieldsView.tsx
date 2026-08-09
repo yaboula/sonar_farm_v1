@@ -13,7 +13,6 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { fixtureHubAdapter } from "../adapters/FixtureHubAdapter";
 import { HubScaffold } from "../components/HubScaffold";
 import { StatePanel } from "../components/StatePanel";
 import { useHub } from "../store/HubContext";
@@ -46,11 +45,11 @@ export function FieldsView() {
 
   useEffect(() => {
     let active = true;
-    void fixtureHubAdapter.load<FieldsOverviewData>({ kind: "fieldsOverview" }, context).then((next) => {
+    void hub.adapter.load<FieldsOverviewData>({ kind: "fieldsOverview" }, context).then((next) => {
       if (active) setModel(next);
     });
     return () => { active = false; };
-  }, [context]);
+  }, [context, hub.adapter]);
 
   const data = model?.data;
   const visibleFields = useMemo(() => (data?.fields ?? []).filter((field) => {

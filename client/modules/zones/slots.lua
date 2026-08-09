@@ -116,7 +116,7 @@ local function createSphereZone(slot, key)
                 onSelect = function()
                     local cropId = Crops.SlotOccupant(zoneKey, index)
                     if cropId then
-                        Actions.Water(cropId)
+                        Actions.OpenCareMenu('water', cropId)
                     end
                 end,
                 canInteract = function()
@@ -164,7 +164,7 @@ local function createSphereZone(slot, key)
                 distance = distance,
                 onSelect = function()
                     local cropId = Crops.SlotOccupant(zoneKey, index)
-                    if cropId then Actions.Fertilize(cropId) end
+                    if cropId then Actions.OpenCareMenu('fertilize', cropId) end
                 end,
                 canInteract = function()
                     if not Sync.IsAvailable() then return false end
@@ -187,7 +187,7 @@ local function createSphereZone(slot, key)
                 distance = distance,
                 onSelect = function()
                     local cropId = Crops.SlotOccupant(zoneKey, index)
-                    if cropId then Actions.Weed(cropId) end
+                    if cropId then Actions.OpenCareMenu('weed', cropId) end
                 end,
                 canInteract = function()
                     if not Sync.IsAvailable() then return false end
@@ -209,7 +209,7 @@ local function createSphereZone(slot, key)
                 distance = distance,
                 onSelect = function()
                     local cropId = Crops.SlotOccupant(zoneKey, index)
-                    if cropId then Actions.TreatPests(cropId) end
+                    if cropId then Actions.OpenCareMenu('treat_pest', cropId) end
                 end,
                 canInteract = function()
                     if not Sync.IsAvailable() then return false end

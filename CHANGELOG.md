@@ -6,6 +6,29 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-09
+
+### Added — Supplies Runtime, Warehouse e Items V2
+
+- Añadido un catálogo canónico de 21 objetos que genera las definiciones de
+  `ox_inventory` y gobierna precios, peso, tier, efectos y durabilidad.
+- Añadido el núcleo autoritativo de Company: membresías, roles, permisos,
+  Treasury, presupuesto mensual, stock del proveedor, pedidos, receipts,
+  entregas, Warehouse, custodia, ledger inmutable y outbox de reconciliación.
+- Añadidas sesiones NUI con nonce y presencia validada por servidor. Tablet
+  prepara pedidos; Office confirma; Warehouse físico retira y devuelve.
+- Añadida entrega diferida e idempotente, consumo por slot exacto, desgaste de
+  herramientas y protección residual de nutrientes y plagas.
+- Añadido un shell NUI único que aísla Business Hub y minijuego, junto con el
+  adaptador FiveM real. Los fixtures quedan limitados a navegador y Sites.
+- Regenerados los 21 assets RGBA transparentes en estilo 3D clay/cartoon, con
+  previews y validación automática de dimensiones, alfa, safe area y hashes.
+
+### Changed
+
+- `Config.Features.Supplies` se distribuye desactivado por defecto para rollout
+  controlado. Company Treasury es el único pagador de suministros.
+
 ## [0.2.0] - 2026-08-09
 
 ### Added — Advanced Crop Care

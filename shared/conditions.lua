@@ -34,6 +34,44 @@ local function belowThresholdHours(startValue, decayPerHour, hours, threshold)
     return crossing >= hours and 0 or hours - math.max(0, crossing)
 end
 
+-- Split a lazy interval at protection expiry. This keeps decay/growth exact
+-- even when one evaluation spans both protected and unprotected time.
+local function protectionSegments(fromTime, toTime, untilTime, strength)
+    local result = {}
+    if toTime <= fromTime then return result end
+    untilTime = tonumber(untilTime) or 0
+    strength = Utils.Clamp(tonumber(strength) or 0, 0, 1)
+    local protectedEnd = math.min(toTime, math.max(fromTime, untilTime))
+    if protectedEnd > fromTime then
+        result[#result + 1] = { hours = (protectedEnd - fromTime) / 3600, multiplier = 1 - strength }
+    end
+    if toTime > protectedEnd then
+        result[#result + 1] = { hours = (toTime - protectedEnd) / 3600, multiplier = 1 }
+    end
+    return result
+end
+
+local function evaluateDecay(startValue, rate, segments, threshold)
+    local value, below = startValue, 0
+    for _, segment in ipairs(segments) do
+        local segmentRate = rate * segment.multiplier
+        below = below + belowThresholdHours(value, segmentRate, segment.hours, threshold)
+        value = Utils.Clamp(value - segmentRate * segment.hours, 0, 100)
+    end
+    return value, below
+end
+
+local function evaluateGrowth(startValue, rate, segments)
+    local value, exposure = startValue, 0
+    for _, segment in ipairs(segments) do
+        local segmentRate = rate * segment.multiplier
+        local nextValue = Utils.Clamp(value + segmentRate * segment.hours, 0, 100)
+        exposure = exposure + ((value + nextValue) * 0.5 / 100) * segment.hours
+        value = nextValue
+    end
+    return value, exposure
+end
+
 local function criticalFactor(record, fromTime, toTime, pendingPenaltyHours)
     local def = definitionFor(record)
     local window = def and def.criticalWindow
@@ -129,26 +167,34 @@ function Conditions.Evaluate(record, now)
         and (tonumber(nutrientParams.decayPerHour) or 0)
             * (1 + averageWeeds / 100 * (tonumber(cfg.WeedNutrientCompetition) or 0))
         or 0
-    local nutrients = nutrientsEnabled and Utils.Clamp(nutrientStart - nutrientDecay * hours, 0, 100) or nil
-    local nutrientDeficitHours = nutrientsEnabled and belowThresholdHours(
-        nutrientStart,
-        nutrientDecay,
-        hours,
-        tonumber(nutrientParams.optimalMin) or 40
-    ) or 0
+    local nutrientProtectionStrength = Utils.Clamp(tonumber(data.nutrientProtectionStrength) or 0, 0, 1)
+    local nutrientProtectionUntil = tonumber(data.nutrientProtectionUntil) or 0
+    local nutrientSegments = protectionSegments(lastCare, now, nutrientProtectionUntil, nutrientProtectionStrength)
+    local nutrients, nutrientDeficitHours
+    if nutrientsEnabled then
+        nutrients, nutrientDeficitHours = evaluateDecay(
+            nutrientStart,
+            nutrientDecay,
+            nutrientSegments,
+            tonumber(nutrientParams.optimalMin) or 40
+        )
+    end
+    nutrientDeficitHours = nutrientDeficitHours or 0
 
     local pestStart = pestsEnabled and Utils.Clamp(tonumber(data.pestPressure) or 0, 0, 100) or 0
     local pestParams = def.pests or {}
     local onsetAt = (tonumber(record.planted_at) or lastCare) + (tonumber(pestParams.onsetHours) or 0) * 3600
-    local activeSeconds = pestsEnabled
-        and math.max(0, now - math.max(lastCare, onsetAt))
-        or 0
-    local pestHours = activeSeconds / 3600
     local pestGrowth = (tonumber(cfg.PestGrowthPerHour) or 0)
         * Utils.Clamp(tonumber(pestParams.susceptibility) or 0, 0, 1)
         * (1 + averageWeeds / 100 * (tonumber(cfg.PestWeedAcceleration) or 0))
-    local pestPressure = pestsEnabled and Utils.Clamp(pestStart + pestGrowth * pestHours, 0, 100) or nil
-    local averagePests = pestsEnabled and (pestStart + pestPressure) * 0.5 or 0
+    local pestProtectionStrength = Utils.Clamp(tonumber(data.pestProtectionStrength) or 0, 0, 1)
+    local pestProtectionUntil = tonumber(data.pestProtectionUntil) or 0
+    local pestFrom = math.max(lastCare, onsetAt)
+    local pestSegments = pestsEnabled and protectionSegments(pestFrom, now, pestProtectionUntil, pestProtectionStrength) or {}
+    local pestPressure, pestExposureHours = nil, 0
+    if pestsEnabled then
+        pestPressure, pestExposureHours = evaluateGrowth(pestStart, pestGrowth, pestSegments)
+    end
 
     local penaltyRates = cfg.GrowthPenaltyPerDeficitHour or {}
     local waterPenaltyRate = math.max(0, tonumber(penaltyRates.water) or 0)
@@ -164,7 +210,7 @@ function Conditions.Evaluate(record, now)
     local weightedWaterDeficit = waterDeficitHours * stressFactor
     local weightedNutrientDeficit = nutrientDeficitHours * stressFactor
     local pestDamageDelta = pestsEnabled
-        and pestHours * averagePests / 100 * (tonumber(cfg.PestDamagePerHour) or 0) * stressFactor
+        and pestExposureHours * (tonumber(cfg.PestDamagePerHour) or 0) * stressFactor
         or 0
 
     local stressRates = cfg.StressPerDeficitHour or {}
@@ -179,6 +225,14 @@ function Conditions.Evaluate(record, now)
         nutrientDeficitHours = nutrientDeficitHours,
         weedCover = weedCover,
         pestPressure = pestPressure,
+        nutrientProtectionStrength = nutrientProtectionStrength,
+        nutrientProtectionUntil = nutrientProtectionUntil,
+        nutrientProtectionTier = data.nutrientProtectionTier,
+        nutrientProtectionItem = data.nutrientProtectionItem,
+        pestProtectionStrength = pestProtectionStrength,
+        pestProtectionUntil = pestProtectionUntil,
+        pestProtectionTier = data.pestProtectionTier,
+        pestProtectionItem = data.pestProtectionItem,
         growthPenaltyHoursDelta = growthPenalty,
         waterStressDelta = weightedWaterDeficit * (tonumber(stressRates.water) or 0),
         nutrientStressDelta = weightedNutrientDeficit * (tonumber(stressRates.nutrients) or 0),

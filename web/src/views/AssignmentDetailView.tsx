@@ -23,7 +23,6 @@ import {
   useState,
 } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { fixtureHubAdapter } from "../adapters/FixtureHubAdapter";
 import { FarmSelect } from "../components/FarmSelect";
 import { StatePanel } from "../components/StatePanel";
 import { ELIGIBLE_ASSIGNEES } from "../data/assignmentFixtures";
@@ -143,16 +142,16 @@ export function AssignmentDetailView() {
     (location.state as { returnTo?: string } | null)?.returnTo ?? "/work?tab=assignment";
 
   const reload = useCallback(async () => {
-    const next = await fixtureHubAdapter.load<AssignmentDetail>(
+    const next = await hub.adapter.load<AssignmentDetail>(
       { kind: "assignmentDetail", assignmentId },
       requestContext,
     );
     setModel(next);
-  }, [assignmentId, requestContext]);
+  }, [assignmentId, requestContext, hub.adapter]);
 
   useEffect(() => {
     let active = true;
-    void fixtureHubAdapter
+    void hub.adapter
       .load<AssignmentDetail>({ kind: "assignmentDetail", assignmentId }, requestContext)
       .then((next) => {
         if (active) setModel(next);
@@ -160,7 +159,7 @@ export function AssignmentDetailView() {
     return () => {
       active = false;
     };
-  }, [assignmentId, requestContext]);
+  }, [assignmentId, requestContext, hub.adapter]);
 
   const assignment = model?.data;
   const totals = useMemo(() => {
@@ -179,7 +178,7 @@ export function AssignmentDetailView() {
   const send = async (intent: ActionIntent) => {
     setPending(true);
     setNotice(undefined);
-    const result = await fixtureHubAdapter.dispatch(intent, requestContext);
+    const result = await hub.adapter.dispatch(intent, requestContext);
     setPending(false);
 
     if (!result.ok) {

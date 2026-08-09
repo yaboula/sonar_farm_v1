@@ -31,8 +31,31 @@ end
 ---@param count number
 ---@param metadata? table
 ---@return boolean success
-function Bridge.Inventory.RemoveItem(source, item, count, metadata)
-    return ox:RemoveItem(source, item, count, metadata) and true or false
+function Bridge.Inventory.RemoveItem(source, item, count, metadata, slot)
+    return ox:RemoveItem(source, item, count, metadata, slot) and true or false
+end
+
+--- Remove an item from one exact slot.
+function Bridge.Inventory.RemoveFromSlot(source, item, count, slot, metadata)
+    return Bridge.Inventory.RemoveItem(source, item, count, metadata, slot)
+end
+
+--- Return every slot containing an item. Never trust a client-provided slot.
+function Bridge.Inventory.GetSlotsWithItem(source, item, metadata, strict)
+    return ox:GetSlotsWithItem(source, item, metadata, strict == true) or {}
+end
+
+--- Return the first matching slot (mainly useful for compatibility callers).
+function Bridge.Inventory.GetSlotWithItem(source, item, metadata, strict)
+    return ox:GetSlotWithItem(source, item, metadata, strict == true)
+end
+
+function Bridge.Inventory.GetSlot(source, slot)
+    return ox:GetSlot(source, slot)
+end
+
+function Bridge.Inventory.SetDurability(source, slot, durability)
+    return ox:SetDurability(source, slot, durability) and true or false
 end
 
 --- Count how many of `item` a player holds (optionally matching metadata).

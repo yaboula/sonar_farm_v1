@@ -66,6 +66,7 @@ Config.Locale = 'en'
 Config.Features = {
     Minigames = true,      -- Stage 5: authoritative tomato planting enabled
     AdvancedCare = false,  -- Causal nutrients/weeds/pests model; opt-in rollout
+    Supplies = false,      -- Authoritative Company procurement and Warehouse
     Machinery = false,     -- Stage 9+: not implemented
     Progression = false,   -- Stage 7: not implemented
     Economy = false,       -- Stage 8: not implemented
@@ -167,21 +168,38 @@ Config.Farming = {
             water = 12,
             nutrients = 14,
         },
-        Fertilizers = {
-            fertilizer_organic = { amount = 28, burnMultiplier = 0.35 },
-            fertilizer_chemical = { amount = 45, burnMultiplier = 1.0 },
-        },
-        PestTreatments = {
-            pest_spray_organic = { reduction = 45 },
-            pest_spray_chemical = { reduction = 75 },
-        },
-        WeedRemoval = 70,
         MinimumWeedCover = 8,
         MinimumPestPressure = 8,
     },
     -- A minigame is cancelled when the ped loses at least this much health
     -- during one active interaction. Death always cancels regardless.
     MinigameDamageThreshold = 15,
+}
+
+-- ---------------------------------------------------------------------------
+-- Company Supplies and Warehouse (0.3.0)
+-- ---------------------------------------------------------------------------
+Config.Supplies = {
+    Ace = 'sonar_farm.company_admin',
+    DraftTtlSeconds = 10 * 60,
+    MaxDraftLines = 10,
+    MaxLineQuantity = 99,
+    SupplierFeeRate = 0.05,
+    MonthlyBudget = 12000,
+    BootstrapTreasury = 25000,
+    ProcurementLimit = 1500,
+    DeliveryWorkerSeconds = 30,
+    UsageRecoveryGraceSeconds = 2,
+    SessionTtlSeconds = 10 * 60,
+    InteractionDistance = 3.0,
+    TabletCommand = 'farmtablet',
+    TabletKey = 'F7',
+    Office = { coords = vec3(2448.38, 4977.18, 46.81), radius = 1.5 },
+    Warehouse = { coords = vec3(2441.84, 4968.77, 46.81), radius = 1.8 },
+    SupplierStock = {
+        plus = { capacity = 20, restockAmount = 5, restockSeconds = 30 * 60 },
+        pro = { capacity = 10, restockAmount = 2, restockSeconds = 60 * 60 },
+    },
 }
 
 -- ---------------------------------------------------------------------------

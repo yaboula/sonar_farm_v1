@@ -1,49 +1,72 @@
-import { CheckCircle, CurrencyDollar, Package, ShieldCheck, Storefront, Warning } from "@phosphor-icons/react";
+import { CheckCircle, ClockCountdown, CurrencyDollar, Package, ShieldCheck, Storefront, Warning } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { fixtureHubAdapter } from "../adapters/FixtureHubAdapter";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DeepViewShell, DetailCard, FactList, StatusPill } from "../components/DeepViewShell";
 import { StatePanel } from "../components/StatePanel";
 import { useHub } from "../store/HubContext";
 import type { HubContextModel, HubViewModel, PurchaseReview } from "../types";
 
-const failureCopy: Record<NonNullable<PurchaseReview["failureReason"]>, string> = {
-  insufficient_funds: "The selected payer no longer has enough available funds.",
-  budget_exceeded: "This purchase exceeds the remaining budget or transaction authority.",
-  permission_lost: "Company purchasing permission was removed while review was open.",
-  stock_changed: "Supplier stock changed after the draft was created.",
-  sold_out: "A required line is now sold out.",
-  inventory_full: "The destination inventory cannot receive this purchase.",
-  unavailable: "The supplier service is currently unavailable.",
+const statusLabel: Record<PurchaseReview["status"], string> = {
+  draft: "Draft", approval_required: "Approval Required", approved: "Approved",
+  ordered: "Ordered", in_transit: "In Transit", delivered: "Delivered",
+  failed: "Failed", rejected: "Rejected",
 };
 
 export function PurchaseReviewView() {
-  const { purchaseId = "" } = useParams(); const hub = useHub(); const navigate = useNavigate(); const location = useLocation();
-  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? "/supplies?area=market";
-  const context = useMemo<HubContextModel>(() => ({ actorId: hub.actorId, role: hub.role, surface: hub.surface, presence: hub.presence, capabilitiesRevision: hub.capabilitiesRevision, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.actorId, hub.role, hub.surface, hub.presence, hub.capabilitiesRevision, hub.viewState, hub.capabilities]);
-  const [model, setModel] = useState<HubViewModel<PurchaseReview> | null>(null); const [confirm, setConfirm] = useState(false); const [pending, setPending] = useState(false); const [notice, setNotice] = useState<string>(); const [handoff, setHandoff] = useState(false);
-  const reload = useCallback(() => fixtureHubAdapter.load<PurchaseReview>({ kind: "purchaseReview", purchaseId }, context).then(setModel), [context, purchaseId]);
-  useEffect(() => { void reload(); }, [reload]);
-  if (!model) return <StatePanel state="loading" />;
-  if (model.state !== "ready") return <StatePanel state={model.state} onAction={() => navigate(returnTo)} />;
-  const purchase = model.data; if (!purchase) return <StatePanel state="empty" onAction={() => navigate(returnTo)} />;
-  const confirmPurchase = async () => { setPending(true); const result = await fixtureHubAdapter.dispatch({ type: "purchase.confirm", purchaseId }, context); setPending(false); setConfirm(false); setNotice(result.message); if (result.closeSurface) setHandoff(true); await reload(); };
-  const completed = purchase.status === "completed";
+  const hub = useHub();
+  const { purchaseId = "" } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? "/supplies";
+  const context = useMemo<HubContextModel>(() => ({ actorId: hub.actorId, role: hub.role, surface: hub.surface, presence: hub.presence, capabilitiesRevision: hub.capabilitiesRevision, viewState: hub.viewState, capabilities: hub.capabilities }), [hub]);
+  const [model, setModel] = useState<HubViewModel<PurchaseReview> | null>(null);
+  const [confirm, setConfirm] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [notice, setNotice] = useState<string>();
+  const [handoff, setHandoff] = useState(false);
 
-  return <DeepViewShell eyebrow="Physical purchase control" title={completed ? "Purchase Receipt" : "Purchase Review"} subtitle={`${purchase.reference} · ${purchase.ownership} ownership`} breadcrumb={["Supplies", "Purchase Review", purchase.reference]} backLabel="Back to Supply Market" onBack={() => navigate(returnTo)} status={<StatusPill tone={completed ? "success" : purchase.failureReason ? "danger" : "warning"}>{completed ? "Completed" : purchase.failureReason ? "Review Required" : "Draft"}</StatusPill>} actionBar={<><div className="domain-action-summary"><span>{completed ? `Receipt ${purchase.receiptId}` : hub.surface === "office" ? "Physical confirmation available" : "Office presence required"}</span><p>{completed ? `${purchase.ownership} inventory updated` : "Stock and funds revalidate at confirmation"}</p></div>{completed ? <button type="button" className="domain-secondary-action" onClick={() => navigate(returnTo)}>Return to Supplies</button> : <button type="button" className="domain-primary-action" onClick={() => hub.surface === "office" ? setConfirm(true) : setHandoff(true)}><ShieldCheck size={19} />{hub.surface === "office" ? "Confirm Purchase" : "Complete at Office Terminal"}</button>}</>}>
+  const reload = useCallback(() => hub.adapter.load<PurchaseReview>({ kind: "purchaseReview", purchaseId }, context).then(setModel), [context, hub.adapter, purchaseId]);
+  useEffect(() => { void reload(); }, [reload]);
+
+  if (!model) return <StatePanel state="loading" />;
+  if (model.state !== "ready" || !model.data) return <StatePanel state={model.state === "ready" ? "empty" : model.state} />;
+  const purchase = model.data;
+  const delivered = purchase.status === "delivered";
+  const moving = purchase.status === "in_transit" || purchase.status === "ordered";
+  const tone = delivered ? "success" : purchase.status === "failed" || purchase.status === "rejected" ? "danger" : "warning";
+
+  const act = async (intent: Parameters<typeof hub.adapter.dispatch>[0]) => {
+    setPending(true);
+    const result = await hub.adapter.dispatch(intent, context);
+    setPending(false);
+    setConfirm(false);
+    setNotice(result.message);
+    await reload();
+  };
+
+  const action = purchase.canApprove ? (
+    <button type="button" className="domain-primary-action" disabled={pending} onClick={() => void act({ type: "procurement.resolve", requestId: purchase.draftId ?? purchaseId, decision: "approve" })}>
+      <ShieldCheck size={19} />Approve Request
+    </button>
+  ) : purchase.canConfirm ? (
+    <button type="button" className="domain-primary-action" disabled={pending} onClick={() => hub.surface === "office" && hub.presence === "office" ? setConfirm(true) : setHandoff(true)}>
+      <ShieldCheck size={19} />{hub.surface === "office" && hub.presence === "office" ? "Confirm Order" : "Complete at Office Terminal"}
+    </button>
+  ) : null;
+
+  return <DeepViewShell eyebrow="Authoritative procurement" title={delivered ? "Warehouse Receipt" : "Purchase Review"} subtitle={`${purchase.reference} · Company Treasury`} breadcrumb={["Supplies", "Purchase Review", purchase.reference]} backLabel="Back to Supplies" onBack={() => navigate(returnTo)} status={<StatusPill tone={tone}>{statusLabel[purchase.status]}</StatusPill>} actionBar={<><div className="domain-action-summary"><span>{delivered ? "Delivered to Company Warehouse" : moving ? "Supplier delivery underway" : statusLabel[purchase.status]}</span><p>{delivered ? "Available for controlled withdrawal" : "No item is delivered directly to a player"}</p></div>{action}</>}>
     {notice ? <div className="domain-notice">{notice}</div> : null}
-    {purchase.failureReason ? <div className="purchase-failure"><Warning size={24} /><div><strong>{purchase.failureReason.replaceAll("_", " ")}</strong><p>{failureCopy[purchase.failureReason]}</p></div></div> : null}
     <div className="domain-two-column"><div className="domain-card-stack">
-      <DetailCard eyebrow="Order lines" title={`${purchase.lines.length} supplier item${purchase.lines.length === 1 ? "" : "s"}`}><div className="purchase-lines">{purchase.lines.map((line) => <div key={line.productId}><Package size={22} /><span><strong>{line.name}</strong><small>{line.quantity} × {`$${line.unitPrice}`} per {line.unit}</small></span><b>{`$${(line.quantity * line.unitPrice).toLocaleString()}`}</b></div>)}</div></DetailCard>
-      <DetailCard eyebrow="Collection" title="Physical fulfillment"><p className="domain-emphasis"><Storefront size={25} />{purchase.fulfillment}</p><FactList facts={[{ label: "Capacity", value: purchase.inventoryCapacity }, { label: "Ownership", value: purchase.ownership }, { label: "Surface", value: hub.surface === "office" ? "Office Terminal · authorized" : "Farm Tablet · review only" }]} /></DetailCard>
-      {completed ? <DetailCard eyebrow="Audit receipt" title={purchase.receiptId ?? "Receipt issued"}><ul className="domain-check-list"><li><CheckCircle size={18} />Supplier stock updated</li><li><CheckCircle size={18} />{purchase.ownership} balance debited</li><li><CheckCircle size={18} />{purchase.ownership} ownership recorded</li>{purchase.payer === "company" ? <li><CheckCircle size={18} />Procurement ledger entry created</li> : null}</ul></DetailCard> : null}
+      <DetailCard eyebrow="Order lines" title={`${purchase.lines.length} supplier item${purchase.lines.length === 1 ? "" : "s"}`}><div className="purchase-lines">{purchase.lines.map((line) => <div key={line.productId}><Package size={22} /><span><strong>{line.name}</strong><small>{line.quantity} × ${line.unitPrice} per {line.unit}</small></span><b>${(line.quantity * line.unitPrice).toLocaleString()}</b></div>)}</div></DetailCard>
+      <DetailCard eyebrow="Fulfillment" title="Delayed Warehouse delivery"><p className="domain-emphasis">{moving ? <ClockCountdown size={25} /> : delivered ? <CheckCircle size={25} /> : <Storefront size={25} />}{moving ? "In transit" : delivered ? "Warehouse received" : purchase.fulfillment}</p><FactList facts={[{ label: "Ownership", value: "Company" }, { label: "Destination", value: "Company Warehouse" }, { label: "Receipt", value: purchase.receiptId ?? "Issued at confirmation" }]} /></DetailCard>
+      {delivered ? <DetailCard eyebrow="Audit receipt" title={purchase.receiptId ?? "Receipt issued"}><ul className="domain-check-list"><li><CheckCircle size={18} />Treasury debit ledgered</li><li><CheckCircle size={18} />Supplier stock reserved</li><li><CheckCircle size={18} />Warehouse lot received exactly once</li></ul></DetailCard> : null}
+      {purchase.status === "failed" || purchase.status === "rejected" ? <div className="purchase-failure"><Warning size={24} /><div><strong>{statusLabel[purchase.status]}</strong><p>Create a fresh draft or ask an authorized manager to review the request.</p></div></div> : null}
     </div><aside className="domain-card-stack">
-      <DetailCard eyebrow="Settlement" title={`$${purchase.total.toLocaleString()}`}><FactList facts={[{ label: "Subtotal", value: `$${purchase.subtotal.toLocaleString()}` }, { label: "Supplier fees", value: `$${purchase.fees.toLocaleString()}` }, { label: "Payer", value: purchase.payer === "company" ? "Sonar Farm Treasury" : "Personal Funds" }, { label: "Balance before", value: `$${purchase.balance.toLocaleString()}` }, { label: "Projected balance", value: `$${purchase.projectedBalance.toLocaleString()}` }]} /></DetailCard>
-      {purchase.payer === "company" ? <DetailCard eyebrow="Procurement authority" title="Company policy"><FactList facts={[{ label: "Budget remaining", value: `$${purchase.budgetRemaining?.toLocaleString()}` }, { label: "Transaction limit", value: `$${purchase.transactionLimit?.toLocaleString()}` }, { label: "Audit", value: "Required" }]} /></DetailCard> : <DetailCard eyebrow="Personal purchase" title="Private ownership"><p className="domain-muted">This purchase never changes Company Treasury, stock or audit records.</p></DetailCard>}
-      <DetailCard eyebrow="Final validation" title="At confirmation"><ul className="domain-check-list"><li><CheckCircle size={18} />Permission and payer</li><li><CheckCircle size={18} />Funds and budget</li><li><CheckCircle size={18} />Supplier stock</li><li><CheckCircle size={18} />Inventory capacity</li></ul></DetailCard>
+      <DetailCard eyebrow="Settlement" title={`$${purchase.total.toLocaleString()}`}><FactList facts={[{ label: "Subtotal", value: `$${purchase.subtotal.toLocaleString()}` }, { label: "Supplier fee", value: `$${purchase.fees.toLocaleString()}` }, { label: "Payer", value: "Company Treasury" }, { label: "Treasury before", value: `$${purchase.balance.toLocaleString()}` }, { label: "Projected", value: `$${purchase.projectedBalance.toLocaleString()}` }]} /></DetailCard>
+      <DetailCard eyebrow="Procurement authority" title="Company policy"><FactList facts={[{ label: "Budget remaining", value: `$${purchase.budgetRemaining?.toLocaleString()}` }, { label: "Transaction limit", value: purchase.transactionLimit ? `$${purchase.transactionLimit.toLocaleString()}` : "Unlimited" }, { label: "Final confirmation", value: "Office Terminal" }]} /></DetailCard>
     </aside></div>
-    {confirm ? <ConfirmDialog eyebrow="Physical transaction" title="Confirm purchase and collection?" confirmLabel="Confirm Purchase" pending={pending} onClose={() => setConfirm(false)} onConfirm={() => void confirmPurchase()}><p>This will debit {purchase.payer === "company" ? "Sonar Farm Treasury" : "your personal funds"}, update supplier stock and record {purchase.ownership.toLowerCase()} ownership.</p><p className="dialog-callout"><CurrencyDollar size={18} />Final charge: ${purchase.total.toLocaleString()}</p></ConfirmDialog> : null}
-    {handoff ? <div className="domain-handoff"><Storefront size={52} /><span>Office presence required</span><h2>Complete at Office Terminal</h2><p>Your fixture draft remains available in this session. No funds or stock changed.</p><button type="button" className="secondary-button" onClick={() => setHandoff(false)}>Return to Review</button></div> : null}
+    {confirm ? <ConfirmDialog eyebrow="Treasury transaction" title="Confirm order for Warehouse delivery?" confirmLabel="Confirm Order" pending={pending} onClose={() => setConfirm(false)} onConfirm={() => void act({ type: "purchase.confirm", purchaseId: purchase.draftId ?? purchaseId })}><p>This debits Company Treasury, reserves supplier stock and creates a delayed Warehouse delivery.</p><p className="dialog-callout"><CurrencyDollar size={18} />Final charge: ${purchase.total.toLocaleString()}</p></ConfirmDialog> : null}
+    {handoff ? <div className="domain-handoff"><Storefront size={52} /><span>Office presence required</span><h2>Complete at Office Terminal</h2><p>No funds or stock changed. The draft remains available until its expiry time.</p><button type="button" className="secondary-button" onClick={() => setHandoff(false)}>Return to Review</button></div> : null}
   </DeepViewShell>;
 }

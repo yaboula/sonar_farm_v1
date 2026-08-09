@@ -1,7 +1,6 @@
 import { CheckCircle, CurrencyDollar, ShieldCheck } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { fixtureHubAdapter } from "../adapters/FixtureHubAdapter";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DeepViewShell, DetailCard, FactList, StatusPill } from "../components/DeepViewShell";
 import { FarmSelect } from "../components/FarmSelect";
@@ -59,14 +58,14 @@ export function WorkCreateView({ kind }: { kind: "assignment" | "contract" }) {
   const [assignment, setAssignment] = useState<AssignmentCreateInput>(() => ({ title: fieldDraft ? `Establish ${fieldDraft.cropLabel} · ${fieldDraft.rowLabels.join(", ")}` : "Water East Tomato Rows", objective: fieldDraft ? "Prepare and establish every eligible planting slot reserved by the Crop Plan." : "Restore safe soil moisture and verify every assigned row.", fieldId: fieldDraft?.fieldId ?? "north-field", crop: fieldDraft?.cropLabel ?? "Tomatoes", scope: fieldDraft ? fieldDraft.rowLabels.join(", ") : "Rows 9–12", assigneeId: "staff-noah", supervisorId: "staff-jordan", deadline: "Tomorrow, 18:00", payout: 220, requirement: fieldDraft ? "Verify every planned planting slot" : "Verify moisture across four rows", materialIds: ["watering-can"], scopeRef: fieldDraft ? { fieldId: fieldDraft.fieldId, rowIds: fieldDraft.rowIds } : undefined, sourcePlanId: fieldDraft?.sourcePlanId }));
   const [contract, setContract] = useState<ContractCreateInput>(() => ({ template: "Planting", title: fieldDraft ? `Establish ${fieldDraft.cropLabel} · ${fieldDraft.rowLabels.join(", ")}` : "Establish East Field Tomato Row", objective: fieldDraft ? "Prepare, plant and initially water every position reserved by the Crop Plan." : "Prepare and establish eight tomato planting positions to farm standard.", field: fieldDraft?.fieldName ?? "East Field", scope: fieldDraft ? `${fieldDraft.rowLabels.join(", ")} · reserved planting scope` : "Row E · 8 planting slots", deadline: "12 Aug, 16:00", reward: 860, requirements: "Personal seedlings ×8, hand trowel and watering can", failureRule: "Missing the deadline or unverified planting fails the contract.", scopeRef: fieldDraft ? { fieldId: fieldDraft.fieldId, rowIds: fieldDraft.rowIds } : undefined, sourcePlanId: fieldDraft?.sourcePlanId }));
 
-  useEffect(() => { void fixtureHubAdapter.load<{ nextReference: string }>(kind === "assignment" ? { kind: "assignmentCreate" } : { kind: "contractCreate" }, context).then(setAccess); }, [context, kind]);
+  useEffect(() => { void hub.adapter.load<{ nextReference: string }>(kind === "assignment" ? { kind: "assignmentCreate" } : { kind: "contractCreate" }, context).then(setAccess); }, [context, hub.adapter, kind]);
   if (!access) return <StatePanel state="loading" />;
   if (access.state !== "ready" || !access.data) return <StatePanel state={access.state === "ready" ? "empty" : access.state} onAction={() => navigate(returnTo)} />;
 
   const valid = kind === "assignment" ? Boolean(assignment.title.trim() && assignment.objective.trim() && assignment.requirement.trim() && assignment.payout > 0) : Boolean(contract.title.trim() && contract.objective.trim() && contract.requirements.trim() && contract.failureRule.trim() && contract.reward > 0);
   const submit = async () => {
     setPending(true);
-    const result = await fixtureHubAdapter.dispatch(kind === "assignment" ? { type: "assignment.create", input: assignment } : { type: "contract.create", input: contract }, context);
+    const result = await hub.adapter.dispatch(kind === "assignment" ? { type: "assignment.create", input: assignment } : { type: "contract.create", input: contract }, context);
     setPending(false); setConfirm(false); setNotice(result.message);
     if (result.ok && result.entityId) navigate(kind === "assignment" ? `/work/assignments/${result.entityId}` : `/work/contracts/${result.entityId}`, { replace: true, state: { returnTo } });
   };

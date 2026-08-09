@@ -37,6 +37,17 @@ describe("Company domain adapter", () => {
     expect(onSite.data?.atWarehouse).toBe(true);
   });
 
+  it("withdraws real Warehouse quantity only at the physical surface", async () => {
+    const remote = context("owner", "remote", "tablet");
+    const onSite = context("owner", "warehouse", "office");
+    const before = await adapter.load<WarehouseData>({ kind: "companyWarehouse" }, onSite);
+    const item = before.data!.items[0];
+    expect((await adapter.dispatch({ type: "warehouse.withdraw", itemId: item.id, quantity: 1, operationId: crypto.randomUUID() }, remote)).ok).toBe(false);
+    expect((await adapter.dispatch({ type: "warehouse.withdraw", itemId: item.id, quantity: 1, operationId: crypto.randomUUID() }, onSite)).ok).toBe(true);
+    const after = await adapter.load<WarehouseData>({ kind: "companyWarehouse" }, onSite);
+    expect(after.data!.items.find((entry) => entry.id === item.id)?.available).toBe(item.available - 1);
+  });
+
   it("keeps Owner-only governance away from Manager", async () => {
     const manager = context("manager");
     expect(manager.capabilities.manageRolePolicies).toBe(false);
@@ -48,10 +59,10 @@ describe("Company domain adapter", () => {
   it("uses Treasury as the shared company purchase balance", async () => {
     const owner = context("owner");
     const before = await adapter.load<TreasurySnapshot>({ kind: "companyTreasury" }, owner);
-    const draft = await adapter.dispatch({ type: "purchase.createDraft", payer: "company", lines: [{ productId: "tomato-seedling", quantity: 1 }] }, owner);
+    const draft = await adapter.dispatch({ type: "purchase.createDraft", payer: "company", lines: [{ productId: "tomato_seedling", quantity: 1 }] }, owner);
     await adapter.dispatch({ type: "purchase.confirm", purchaseId: draft.entityId! }, owner);
     const after = await adapter.load<TreasurySnapshot>({ kind: "companyTreasury" }, owner);
-    expect(after.data!.available).toBe(before.data!.available - 18);
+    expect(after.data!.available).toBe(before.data!.available - 45);
     expect(after.data?.recentEntries[0]).toMatchObject({ type: "purchase", linkedId: draft.entityId });
   });
 

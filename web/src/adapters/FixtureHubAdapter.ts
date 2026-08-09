@@ -199,7 +199,7 @@ export class FixtureHubAdapter implements HubAdapter {
             transactionLimit: 1500,
             allowedCategories: ["Seedlings", "Seeds", "Hand Tools", "Watering", "Fertilizer", "Pest Treatment"],
             recentPurchases: this.workSupplies.purchases
-              .filter((purchase) => purchase.payer === "company" && purchase.status === "completed")
+              .filter((purchase) => purchase.payer === "company" && purchase.status === "delivered")
               .slice(-3)
               .map((purchase) => ({ id: purchase.id, detail: purchase.reference, amount: purchase.total, at: "Just now" })),
             requests: structuredClone(this.workSupplies.procurementRequests),
@@ -363,8 +363,10 @@ export class FixtureHubAdapter implements HubAdapter {
     const allowed = purchase.payer === "personal"
       ? context.capabilities.buyPersonalSupplies
       : context.capabilities.buyCompanySupplies;
+    const safePurchase = structuredClone(purchase);
+    safePurchase.canConfirm = safePurchase.status === "draft";
     return allowed
-      ? { request, state: "ready", data: structuredClone(purchase) as TData }
+      ? { request, state: "ready", data: safePurchase as TData }
       : { request, state: "restricted", data: null };
   }
 
@@ -389,6 +391,7 @@ export class FixtureHubAdapter implements HubAdapter {
     if (intent.type === "field.setRoute") return this.fields.setRoute(intent.scope, context);
     if (intent.type === "companyCargo.setRoute") return this.company.setCargoRoute(intent.cargoId, context);
     if (intent.type === "company.setRoute") return this.company.setRoute(intent.destination);
+    if (intent.type === "warehouse.withdraw") return this.company.withdraw(intent.itemId, intent.quantity, context);
     if (intent.type === "warehouse.prepareOrder") return this.company.prepareOrder(intent.reservationId, context);
     if (intent.type === "warehouse.createWholesale") return this.company.createWholesale(intent.itemId, intent.quantity, intent.quality, context);
     if (intent.type === "warehouse.confirmWholesale") return this.company.confirmWholesale(intent.saleId, context);
@@ -648,7 +651,7 @@ export class FixtureHubAdapter implements HubAdapter {
       const product = this.workSupplies.products.find((item) => item.id === line.productId);
       if (!product || (product.stock !== "base" && product.stock < line.quantity)) { purchase.failureReason = product?.stock === 0 ? "sold_out" : "stock_changed"; return { ok: false, message: product?.stock === 0 ? `${line.name} is sold out.` : `${line.name} stock changed before confirmation.` }; }
     }
-    purchase.status = "completed";
+    purchase.status = "delivered";
     purchase.receiptId = `SF-${Date.now().toString().slice(-6)}`;
     purchase.failureReason = undefined;
     for (const line of purchase.lines) {

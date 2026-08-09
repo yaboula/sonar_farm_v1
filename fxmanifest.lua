@@ -5,7 +5,7 @@ lua54 'yes'
 name 'sonar_farm'
 author 'Sonar'
 description 'Scalable, server-authoritative farming platform for FiveM (QB-Core + ox).'
-version '0.2.0'
+version '0.3.0'
 repository 'https://github.com/yaboula/sonar_farm_v1.git'
 
 -- Hard dependencies. The Bridge auto-detects the framework at runtime.
@@ -23,6 +23,7 @@ shared_scripts {
     'config/crops.lua',
     'config/zones.lua',
     'config/minigames.lua',
+    'shared/item_catalog.lua',
     'shared/constants.lua',
     'shared/utils.lua',
     'shared/time.lua',
@@ -50,10 +51,16 @@ server_scripts {
     'server/modules/runtime/runtime.lua',
     'server/modules/admin/permissions.lua',
     'server/modules/database/database.lua',
+    'server/modules/company/database.lua',
+    'server/modules/company/company.lua',
+    'server/modules/supplies/service.lua',
+    'server/modules/hub/runtime.lua',
+    'server/modules/inventory/company_hooks.lua',
     'server/modules/state/state.lua',
     -- Security before farming: actions depend on these guards.
     'server/modules/security/ratelimit.lua',
     'server/modules/security/validation.lua',
+    'server/modules/inventory/items.lua',
     -- Sync after validation (it reads the authoritative player position) and
     -- before farming (the action handlers emit deltas through it).
     'server/modules/sync/subscriptions.lua',
@@ -80,6 +87,7 @@ client_scripts {
     -- Actions before sync/slots: those bind to Actions on select.
     'client/modules/interaction/actions.lua',
     'client/modules/minigames/controller.lua',
+    'client/modules/hub/controller.lua',
     'client/modules/zones/slots.lua',
     'client/modules/sync/client.lua',
     'client/modules/zones/blips.lua',
@@ -89,11 +97,14 @@ client_scripts {
     'client/modules/debug/commands.lua',
 }
 
--- Stage 5 minigames own the resource's single NUI page. The Business Hub stays
--- isolated in `web/` until the two surfaces receive an explicit shared shell.
-ui_page 'minigames-ui/dist/index.html'
+-- One explicit shell owns focus and keeps the Business Hub and minigame in
+-- independent iframes. Only the active surface is rendered.
+ui_page 'nui-shell/index.html'
 files {
+    'nui-shell/index.html',
     'minigames-ui/dist/index.html',
     'minigames-ui/dist/assets/**/*',
     'minigames-ui/dist/contracts/**/*',
+    'web/build/index.html',
+    'web/build/assets/**/*',
 }

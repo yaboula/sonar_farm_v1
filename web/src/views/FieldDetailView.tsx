@@ -13,7 +13,6 @@ import {
 } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { fixtureHubAdapter } from "../adapters/FixtureHubAdapter";
 import { applyFieldDelta, createFieldSyncState, projectFieldDelta } from "../adapters/fieldSync";
 import { DeepViewShell, StatusPill } from "../components/DeepViewShell";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -62,15 +61,15 @@ export function FieldDetailView() {
 
   const reload = useCallback(async () => {
     setSyncStatus("resyncing");
-    const next = await fixtureHubAdapter.load<FieldDetail>({ kind: "fieldDetail", fieldId }, context);
+    const next = await hub.adapter.load<FieldDetail>({ kind: "fieldDetail", fieldId }, context);
     syncRef.current = next.data ? createFieldSyncState(next.data) : undefined;
     setModel(next);
     setSyncStatus("live");
-  }, [context, fieldId]);
+  }, [context, fieldId, hub.adapter]);
 
   useEffect(() => {
     let active = true;
-    void fixtureHubAdapter.load<FieldDetail>({ kind: "fieldDetail", fieldId }, context).then((next) => {
+    void hub.adapter.load<FieldDetail>({ kind: "fieldDetail", fieldId }, context).then((next) => {
       if (active) {
         syncRef.current = next.data ? createFieldSyncState(next.data) : undefined;
         setModel(next);
@@ -78,11 +77,11 @@ export function FieldDetailView() {
       }
     });
     return () => { active = false; };
-  }, [context, fieldId]);
+  }, [context, fieldId, hub.adapter]);
 
   useEffect(() => {
     if (!model?.data) return undefined;
-    return fixtureHubAdapter.subscribeField(fieldId, model.data.sequence, context, (delta) => {
+    return hub.adapter.subscribeField(fieldId, model.data.sequence, context, (delta) => {
       const currentSync = syncRef.current;
       if (!currentSync) { void reload(); return; }
       const nextSync = applyFieldDelta(currentSync, delta);
@@ -90,7 +89,7 @@ export function FieldDetailView() {
       if (nextSync.resyncRequired) { void reload(); return; }
       setModel((current) => current?.data ? { ...current, data: projectFieldDelta(current.data, delta) } : current);
     });
-  }, [context, fieldId, model?.data, reload]);
+  }, [context, fieldId, hub.adapter, model?.data, reload]);
 
   const setQuery = (updates: Record<string, string | undefined>) => {
     const next = new URLSearchParams(searchParams);
@@ -117,7 +116,7 @@ export function FieldDetailView() {
     }
   };
   const setRoute = async () => {
-    const result = await fixtureHubAdapter.dispatch({ type: "field.setRoute", scope: { fieldId: field.id, rowIds: selectedRow ? [selectedRow.id] : undefined } }, context);
+    const result = await hub.adapter.dispatch({ type: "field.setRoute", scope: { fieldId: field.id, rowIds: selectedRow ? [selectedRow.id] : undefined } }, context);
     setNotice(result.message);
     if (result.ok && result.closeSurface) setHandoff(true);
   };
@@ -129,8 +128,8 @@ export function FieldDetailView() {
   const savePlan = async (input: CropPlanInput) => {
     setPlanPending(true);
     const result = planEditor && planEditor !== "new"
-      ? await fixtureHubAdapter.dispatch({ type: "cropPlan.update", planId: planEditor.id, input }, context)
-      : await fixtureHubAdapter.dispatch({ type: "cropPlan.create", input }, context);
+      ? await hub.adapter.dispatch({ type: "cropPlan.update", planId: planEditor.id, input }, context)
+      : await hub.adapter.dispatch({ type: "cropPlan.create", input }, context);
     setPlanPending(false);
     setPlanEditor(undefined);
     setNotice(result.message);
@@ -143,7 +142,7 @@ export function FieldDetailView() {
   const resolvePlanCancellation = async () => {
     if (!cancelPlan) return;
     setPlanPending(true);
-    const result = await fixtureHubAdapter.dispatch({ type: "cropPlan.cancel", planId: cancelPlan.id }, context);
+    const result = await hub.adapter.dispatch({ type: "cropPlan.cancel", planId: cancelPlan.id }, context);
     setPlanPending(false);
     setCancelPlan(undefined);
     setSelectedPlanId(undefined);

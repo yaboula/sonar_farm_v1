@@ -327,6 +327,33 @@ de `0.05 ms`.
 
 ---
 
+### Activar Supplies Runtime V2
+
+1. Mantén `Config.Features.Supplies = false` mientras instalas y valida primero
+   Advanced Crop Care 0.2.0.
+2. Copia las 21 definiciones generadas de `data/ox_inventory_items.lua` y las 21
+   imágenes de `inventory_images/` a la carpeta de imágenes de `ox_inventory`.
+3. Construye `minigames-ui/` y `web/`; `nui-shell/index.html` es el único
+   `ui_page` y necesita ambos artefactos.
+4. Concede `sonar_farm.company_admin` al grupo administrativo. En juego ejecuta
+   `/farmcompany bootstrap <nombre>` como futuro Owner; registra $25.000 de
+   crédito inicial en el ledger de forma idempotente.
+5. Añade miembros con `/farmcompany member <identifier> <role>`. Desde consola
+   usa `/farmcompany member <companyId> <identifier> <role>`; `owner` está
+   reservado al bootstrap.
+6. Activa `Config.Features.Supplies = true` solo en pruebas. Reduce los lead
+   times en configuración para E2E, nunca en la lógica.
+7. Verifica Tablet → draft, Office → aprobación/confirmación, una única entrega,
+   retirada en Warehouse, uso de cada tier y devolución con durabilidad.
+8. Reinicia durante una entrega y durante una retirada; la evaluación lazy y el
+   outbox deben reconciliar sin duplicar objetos ni movimientos del ledger.
+
+Antes del rollout ejecuta `lua scripts/generate_items.lua --check`,
+`python scripts/process_item_assets.py --check`, las pruebas Lua, y todas las
+puertas de `web/` y `minigames-ui/`. Mantén el flag apagado si falla cualquiera.
+
+---
+
 ## 8. Troubleshooting
 
 | Sintoma | Causa probable | Solucion |

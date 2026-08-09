@@ -305,7 +305,6 @@ local function validateAdvancedCare(errors)
         end
     end
 
-    nonEmptyString(errors, 'Config.Farming.Tools.weed', farming.Tools and farming.Tools.weed)
     for _, action in ipairs({ 'fertilize', 'weed', 'treat_pest' }) do
         positive(errors, ('Config.Cooldowns.%s'):format(action), Config.Cooldowns and Config.Cooldowns[action], false)
     end
@@ -328,9 +327,6 @@ local function validateAdvancedCare(errors)
     end
     range(errors, 'Config.Farming.AdvancedCare.MinimumWeedCover', advanced.MinimumWeedCover, 0, 100)
     range(errors, 'Config.Farming.AdvancedCare.MinimumPestPressure', advanced.MinimumPestPressure, 0, 100)
-    if not finite(advanced.WeedRemoval) or advanced.WeedRemoval <= 0 or advanced.WeedRemoval > 100 then
-        errors[#errors + 1] = 'Config.Farming.AdvancedCare.WeedRemoval must be within 0..100 and greater than 0.'
-    end
 
     local penalties = advanced.GrowthPenaltyPerDeficitHour
     if type(penalties) ~= 'table' then
@@ -352,35 +348,37 @@ local function validateAdvancedCare(errors)
         positive(errors, 'Config.Farming.AdvancedCare.StressPerDeficitHour.nutrients', stress.nutrients, true)
     end
 
-    local fertilizers = advanced.Fertilizers
-    if type(fertilizers) ~= 'table' then
-        errors[#errors + 1] = 'Config.Farming.AdvancedCare.Fertilizers must be a table.'
-    else
-        for _, item in ipairs({ 'fertilizer_organic', 'fertilizer_chemical' }) do
-            local effect = fertilizers[item]
-            local path = ('Config.Farming.AdvancedCare.Fertilizers.%s'):format(item)
-            if type(effect) ~= 'table' then
-                errors[#errors + 1] = path .. ' must be a table.'
+    local catalog = Sonar.ItemCatalog
+    if type(catalog) ~= 'table' or type(catalog.items) ~= 'table' or #catalog.items ~= 21 then
+        errors[#errors + 1] = 'Sonar.ItemCatalog must contain exactly 21 canonical items.'
+        return
+    end
+    local counts = { water = 0, weed = 0, fertilize = 0, treat_pest = 0 }
+    for _, item in ipairs(catalog.items) do
+        local effect = item.tool or item.consumable
+        if effect and counts[effect.action] ~= nil then
+            counts[effect.action] = counts[effect.action] + 1
+            local path = ('Sonar.ItemCatalog.%s'):format(item.id)
+            if not catalog.tiers[item.tier] then errors[#errors + 1] = path .. '.tier is invalid.' end
+            positive(errors, path .. '.price', item.price, false)
+            positive(errors, path .. '.leadMinutes', item.leadMinutes, false)
+            if item.tool then
+                positive(errors, path .. '.tool.uses', effect.uses, false)
+                if effect.action == 'weed' then range(errors, path .. '.tool.weedRemoval', effect.weedRemoval, 0.01, 100) end
             else
-                positive(errors, path .. '.amount', effect.amount, false)
-                positive(errors, path .. '.burnMultiplier', effect.burnMultiplier, true)
+                range(errors, path .. '.consumable.protectionStrength', effect.protectionStrength, 0, 1)
+                positive(errors, path .. '.consumable.protectionHours', effect.protectionHours, false)
+                if effect.action == 'fertilize' then
+                    positive(errors, path .. '.consumable.amount', effect.amount, false)
+                    positive(errors, path .. '.consumable.burnMultiplier', effect.burnMultiplier, true)
+                else
+                    range(errors, path .. '.consumable.reduction', effect.reduction, 0.01, 100)
+                end
             end
         end
     end
-
-    local treatments = advanced.PestTreatments
-    if type(treatments) ~= 'table' then
-        errors[#errors + 1] = 'Config.Farming.AdvancedCare.PestTreatments must be a table.'
-    else
-        for _, item in ipairs({ 'pest_spray_organic', 'pest_spray_chemical' }) do
-            local effect = treatments[item]
-            local path = ('Config.Farming.AdvancedCare.PestTreatments.%s'):format(item)
-            if type(effect) ~= 'table' then
-                errors[#errors + 1] = path .. ' must be a table.'
-            elseif not finite(effect.reduction) or effect.reduction <= 0 or effect.reduction > 100 then
-                errors[#errors + 1] = path .. '.reduction must be within 0..100 and greater than 0.'
-            end
-        end
+    for action, count in pairs(counts) do
+        if count ~= 3 then errors[#errors + 1] = ('Canonical catalog requires 3 %s tiers.'):format(action) end
     end
 end
 
@@ -388,6 +386,28 @@ local function validateSection(errors, name, fn, ...)
     local ok, err = pcall(fn, errors, ...)
     if not ok then
         errors[#errors + 1] = ('%s validation failed: %s'):format(name, tostring(err))
+    end
+end
+
+local function validateSupplies(errors)
+    local cfg = Config.Supplies
+    if type(cfg) ~= 'table' then errors[#errors + 1] = 'Config.Supplies must be a table.'; return end
+    nonEmptyString(errors, 'Config.Supplies.Ace', cfg.Ace)
+    for _, key in ipairs({ 'DraftTtlSeconds','MaxDraftLines','MaxLineQuantity','MonthlyBudget','BootstrapTreasury','ProcurementLimit','DeliveryWorkerSeconds','UsageRecoveryGraceSeconds','SessionTtlSeconds','InteractionDistance' }) do
+        positive(errors, 'Config.Supplies.' .. key, cfg[key], false)
+    end
+    range(errors, 'Config.Supplies.SupplierFeeRate', cfg.SupplierFeeRate, 0, 1)
+    for _, tier in ipairs({ 'plus', 'pro' }) do
+        local stock = cfg.SupplierStock and cfg.SupplierStock[tier]
+        if type(stock) ~= 'table' then errors[#errors + 1] = 'Config.Supplies.SupplierStock.' .. tier .. ' must be a table.'
+        else
+            positive(errors, 'Config.Supplies.SupplierStock.' .. tier .. '.capacity', stock.capacity, false)
+            positive(errors, 'Config.Supplies.SupplierStock.' .. tier .. '.restockAmount', stock.restockAmount, false)
+            positive(errors, 'Config.Supplies.SupplierStock.' .. tier .. '.restockSeconds', stock.restockSeconds, false)
+            if finite(stock.capacity) and finite(stock.restockAmount) and stock.restockAmount > stock.capacity then
+                errors[#errors + 1] = 'Config.Supplies.SupplierStock.' .. tier .. '.restockAmount cannot exceed capacity.'
+            end
+        end
     end
 end
 
@@ -399,6 +419,7 @@ function ConfigValidation.Validate()
     validateSection(errors, 'Zone', validateZones, warnings)
     validateSection(errors, 'Minigame', validateMinigames)
     validateSection(errors, 'AdvancedCare', validateAdvancedCare)
+    validateSection(errors, 'Supplies', validateSupplies)
 
     nonEmptyString(errors, 'Config.Admin.Ace', Config.Admin and Config.Admin.Ace)
     positive(errors, 'Config.SaveInterval', Config.SaveInterval, false)

@@ -1,7 +1,6 @@
 import { ArrowSquareOut, CalendarBlank, CheckCircle, ClipboardText, CurrencyDollar, MapPin, Package, ShieldCheck, Truck, Warning } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { fixtureHubAdapter } from "../adapters/FixtureHubAdapter";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DeepViewShell, DetailCard, FactList, StatusPill } from "../components/DeepViewShell";
 import { StatePanel } from "../components/StatePanel";
@@ -25,7 +24,7 @@ export function BuyerOrderDetailView() {
   const context = useMemo<HubContextModel>(() => ({ actorId: hub.actorId, role: hub.role, surface: hub.surface, presence: hub.presence, capabilitiesRevision: hub.capabilitiesRevision, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.actorId, hub.role, hub.surface, hub.presence, hub.capabilitiesRevision, hub.viewState, hub.capabilities]);
   const [model, setModel] = useState<HubViewModel<BuyerOrderDetail> | null>(null);
   const [dialog, setDialog] = useState<BuyerOrderAction>(); const [notice, setNotice] = useState<string>(); const [pending, setPending] = useState(false);
-  const reload = useCallback(() => fixtureHubAdapter.load<BuyerOrderDetail>({ kind: "buyerOrderDetail", orderId }, context).then(setModel), [context, orderId]);
+  const reload = useCallback(() => hub.adapter.load<BuyerOrderDetail>({ kind: "buyerOrderDetail", orderId }, context).then(setModel), [context, hub.adapter, orderId]);
   useEffect(() => { void reload(); }, [reload]);
   if (!model) return <StatePanel state="loading" />;
   if (model.state !== "ready") return <StatePanel state={model.state} onAction={() => navigate(returnTo)} />;
@@ -34,7 +33,7 @@ export function BuyerOrderDetailView() {
 
   const act = async (action: BuyerOrderAction) => {
     if (action === "create_assignment") { navigate("/work/assignments/new", { state: { returnTo: `/work/orders/${order.id}` } }); return; }
-    setPending(true); const result = await fixtureHubAdapter.dispatch({ type: "buyerOrder.transition", orderId: order.id, action }, context); setPending(false); setDialog(undefined); setNotice(result.message); if (result.changed) await reload();
+    setPending(true); const result = await hub.adapter.dispatch({ type: "buyerOrder.transition", orderId: order.id, action }, context); setPending(false); setDialog(undefined); setNotice(result.message); if (result.changed) await reload();
   };
   const tone = order.status === "completed" ? "success" : order.status === "rejected" ? "danger" : order.status === "open" ? "warning" : "active";
 

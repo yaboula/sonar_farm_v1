@@ -144,7 +144,7 @@ export type ActionIntent =
   | { type: "purchase.createDraft"; payer: SupplyPayer; lines: PurchaseLineInput[] }
   | { type: "purchase.confirm"; purchaseId: string }
   | { type: "procurement.resolve"; requestId: string; decision: "approve" | "reject" }
-  | { type: "issuedMaterial.transition"; materialId: string; action: "return" | "flag" }
+  | { type: "issuedMaterial.transition"; materialId: string; action: "return" | "flag"; operationId?: string }
   | { type: "cropPlan.create"; input: CropPlanInput }
   | { type: "cropPlan.update"; planId: string; input: CropPlanInput }
   | { type: "cropPlan.cancel"; planId: string }
@@ -152,6 +152,7 @@ export type ActionIntent =
   | { type: "companyCargo.setRoute"; cargoId: string }
   | { type: "company.setRoute"; destination: "office" | "warehouse" | "registry" }
   | { type: "warehouse.prepareOrder"; reservationId: string }
+  | { type: "warehouse.withdraw"; itemId: string; quantity: number; operationId: string }
   | { type: "warehouse.createWholesale"; itemId: string; quantity: number; quality: string }
   | { type: "warehouse.confirmWholesale"; saleId: string }
   | { type: "jobApplication.saveDraft"; input: JobApplicationInput }
@@ -224,6 +225,8 @@ export interface IntentResult {
 export type FieldDeltaListener = (delta: FieldDelta) => void;
 
 export interface HubAdapter {
+  bootstrap?(): Promise<HubContextModel>;
+  close?(): Promise<void>;
   load<TData>(request: HubViewRequest, context: HubContextModel): Promise<HubViewModel<TData>>;
   dispatch(intent: ActionIntent, context: HubContextModel): Promise<IntentResult>;
   subscribeField(fieldId: string, afterSequence: number, context: HubContextModel, listener: FieldDeltaListener): () => void;
@@ -652,6 +655,11 @@ export interface SupplyProduct {
   restock: string;
   personalOwned: number;
   companyOwned: number;
+  tier?: "basic" | "plus" | "pro";
+  effect?: string;
+  image?: string;
+  leadMinutes?: number;
+  applications?: number;
 }
 
 export interface PurchaseLineInput {
@@ -665,7 +673,7 @@ export interface PurchaseLine extends PurchaseLineInput {
   unitPrice: number;
 }
 
-export type PurchaseStatus = "draft" | "processing" | "completed" | "failed";
+export type PurchaseStatus = "draft" | "approval_required" | "approved" | "ordered" | "in_transit" | "delivered" | "failed" | "rejected";
 
 export interface PurchaseReview {
   id: string;
@@ -685,6 +693,10 @@ export interface PurchaseReview {
   status: PurchaseStatus;
   failureReason?: "insufficient_funds" | "budget_exceeded" | "permission_lost" | "stock_changed" | "sold_out" | "inventory_full" | "unavailable";
   receiptId?: string;
+  draftId?: string;
+  dueAt?: number;
+  canConfirm?: boolean;
+  canApprove?: boolean;
 }
 
 export interface ProcurementRequest {

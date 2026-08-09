@@ -12,6 +12,7 @@
 Actions = Actions or {}
 
 local CALLBACKS = Sonar.Constants.CALLBACKS
+local ACTIONS = Sonar.Constants.ACTIONS
 local REJECT = Sonar.Constants.REJECT
 local NOTIFY = Sonar.Constants.NOTIFY
 
@@ -168,41 +169,97 @@ end
 
 --- Water a crop.
 ---@param cropId string
-function Actions.Water(cropId)
+function Actions.Water(cropId, itemId)
     if not cropId then return end
 
     if not placeholderProgress('Watering...', 'water') then
         return
     end
 
-    local response = lib.callback.await(CALLBACKS.WATER, false, { cropId = cropId })
+    local response = lib.callback.await(CALLBACKS.WATER, false, { cropId = cropId, itemId = itemId })
     if not response or not response.ok then
         return handleRejection(response)
     end
 
     Bridge.Notify(('Watered. Water %s%%, health %s%%.')
         :format(response.data.water, response.data.health), NOTIFY.SUCCESS)
+    if response.data.toolBroken then Bridge.Notify('The tool reached the end of its service life.', NOTIFY.WARNING) end
 end
 
-function Actions.Fertilize(cropId)
+function Actions.Fertilize(cropId, itemId)
     if not cropId or not placeholderProgress('Fertilizing...', 'fertilize') then return end
-    local response = lib.callback.await(CALLBACKS.FERTILIZE, false, { cropId = cropId })
+    local response = lib.callback.await(CALLBACKS.FERTILIZE, false, { cropId = cropId, itemId = itemId })
     if not response or not response.ok then return handleRejection(response) end
     Bridge.Notify(('Fertilized. Nutrients %s%%.'):format(response.data.nutrients), NOTIFY.SUCCESS)
 end
 
-function Actions.Weed(cropId)
+function Actions.Weed(cropId, itemId)
     if not cropId or not placeholderProgress('Removing weeds...', 'weed') then return end
-    local response = lib.callback.await(CALLBACKS.WEED, false, { cropId = cropId })
+    local response = lib.callback.await(CALLBACKS.WEED, false, { cropId = cropId, itemId = itemId })
     if not response or not response.ok then return handleRejection(response) end
     Bridge.Notify(('Weeded. Cover %s%%.'):format(response.data.weedCover), NOTIFY.SUCCESS)
+    if response.data.toolBroken then Bridge.Notify('The tool reached the end of its service life.', NOTIFY.WARNING) end
 end
 
-function Actions.TreatPests(cropId)
+function Actions.TreatPests(cropId, itemId)
     if not cropId or not placeholderProgress('Treating pests...', 'treat_pest') then return end
-    local response = lib.callback.await(CALLBACKS.TREAT_PEST, false, { cropId = cropId })
+    local response = lib.callback.await(CALLBACKS.TREAT_PEST, false, { cropId = cropId, itemId = itemId })
     if not response or not response.ok then return handleRejection(response) end
     Bridge.Notify(('Treated. Pest pressure %s%%.'):format(response.data.pestPressure), NOTIFY.SUCCESS)
+end
+
+local CARE_ACTION = {
+    water = Actions.Water,
+    fertilize = Actions.Fertilize,
+    weed = Actions.Weed,
+    treat_pest = Actions.TreatPests,
+}
+
+local CARE_ICON = {
+    water = 'droplet',
+    fertilize = 'flask',
+    weed = 'leaf',
+    treat_pest = 'bug',
+}
+
+local function careDescription(action, option)
+    local effect = option.effect or {}
+    if action == ACTIONS.WATER then
+        return ('%s tier | %d uses remaining'):format(option.tier, option.usesRemaining or 0)
+    elseif action == ACTIONS.WEED then
+        return ('%s tier | removes %d%% | %d uses remaining')
+            :format(option.tier, effect.weedRemoval or 0, option.usesRemaining or 0)
+    elseif action == ACTIONS.FERTILIZE then
+        return ('%s tier | +%d nutrients | %d%% retention for %dh | %d available')
+            :format(option.tier, effect.amount or 0, math.floor((effect.protectionStrength or 0) * 100),
+                effect.protectionHours or 0, option.count or 0)
+    end
+    return ('%s tier | -%d pressure | %d%% suppression for %dh | %d available')
+        :format(option.tier, effect.reduction or 0, math.floor((effect.protectionStrength or 0) * 100),
+            effect.protectionHours or 0, option.count or 0)
+end
+
+function Actions.OpenCareMenu(action, cropId)
+    local execute = CARE_ACTION[action]
+    if not execute or not cropId then return end
+    local response = lib.callback.await(CALLBACKS.CARE_OPTIONS, false, { cropId = cropId, action = action })
+    if not response or not response.ok then return handleRejection(response) end
+    local available = response.data and response.data.options or {}
+    if #available == 0 then
+        return Bridge.Notify('You do not have an eligible tool or treatment.', NOTIFY.ERROR)
+    end
+    local options = {}
+    for _, option in ipairs(available) do
+        local selected = option
+        options[#options + 1] = {
+            title = selected.label,
+            description = careDescription(action, selected),
+            icon = CARE_ICON[action],
+            onSelect = function() execute(cropId, selected.id) end,
+        }
+    end
+    lib.registerContext({ id = 'sonar_farm_care_' .. action, title = 'Select field material', options = options })
+    lib.showContext('sonar_farm_care_' .. action)
 end
 
 --- Harvest a crop.

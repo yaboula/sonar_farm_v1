@@ -16,11 +16,15 @@ jobs:
       - name: Install Lua 5.4
         run: |
           sudo apt-get update
-          sudo apt-get install -y lua5.4
+          sudo apt-get install -y lua5.4 python3-pil
       - name: Parse Lua
         run: find . -name '*.lua' -not -path './.git/*' -print0 | xargs -0 -n1 luac5.4 -p
       - name: Run regression suite
         run: lua5.4 tests/run.lua
+      - name: Verify generated item catalog and artwork
+        run: |
+          lua5.4 scripts/generate_items.lua --check
+          python3 scripts/process_item_assets.py --check
       - name: Verify release version contract
         run: lua5.4 scripts/check_version.lua
       - name: Check whitespace

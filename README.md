@@ -42,6 +42,8 @@ sonar_farm/
       logger/    Logging por niveles con conectores
   client/        Motor visual, interaccion y herramientas de administracion
   minigames-ui/  NUI React/Canvas 2D aislada del Business Hub
+  nui-shell/     Punto de entrada NUI unico y control de foco entre superficies
+  web/           Business Hub React (runtime FiveM + fixtures de navegador)
   docs/          Documentacion tecnica (espanol)
 ```
 
@@ -50,14 +52,16 @@ sonar_farm/
 1. Clonar dentro de `resources/[local]/` de tu servidor FiveM.
 2. Asegurar que `oxmysql`, `qb-core`, `ox_lib`, `ox_inventory` y `ox_target` estan iniciados antes.
 3. Copiar los items de [`data/ox_inventory_items.lua`](data/ox_inventory_items.lua) a `ox_inventory/data/items.lua` y reiniciar `ox_inventory`.
-4. Construir la NUI de minijuegos con `npm ci` y `npm run build` dentro de
-   `minigames-ui/`.
-5. Conceder `sonar_farm.admin` solo a administradores que deban usar las
+4. Construir `minigames-ui/` y `web/` con `npm ci` y `npm run build` en cada
+   directorio. El shell carga ambos artefactos sin compartir foco.
+5. Conceder `sonar_farm.admin` y `sonar_farm.company_admin` solo a los
+   administradores correspondientes.
    herramientas de desarrollo.
 6. Anadir `ensure sonar_farm` a tu `server.cfg`.
 
 ```cfg
 add_ace group.admin sonar_farm.admin allow
+add_ace group.admin sonar_farm.company_admin allow
 ```
 
 El esquema de base de datos se crea solo al arrancar (`Config.Database.AutoCreateSchema`). Detalles y alternativa manual en [docs/RUNBOOK.md](docs/RUNBOOK.md).
@@ -76,6 +80,7 @@ para el historial.
 - [x] Etapa 4 — Motor visual (streaming/culling + ox_target)
 - [~] Etapa 5 — Motor de minijuegos (Tomato Initial Planting)
 - [x] Advanced Crop Care — modelo causal opcional (`AdvancedCare = false`)
+- [x] Supplies Runtime V2 - Treasury, pedidos y Warehouse (`Supplies = false`)
 - [ ] ... (ver docs/DECISIONES.md)
 
 Tomato se planta como trasplante mediante el minijuego de cuatro pasos
@@ -88,6 +93,10 @@ Advanced Crop Care añade nutrientes, malas hierbas y plagas con crecimiento,
 producción, calidad y defectos causalmente separados. Se entrega desactivado por
 defecto para preservar exactamente el farming estabilizado; activación y objetos
 necesarios se documentan en [docs/RUNBOOK.md](docs/RUNBOOK.md).
+
+Supplies Runtime convierte el Business Hub en una superficie autoritativa:
+Tablet prepara, Office confirma contra Company Treasury y Warehouse entrega tras
+el plazo configurado. Los objetos empresariales conservan custodia y durabilidad.
 
 La versión actual del recurso se encuentra en `VERSION`. El contrato frontend
 mantiene versionado independiente; el proceso de tags y paquetes está en

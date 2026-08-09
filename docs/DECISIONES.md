@@ -287,6 +287,27 @@ El plantado libre dentro de un radio se sustituyó por surcos configurados:
 
 ---
 
+## Decisiones de Supplies Runtime V2
+
+- `shared/item_catalog.lua` es la única fuente de verdad de inventario, mercado
+  y efecto agronómico. `data/ox_inventory_items.lua` es un artefacto generado.
+- Company Treasury es el único pagador. Confirmar descuenta saldo, reserva stock,
+  escribe receipt y ledger dentro de una transacción idempotente.
+- Tablet prepara; Office confirma; Warehouse entrega. La autoridad depende de
+  permiso, superficie y presencia física recalculada en servidor.
+- Una compra nunca toca el inventario del jugador. La entrega diferida crea lotes
+  del Warehouse exactamente una vez y las retiradas cruzan MySQL/ox_inventory
+  mediante outbox recuperable.
+- Todo objeto retirado lleva `ownership`, `companyId` e `issueId`; los hooks
+  bloquean drop, transferencia y almacenes externos. Una devolución conserva la
+  durabilidad exacta.
+- Basic, Plus y Pro no son etiquetas cosméticas: controlan durabilidad, efecto,
+  protección residual, precio, stock y lead time. Una reaplicación conserva el
+  residual de mayor valor `strength × horas restantes`.
+- Advanced Care y Supplies mantienen flags independientes y apagados por defecto.
+
+---
+
 ## Principios de ingeniería (no negociables)
 
 - **Server-authoritative** en todo lo que da valor.

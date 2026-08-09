@@ -493,6 +493,31 @@ sigue interpolando desde calidad exactamente como antes.
 
 ---
 
+### Supplies Runtime V2
+
+`Config.Features.Supplies = false` mantiene aislado este vertical. Cuando se
+activa, el cliente abre una sesión con nonce ligado a `source`, superficie,
+presencia y TTL. La NUI utiliza únicamente estos callbacks genéricos:
+
+- `hub:bootstrap`: crea la sesión y devuelve capacidades reales.
+- `hub:load`: carga Supplies o el slice disponible de Company.
+- `hub:dispatch`: envía una intención; nunca precios, efectos ni permisos.
+- `hub:close`: invalida el nonce y libera el foco.
+
+Las superficies son `tablet` y `office`; la presencia independiente puede ser
+`remote`, `office` o `warehouse`. Confirmar exige Office físico y retirar o
+devolver exige Warehouse físico, ambos revalidados con coordenadas del ped en el
+servidor. Las áreas sin backend responden `unavailable`.
+
+Permisos persistidos: `supplies.view`, `supplies.request`, `supplies.order`,
+`supplies.approve`, `supplies.view_ledger`, `warehouse.view`,
+`warehouse.withdraw` y `warehouse.return`. Company Treasury es el único pagador.
+El catálogo canónico vive en `shared/item_catalog.lua`; genera conjuntamente
+`data/ox_inventory_items.lua` y `web/src/data/itemCatalog.generated.ts`. Ejecuta
+`lua scripts/generate_items.lua --check` para rechazar divergencias.
+
+---
+
 ## 7. Motor visual (cliente)
 
 El cliente es "tonto" en decisiones y "listo" en dibujo: no calcula rendimientos ni

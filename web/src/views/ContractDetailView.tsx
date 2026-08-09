@@ -1,7 +1,6 @@
 import { CheckCircle, Circle, Clock, CurrencyDollar, MapPin, Package, Path, ShoppingCartSimple, Warning } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { fixtureHubAdapter } from "../adapters/FixtureHubAdapter";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DeepViewShell, DetailCard, FactList, StatusPill } from "../components/DeepViewShell";
 import { StatePanel } from "../components/StatePanel";
@@ -17,7 +16,7 @@ export function ContractDetailView({ mode }: { mode: "public" | "active" | "prog
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? `/work?area=${mode === "public" ? "publicContracts" : "activeContract"}`;
   const context = useMemo<HubContextModel>(() => ({ actorId: hub.actorId, role: hub.role, surface: hub.surface, presence: hub.presence, capabilitiesRevision: hub.capabilitiesRevision, viewState: hub.viewState, capabilities: hub.capabilities }), [hub.actorId, hub.role, hub.surface, hub.presence, hub.capabilitiesRevision, hub.viewState, hub.capabilities]);
   const [model, setModel] = useState<HubViewModel<ContractDetail> | null>(null); const [dialog, setDialog] = useState<ContractAction>(); const [notice, setNotice] = useState<string>(); const [pending, setPending] = useState(false); const [handoff, setHandoff] = useState<string>();
-  const reload = useCallback(() => fixtureHubAdapter.load<ContractDetail>({ kind: "contractDetail", contractId, mode }, context).then(setModel), [contractId, context, mode]);
+  const reload = useCallback(() => hub.adapter.load<ContractDetail>({ kind: "contractDetail", contractId, mode }, context).then(setModel), [contractId, context, hub.adapter, mode]);
   useEffect(() => { void reload(); }, [reload]);
   if (!model) return <StatePanel state="loading" />;
   if (model.state !== "ready") return <StatePanel state={model.state} onAction={() => navigate(returnTo)} />;
@@ -25,7 +24,7 @@ export function ContractDetailView({ mode }: { mode: "public" | "active" | "prog
 
   const run = async (action: ContractAction) => {
     setPending(true);
-    const result = action === "accept" ? await fixtureHubAdapter.dispatch({ type: "contract.accept", contractId }, context) : await fixtureHubAdapter.dispatch({ type: "contract.transition", contractId, action }, context);
+    const result = action === "accept" ? await hub.adapter.dispatch({ type: "contract.accept", contractId }, context) : await hub.adapter.dispatch({ type: "contract.transition", contractId, action }, context);
     setPending(false); setDialog(undefined); setNotice(result.message);
     if (!result.ok) { await reload(); return; }
     if (result.contextUpdate?.role) hub.setRole(result.contextUpdate.role);
@@ -34,7 +33,7 @@ export function ContractDetailView({ mode }: { mode: "public" | "active" | "prog
     if (result.closeSurface) setHandoff(result.message);
     if (result.changed) await reload();
   };
-  const verify = async (stepId: string) => { const result = await fixtureHubAdapter.dispatch({ type: "contract.verifyStep", contractId, stepId }, context); setNotice(result.message); if (result.changed) await reload(); };
+  const verify = async (stepId: string) => { const result = await hub.adapter.dispatch({ type: "contract.verifyStep", contractId, stepId }, context); setNotice(result.message); if (result.changed) await reload(); };
   const completed = contract.steps.filter((step) => step.completed).length;
   const percent = Math.round(completed / contract.steps.length * 100);
   const tone = contract.status === "completed" ? "success" : ["failed", "expired", "cancelled"].includes(contract.status) ? "danger" : contract.status === "published" || contract.status === "draft" ? "warning" : "active";

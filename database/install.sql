@@ -31,3 +31,7 @@ CREATE TABLE IF NOT EXISTS `farming_crops` (
   KEY `idx_zone` (`zone`),
   KEY `idx_owner` (`owner`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Company/Supplies tables are created idempotently by
+-- server/modules/company/database.lua. Keep that file as the executable source
+-- because oxmysql installations may disable multi-statement queries.

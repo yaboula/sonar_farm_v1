@@ -25,6 +25,15 @@ local function advancedSummary(record, condition)
     if Sonar.Conditions.IsEnabled(record, 'pests') then
         parts[#parts + 1] = ('pests %d%%'):format(math.floor(condition.pestPressure or 0))
     end
+    local now = Sonar.Time.Now()
+    if (condition.nutrientProtectionUntil or 0) > now then
+        parts[#parts + 1] = ('%s nutrient protection %dm')
+            :format(condition.nutrientProtectionTier or 'active', math.ceil((condition.nutrientProtectionUntil - now) / 60))
+    end
+    if (condition.pestProtectionUntil or 0) > now then
+        parts[#parts + 1] = ('%s pest protection %dm')
+            :format(condition.pestProtectionTier or 'active', math.ceil((condition.pestProtectionUntil - now) / 60))
+    end
     return #parts > 0 and (' ' .. table.concat(parts, ', ') .. '.') or ''
 end
 

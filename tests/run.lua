@@ -24,6 +24,7 @@ function GetCurrentResourceName() return 'sonar_farm' end
 function IsDuplicityVersion() return true end
 function GetNetworkTimeAccurate() return os.time() * 1000 end
 function AddEventHandler() end
+function RegisterCommand() end
 function GetPlayerPed() return 1 end
 function GetEntityCoords() return vec3(2236.0, 5031.0, 44.2) end
 function GetPlayerRoutingBucket() return 0 end
@@ -46,13 +47,19 @@ Bridge = {
     Ready = true,
     GetIdentifier = function() return 'citizen-test' end,
     GetPlayerName = function() return 'Test Player' end,
-    Inventory = { HasItem = function() return true end },
+    Inventory = {
+        HasItem = function() return true end,
+        GetSlotsWithItem = function() return {} end,
+        SetDurability = function() return true end,
+        RemoveFromSlot = function() return true end,
+    },
 }
 
 dofile('config/config.lua')
 dofile('config/crops.lua')
 dofile('config/zones.lua')
 dofile('config/minigames.lua')
+dofile('shared/item_catalog.lua')
 dofile('shared/constants.lua')
 dofile('shared/utils.lua')
 dofile('shared/time.lua')
@@ -62,6 +69,7 @@ dofile('shared/physiology.lua')
 dofile('shared/zones.lua')
 dofile('shared/config_validation.lua')
 dofile('server/modules/minigames/tomato_plant_scoring.lua')
+dofile('server/modules/inventory/items.lua')
 
 test('production config validates', function()
     local errors = Sonar.ConfigValidation.Validate()
@@ -105,32 +113,28 @@ end)
 
 test('advanced care config rejects incomplete operational effects', function()
     local advanced = Config.Farming.AdvancedCare
-    local fertilizer = advanced.Fertilizers.fertilizer_organic
-    local treatment = advanced.PestTreatments.pest_spray_chemical
-    local weedTool = Config.Farming.Tools.weed
-    local weedRemoval = advanced.WeedRemoval
+    local fertilizer = Sonar.ItemCatalog.byId.fertilizer_organic.consumable.amount
+    local treatment = Sonar.ItemCatalog.byId.pest_spray_chemical.consumable.reduction
+    local weedRemoval = Sonar.ItemCatalog.byId.hand_hoe.tool.weedRemoval
     local waterPenalty = advanced.GrowthPenaltyPerDeficitHour.water
     local nutrientPenalty = advanced.GrowthPenaltyPerDeficitHour.nutrients
 
-    advanced.Fertilizers.fertilizer_organic = nil
-    advanced.PestTreatments.pest_spray_chemical = nil
-    Config.Farming.Tools.weed = nil
-    advanced.WeedRemoval = 0
+    Sonar.ItemCatalog.byId.fertilizer_organic.consumable.amount = nil
+    Sonar.ItemCatalog.byId.pest_spray_chemical.consumable.reduction = nil
+    Sonar.ItemCatalog.byId.hand_hoe.tool.weedRemoval = 0
     advanced.GrowthPenaltyPerDeficitHour.water = 0.7
     advanced.GrowthPenaltyPerDeficitHour.nutrients = 0.6
 
     local errors = Sonar.ConfigValidation.Validate()
     local report = table.concat(errors, '\n')
-    assert(report:find('Fertilizers.fertilizer_organic', 1, true), 'missing fertilizer effect rejected')
-    assert(report:find('PestTreatments.pest_spray_chemical', 1, true), 'missing treatment effect rejected')
-    assert(report:find('Config.Farming.Tools.weed', 1, true), 'missing weed tool rejected')
-    assert(report:find('AdvancedCare.WeedRemoval', 1, true), 'ineffective weed removal rejected')
+    assert(report:find('fertilizer_organic', 1, true), 'missing fertilizer effect rejected')
+    assert(report:find('pest_spray_chemical', 1, true), 'missing treatment effect rejected')
+    assert(report:find('hand_hoe', 1, true), 'ineffective weed removal rejected')
     assert(report:find('sum to at most 1', 1, true), 'growth rates that can reverse progress rejected')
 
-    advanced.Fertilizers.fertilizer_organic = fertilizer
-    advanced.PestTreatments.pest_spray_chemical = treatment
-    Config.Farming.Tools.weed = weedTool
-    advanced.WeedRemoval = weedRemoval
+    Sonar.ItemCatalog.byId.fertilizer_organic.consumable.amount = fertilizer
+    Sonar.ItemCatalog.byId.pest_spray_chemical.consumable.reduction = treatment
+    Sonar.ItemCatalog.byId.hand_hoe.tool.weedRemoval = weedRemoval
     advanced.GrowthPenaltyPerDeficitHour.water = waterPenalty
     advanced.GrowthPenaltyPerDeficitHour.nutrients = nutrientPenalty
 end)
@@ -462,6 +466,72 @@ test('advanced care mutators settle weeds pests and overfertilize consequences',
     Config.Features.AdvancedCare = enabled
 end)
 
+test('protection trajectories split exactly at expiry', function()
+    local enabled = Config.Features.AdvancedCare
+    local weeds = Config.Farming.ConditionEffects.Weeds
+    local pests = Config.Farming.ConditionEffects.Pests
+    Config.Features.AdvancedCare = true
+    Config.Farming.ConditionEffects.Weeds = false
+    Config.Farming.ConditionEffects.Pests = true
+
+    local def = Config.Crops.carrot
+    local record = {
+        crop_type = 'carrot', planted_at = -100000, growth_time = 999999,
+        data = {
+            lastCare = 1000, water = 100, nutrients = 80, pestPressure = 10,
+            nutrientProtectionStrength = 0.5, nutrientProtectionUntil = 1000 + 2 * 3600,
+            pestProtectionStrength = 0.5, pestProtectionUntil = 1000 + 2 * 3600,
+        },
+    }
+    local trajectory = Sonar.Conditions.Evaluate(record, 1000 + 4 * 3600)
+    local expectedNutrients = Sonar.Utils.Clamp(80 - def.nutrients.decayPerHour * 3, 0, 100)
+    equal(Sonar.Utils.Round(trajectory.nutrients, 4), Sonar.Utils.Round(expectedNutrients, 4), 'nutrient protection split')
+    local pestRate = Config.Farming.AdvancedCare.PestGrowthPerHour * def.pests.susceptibility
+    local expectedPests = Sonar.Utils.Clamp(10 + pestRate * 3, 0, 100)
+    equal(Sonar.Utils.Round(trajectory.pestPressure, 4), Sonar.Utils.Round(expectedPests, 4), 'pest protection split')
+
+    Config.Features.AdvancedCare = enabled
+    Config.Farming.ConditionEffects.Weeds = weeds
+    Config.Farming.ConditionEffects.Pests = pests
+end)
+
+test('item runtime selects lowest durability and breaks exact slot', function()
+    local slots = {
+        { slot = 8, count = 1, metadata = { durability = 80 } },
+        { slot = 3, count = 1, metadata = { durability = 30 } },
+    }
+    local setSlot, setValue, removedSlot
+    Bridge.Inventory.GetSlotsWithItem = function(_, item)
+        return item == 'watering_can' and slots or {}
+    end
+    Bridge.Inventory.SetDurability = function(_, slot, value) setSlot, setValue = slot, value; return true end
+    Bridge.Inventory.RemoveFromSlot = function(_, _, _, slot) removedSlot = slot; return true end
+
+    local selected = assert(Items.Resolve(1, 'water', 'watering_can'))
+    equal(selected.slot, 3, 'lowest durability slot selected')
+    local consumed, broken = Items.Consume(1, selected)
+    equal(consumed, true, 'tool use committed')
+    equal(broken, false, 'tool remains')
+    equal(setSlot, 3, 'exact slot durability updated')
+    equal(Sonar.Utils.Round(setValue, 4), 25, 'one of twenty uses consumed')
+
+    slots = { { slot = 9, count = 1, metadata = { durability = 5 } } }
+    selected = assert(Items.Resolve(1, 'water', 'watering_can'))
+    consumed, broken = Items.Consume(1, selected)
+    equal(consumed, true, 'final use committed')
+    equal(broken, true, 'tool broke')
+    equal(removedSlot, 9, 'broken tool removed from exact slot')
+
+    slots = {
+        { slot = 10, count = 1, metadata = { durability = 0 } },
+        { slot = 11, count = 1, metadata = { durability = 50 } },
+    }
+    selected = assert(Items.Resolve(1, 'water', 'watering_can'))
+    equal(selected.slot, 11, 'zero durability tools are never offered')
+    local options = Items.ListForAction(1, 'water')
+    equal(options[1].usesRemaining, 10, 'menu excludes broken tool uses')
+end)
+
 test('state load fails closed on database errors', function()
     Database.LoadAllCrops = function() return nil, 'database unavailable' end
     local ok, err = State.LoadAll()
@@ -634,6 +704,78 @@ test('database rejects an empty but incompatible schema', function()
     equal(Database.ValidateSchema(), true, 'complete schema')
     table.remove(columns)
     equal(Database.ValidateSchema(), false, 'missing data column')
+end)
+
+test('company custody closes consumables and tools per consumed unit', function()
+    local transaction, outboxStatus = {}, {}
+    MySQL.insert = { await = function(_, values) outboxStatus[values[1]] = 'prepared'; return 1 end }
+    MySQL.single = { await = function(sql)
+        if sql:find('FROM sf_company_members', 1, true) then
+            return { company_id = 'company-test', identifier = 'citizen-test', display_name = 'Test Player',
+                role_key = 'worker', status = 'active', permissions = { 'warehouse.withdraw' },
+                treasury_cents = 0, monthly_budget_cents = 0 }
+        end
+        return nil
+    end }
+    MySQL.scalar = { await = function(sql, values)
+        if sql:find('FROM sf_material_issues', 1, true) then return 'issued' end
+        return outboxStatus[values[1]]
+    end }
+    MySQL.update = { await = function(_, values)
+        if outboxStatus[values[1]] == 'prepared' then outboxStatus[values[1]] = 'inventory_done'; return 1 end
+        return 0
+    end }
+    MySQL.transaction = { await = function(queries)
+        transaction = queries
+        local outboxId = queries[#queries].values[1]
+        outboxStatus[outboxId] = 'completed'
+        return true
+    end }
+    Bridge.Inventory.GetItemCount = function() return 1 end
+    dofile('server/modules/company/company.lua')
+
+    local consumableMetadata = { ownership = 'company', companyId = 'company-test',
+        issueId = 'issue-consumable', itemId = 'fertilizer_organic' }
+    local prepared, outboxId, payload = Company.PrepareItemUse(1, consumableMetadata, 'fertilize',
+        { slot = 1, count = 1, durability = 100 }, false)
+    equal(prepared, true, 'consumable custody is durably reserved before mutation')
+    Company.RecordItemUse(1, consumableMetadata, 'fertilize', false, outboxId, payload)
+    equal(transaction[1].values[1], 1, 'consumable increments consumed units')
+    equal(transaction[1].values[2], 1, 'consumable can close its custody total')
+
+    transaction = {}
+    local toolMetadata = { ownership = 'company', companyId = 'company-test', issueId = 'issue-tool', itemId = 'watering_can' }
+    prepared, outboxId, payload = Company.PrepareItemUse(1, toolMetadata, 'water',
+        { slot = 2, count = 1, durability = 5 }, true)
+    equal(prepared, true, 'broken tool custody is reserved')
+    Company.RecordItemUse(1, toolMetadata, 'water', true, outboxId, payload)
+    equal(transaction[1].values[1], 1, 'broken tool consumes one issued unit')
+    assert(transaction[2].query:find("status='consumed'", 1, true), 'warehouse tool unit is retired')
+
+    transaction = {}
+    prepared, outboxId, payload = Company.PrepareItemUse(1, toolMetadata, 'water',
+        { slot = 2, count = 1, durability = 50 }, false)
+    equal(prepared, true, 'ordinary tool custody is reserved')
+    Company.RecordItemUse(1, toolMetadata, 'water', false, outboxId, payload)
+    equal(transaction[1].values[1], 0, 'ordinary tool use does not consume the unit')
+    equal(#transaction, 2, 'ordinary tool use only updates custody and outbox')
+end)
+
+test('warehouse schema preserves tool durability and operation idempotency', function()
+    local function read(path)
+        local file = assert(io.open(path, 'rb'))
+        local value = file:read('*a')
+        file:close()
+        return value
+    end
+    local schema = read('server/modules/company/database.lua')
+    local service = read('server/modules/supplies/service.lua')
+    assert(schema:find('sf_warehouse_tool_units', 1, true), 'per-tool warehouse storage required')
+    assert(schema:find('uniq_sf_issue_operation', 1, true), 'withdrawal idempotency constraint required')
+    assert(service:find('identifier = member.identifier', 1, true), 'return outbox must bind its owner')
+    assert(service:find("ORDER BY durability,id LIMIT 1", 1, true), 'lowest durability warehouse tool selected first')
+    assert(service:find("row.status == 'prepared'", 1, true), 'prepared usage rows must be reconciled after a restart')
+    assert(service:find("Lock.With('member-custody:' .. member.identifier", 1, true), 'withdrawal and member removal share a custody lock')
 end)
 
 print(('All %d tests passed.'):format(passed))

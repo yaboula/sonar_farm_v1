@@ -171,6 +171,16 @@ export class CompanyFixtureRepository {
     return { ok: true, changed: true, message: `${reservation.sourceLabel} stock prepared for delivery.`, invalidated: [reservation.sourceId, "warehouse"] };
   }
 
+  withdraw(itemId: string, quantity: number, context: HubContextModel): IntentResult {
+    if (!context.capabilities.manageWarehouse) return { ok: false, message: "Warehouse withdrawal permission is required." };
+    if (context.presence !== "warehouse") return { ok: false, closeSurface: true, message: "Continue at the Farm Warehouse." };
+    const item = this.state.warehouseItems.find((entry) => entry.id === itemId);
+    if (!item || !Number.isInteger(quantity) || quantity < 1 || quantity > item.available) return { ok: false, message: "Warehouse stock changed." };
+    item.total -= quantity;
+    item.available -= quantity;
+    return { ok: true, changed: true, message: `${quantity} ${item.name} withdrawn under Company custody.`, invalidated: ["warehouse"] };
+  }
+
   createWholesale(itemId: string, quantity: number, quality: string, context: HubContextModel): IntentResult {
     if (!context.capabilities.sellWholesaleStock) return { ok: false, message: "Wholesale sales are not permitted." };
     const item = this.state.warehouseItems.find((entry) => entry.id === itemId);

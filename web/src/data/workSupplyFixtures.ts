@@ -6,6 +6,7 @@ import type {
   PurchaseReview,
   SupplyProduct,
 } from "../types";
+import { CANONICAL_SUPPLY_PRODUCTS } from "./itemCatalog.generated";
 
 export const BUYER_ORDERS: BuyerOrderDetail[] = [
   {
@@ -172,16 +173,7 @@ export const CONTRACTS: ContractDetail[] = [
   },
 ];
 
-export const SUPPLY_PRODUCTS: SupplyProduct[] = [
-  { id: "tomato-seedling", name: "Tomato Seedling", category: "Seedlings", cropRelation: "Tomato", detail: "Healthy greenhouse-raised starter", unit: "seedling", unitPrice: 18, stock: "base", restock: "Always available", personalOwned: 4, companyOwned: 36 },
-  { id: "lettuce-seed", name: "Lettuce Seed Packet", category: "Seeds", cropRelation: "Lettuce", detail: "Calibrated field packet · 20 seeds", unit: "packet", unitPrice: 42, stock: "base", restock: "Always available", personalOwned: 0, companyOwned: 8 },
-  { id: "hand-trowel", name: "Forged Hand Trowel", category: "Hand Tools", cropRelation: "All crops", detail: "Narrow field blade with depth marks", unit: "tool", unitPrice: 165, stock: 7, restock: "Tomorrow, 08:00", personalOwned: 1, companyOwned: 4 },
-  { id: "watering-can", name: "Galvanized Watering Can", category: "Watering", cropRelation: "All crops", detail: "8 L field can · removable rose", unit: "tool", unitPrice: 240, stock: 4, restock: "10 Aug, 09:00", personalOwned: 0, companyOwned: 3 },
-  { id: "drip-hose", name: "Drip Hose Kit", category: "Watering", cropRelation: "Tomato", detail: "12 m line with service connectors", unit: "kit", unitPrice: 390, stock: 2, restock: "12 Aug, 12:00", personalOwned: 0, companyOwned: 2 },
-  { id: "balanced-fertilizer", name: "Balanced Fertilizer", category: "Fertilizer", cropRelation: "Tomato · Lettuce", detail: "10 kg controlled-release blend", unit: "bag", unitPrice: 96, stock: 12, restock: "Tomorrow, 08:00", personalOwned: 1, companyOwned: 9 },
-  { id: "neem-treatment", name: "Neem Pest Treatment", category: "Pest Treatment", cropRelation: "All crops", detail: "Plant-safe concentrate · 1 L", unit: "bottle", unitPrice: 78, stock: 0, restock: "9 Aug, 16:00", personalOwned: 0, companyOwned: 2 },
-  { id: "soft-ties", name: "Soft Plant Ties", category: "Hand Tools", cropRelation: "Tomato", detail: "Reusable soft ties · pack of 20", unit: "pack", unitPrice: 55, stock: 9, restock: "Tomorrow, 08:00", personalOwned: 0, companyOwned: 3 },
-];
+export const SUPPLY_PRODUCTS: SupplyProduct[] = CANONICAL_SUPPLY_PRODUCTS;
 
 export const ISSUED_MATERIALS: IssuedMaterialRecord[] = [
   { id: "issue-118", asset: "Field Pruners · SF-118", worker: "Noah Reed", assignment: "ASG-1052", issued: 1, used: 0, remaining: 1, unit: "tool", status: "return_due", availableActions: ["return", "flag"] },

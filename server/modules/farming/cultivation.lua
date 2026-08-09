@@ -43,13 +43,6 @@ local function validateLocked(source, record, conditionName)
     return true
 end
 
-local function firstHeld(source, names)
-    for _, name in ipairs(names) do
-        if Bridge.Inventory.HasItem(source, name, 1) then return name end
-    end
-    return nil
-end
-
 lib.callback.register(CALLBACKS.FERTILIZE, function(source, payload)
     local context, failure = beginAction(source, ACTIONS.FERTILIZE, payload or {})
     if not context then return failure end
@@ -57,31 +50,27 @@ lib.callback.register(CALLBACKS.FERTILIZE, function(source, payload)
     local acquired, result = Lock.With(record.id, function()
         local valid, invalid = validateLocked(source, record, 'nutrients')
         if not valid then return invalid end
-        local item = firstHeld(source, { 'fertilizer_organic', 'fertilizer_chemical' })
-        if not item then return reject(REJECT.MISSING_TOOL) end
-
         local condition = Physiology.Apply(record)
         if condition.state == CROP_STATE.DEAD then return reject(REJECT.CROP_DEAD) end
         local def = Config.Crops[record.crop_type]
         local ceiling = def.nutrients.overfertilizeCeiling
         if condition.nutrients >= ceiling then return reject(REJECT.NUTRIENTS_SATURATED) end
 
-        local effects = Config.Farming.AdvancedCare.Fertilizers
-        local effect = type(effects) == 'table' and effects[item] or nil
-        if type(effect) ~= 'table' or type(effect.amount) ~= 'number'
-            or type(effect.burnMultiplier) ~= 'number' then
-            return reject(REJECT.CONDITION_DISABLED)
-        end
-        if not Bridge.Inventory.RemoveItem(source, item, 1) then return reject(REJECT.MISSING_TOOL) end
+        local selected, itemReason = Items.Resolve(source, ACTIONS.FERTILIZE, payload.itemId)
+        if not selected then return reject(itemReason) end
+        local effect = selected.effect
+        local consumed = Items.Consume(source, selected)
+        if not consumed then return reject(REJECT.MISSING_TOOL) end
 
-        local nutrients, excess = Physiology.Fertilize(record, effect.amount, effect.burnMultiplier)
+        local nutrients, excess = Physiology.Fertilize(record, effect, selected.definition)
+        Items.RecordCompanyUse(source, selected, ACTIONS.FERTILIZE, false)
         local updated = State.Get(record.id)
         Sync.OnCropChanged(updated)
         TriggerEvent(PUBLIC.CROP_FERTILIZED, {
             cropId = record.id, cropType = record.crop_type, owner = record.owner,
-            source = source, item = item, nutrients = nutrients, overfertilizeExcess = excess,
+            source = source, item = selected.definition.id, nutrients = nutrients, overfertilizeExcess = excess,
         })
-        return { ok = true, data = { cropId = record.id, nutrients = nutrients, overfertilizeExcess = excess } }
+        return { ok = true, data = { cropId = record.id, itemId = selected.definition.id, nutrients = nutrients, overfertilizeExcess = excess } }
     end)
     return acquired and result or reject(REJECT.ALREADY_IN_PROGRESS)
 end)
@@ -94,21 +83,23 @@ lib.callback.register(CALLBACKS.WEED, function(source, payload)
         local valid, invalid = validateLocked(source, record, 'weeds')
         if not valid then return invalid end
         local cfg = Config.Farming.AdvancedCare
-        local tool = Config.Farming.Tools.weed
-        if type(tool) ~= 'string' or tool == '' then return reject(REJECT.CONDITION_DISABLED) end
-        if not Validation.HasItem(source, tool, REJECT.MISSING_TOOL).ok then return reject(REJECT.MISSING_TOOL) end
 
         local condition = Physiology.Apply(record)
         if condition.state == CROP_STATE.DEAD then return reject(REJECT.CROP_DEAD) end
         if condition.weedCover < cfg.MinimumWeedCover then return reject(REJECT.NO_WEEDS_DETECTED) end
 
-        local weedCover = Physiology.Weed(record, cfg.WeedRemoval)
+        local selected, itemReason = Items.Resolve(source, ACTIONS.WEED, payload.itemId)
+        if not selected then return reject(itemReason) end
+        local consumed, broken = Items.Consume(source, selected)
+        if not consumed then return reject(REJECT.MISSING_TOOL) end
+        local weedCover = Physiology.Weed(record, selected.effect.weedRemoval)
+        Items.RecordCompanyUse(source, selected, ACTIONS.WEED, broken)
         Sync.OnCropChanged(State.Get(record.id))
         TriggerEvent(PUBLIC.CROP_WEEDED, {
             cropId = record.id, cropType = record.crop_type, owner = record.owner,
-            source = source, weedCover = weedCover,
+            source = source, item = selected.definition.id, weedCover = weedCover,
         })
-        return { ok = true, data = { cropId = record.id, weedCover = weedCover } }
+        return { ok = true, data = { cropId = record.id, itemId = selected.definition.id, weedCover = weedCover, toolBroken = broken } }
     end)
     return acquired and result or reject(REJECT.ALREADY_IN_PROGRESS)
 end)
@@ -121,26 +112,24 @@ lib.callback.register(CALLBACKS.TREAT_PEST, function(source, payload)
         local valid, invalid = validateLocked(source, record, 'pests')
         if not valid then return invalid end
         local cfg = Config.Farming.AdvancedCare
-        local item = firstHeld(source, { 'pest_spray_organic', 'pest_spray_chemical' })
-        if not item then return reject(REJECT.MISSING_TOOL) end
-
         local condition = Physiology.Apply(record)
         if condition.state == CROP_STATE.DEAD then return reject(REJECT.CROP_DEAD) end
         if condition.pestPressure < cfg.MinimumPestPressure then return reject(REJECT.NO_PEST_DETECTED) end
 
-        local effect = type(cfg.PestTreatments) == 'table' and cfg.PestTreatments[item] or nil
-        if type(effect) ~= 'table' or type(effect.reduction) ~= 'number' then
-            return reject(REJECT.CONDITION_DISABLED)
-        end
-        if not Bridge.Inventory.RemoveItem(source, item, 1) then return reject(REJECT.MISSING_TOOL) end
+        local selected, itemReason = Items.Resolve(source, ACTIONS.TREAT_PEST, payload.itemId)
+        if not selected then return reject(itemReason) end
+        local effect = selected.effect
+        local consumed = Items.Consume(source, selected)
+        if not consumed then return reject(REJECT.MISSING_TOOL) end
 
-        local pestPressure = Physiology.TreatPests(record, effect.reduction)
+        local pestPressure = Physiology.TreatPests(record, effect, selected.definition)
+        Items.RecordCompanyUse(source, selected, ACTIONS.TREAT_PEST, false)
         Sync.OnCropChanged(State.Get(record.id))
         TriggerEvent(PUBLIC.CROP_TREATED, {
             cropId = record.id, cropType = record.crop_type, owner = record.owner,
-            source = source, item = item, pestPressure = pestPressure,
+            source = source, item = selected.definition.id, pestPressure = pestPressure,
         })
-        return { ok = true, data = { cropId = record.id, pestPressure = pestPressure } }
+        return { ok = true, data = { cropId = record.id, itemId = selected.definition.id, pestPressure = pestPressure } }
     end)
     return acquired and result or reject(REJECT.ALREADY_IN_PROGRESS)
 end)

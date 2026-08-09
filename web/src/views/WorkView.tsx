@@ -1,7 +1,6 @@
 import { Briefcase, CaretRight, Clock, FilePlus, FileText, Handshake, MagnifyingGlass, Plus } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { fixtureHubAdapter } from "../adapters/FixtureHubAdapter";
 import { HubScaffold } from "../components/HubScaffold";
 import { StatePanel } from "../components/StatePanel";
 import { useHub } from "../store/HubContext";
@@ -30,11 +29,11 @@ export function WorkView() {
   const [loadedFor, setLoadedFor] = useState("");
   useEffect(() => {
     let active = true;
-    void fixtureHubAdapter.load<WorkQueueData>({ kind: "hub", route: "work" }, context).then((next) => {
+    void hub.adapter.load<WorkQueueData>({ kind: "hub", route: "work" }, context).then((next) => {
       if (active) { setModel(next); setLoadedFor(contextKey); }
     });
     return () => { active = false; };
-  }, [context, contextKey]);
+  }, [context, contextKey, hub.adapter]);
 
   if (!model || loadedFor !== contextKey) return <StatePanel state="loading" />;
   if (model.state !== "ready") return <StatePanel state={model.state} onAction={() => hub.setViewState("ready")} />;

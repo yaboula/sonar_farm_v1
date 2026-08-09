@@ -150,6 +150,14 @@ function Physiology.Evaluate(record, now)
         result.overfertilizeExcess = trajectory.enabled.nutrients
             and Utils.Round(Utils.Clamp(tonumber(data.overfertilizeExcess) or 0, 0, 100), 2)
             or nil
+        result.nutrientProtectionStrength = trajectory.nutrientProtectionStrength
+        result.nutrientProtectionUntil = trajectory.nutrientProtectionUntil
+        result.nutrientProtectionTier = trajectory.nutrientProtectionTier
+        result.nutrientProtectionItem = trajectory.nutrientProtectionItem
+        result.pestProtectionStrength = trajectory.pestProtectionStrength
+        result.pestProtectionUntil = trajectory.pestProtectionUntil
+        result.pestProtectionTier = trajectory.pestProtectionTier
+        result.pestProtectionItem = trajectory.pestProtectionItem
     end
     return result
 end

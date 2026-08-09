@@ -158,6 +158,9 @@ function Minigame.Begin(cropType, zoneKey, slotIndex)
     if active then
         return Bridge.Notify('A planting session is already open.', NOTIFY.ERROR)
     end
+    if Hub and Hub.IsActive and Hub.IsActive() then
+        return Bridge.Notify('Close the Business Hub before planting.', NOTIFY.ERROR)
+    end
 
     local response = awaitServer(CALLBACKS.MINIGAME_BEGIN, {
         cropType = cropType,
@@ -173,7 +176,7 @@ end
 
 ---@param cropId string
 function Minigame.Resume(cropId)
-    if active then return end
+    if active or Hub and Hub.IsActive and Hub.IsActive() then return end
     local response = awaitServer(CALLBACKS.MINIGAME_RESUME, { cropId = cropId })
     if not response or not response.ok then
         return Actions.HandleRejection(response)

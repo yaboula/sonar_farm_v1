@@ -77,6 +77,17 @@ CreateThread(function()
         return
     end
 
+    local companyReady = Company.Init()
+    if not companyReady and Supplies.IsEnabled() then
+        Runtime.SetStatus(Runtime.STATUS.FAILED, 'company_database')
+        Logger.Warn('Company persistence failed while Supplies is enabled.', 'boot')
+        return
+    elseif not companyReady then
+        Logger.Warn('Company persistence is unavailable; Supplies remains disabled.', 'boot')
+    else
+        CompanyInventoryHooks.Init()
+    end
+
     local loadedOk, loadedOrError = State.LoadAll()
     if not loadedOk then
         Runtime.SetStatus(Runtime.STATUS.FAILED, 'state_load')
@@ -98,6 +109,17 @@ CreateThread(function()
             State.Flush()
         end
     end)
+
+
+    if companyReady and Supplies.IsEnabled() then
+        CreateThread(function()
+            while true do
+                Wait(math.max(5, Config.Supplies.DeliveryWorkerSeconds) * 1000)
+                Lock.With('supplier-order', function() Supplies.Restock() end)
+                Supplies.ProcessDue()
+            end
+        end)
+    end
 end)
 
 -- Emergency flush on resource stop / server shutdown (txAdmin hot updates).
@@ -105,6 +127,7 @@ AddEventHandler('onResourceStop', function(resourceName)
     if resourceName ~= Sonar.Constants.RESOURCE then return end
     Runtime.SetStatus(Runtime.STATUS.STOPPING)
     if not engineReady then return end
+    CompanyInventoryHooks.Shutdown()
     Logger.Info('Resource stopping: flushing state to database.', 'boot')
     State.FlushSync()
 end)

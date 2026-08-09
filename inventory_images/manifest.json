@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "items": {
+    "carrot_seed": {
+      "sha256": "5913ebd76c8e88f9eed0b485a9ad53ca09930b02420169855df0a6088ecc874f",
+      "bytes": 258317,
+      "width": 512,
+      "height": 512
+    },
+    "potato_seed": {
+      "sha256": "54728d6dc2a0a35ed60372f26172643950e9c48e55397bcac5c125098b71b54a",
+      "bytes": 205234,
+      "width": 512,
+      "height": 512
+    },
+    "lettuce_seed": {
+      "sha256": "ebaf417521a968b1efa11715aacc331bf006393dc7eb26476e2adb8b8c5d9c53",
+      "bytes": 209973,
+      "width": 512,
+      "height": 512
+    },
+    "tomato_seed": {
+      "sha256": "260797a347f1d3c55c1de55738161ef63c4dbf692feb83ef14a1339920075368",
+      "bytes": 269229,
+      "width": 512,
+      "height": 512
+    },
+    "tomato_seedling": {
+      "sha256": "5b5632018dbe1e137f2c2adc8cecc8228c79fca56086b57aaf45ddf235cc9eb5",
+      "bytes": 225241,
+      "width": 512,
+      "height": 512
+    },
+    "carrot": {
+      "sha256": "888930da1a93bd0d4d282b3a28fe4bdcc255a2396df8f3cd5256e8e375c5f72c",
+      "bytes": 135771,
+      "width": 512,
+      "height": 512
+    },
+    "potato": {
+      "sha256": "52c16ccf0ffff678d51fdb72d648ce1a185ff8fb5c78f0625b3986567161c657",
+      "bytes": 209464,
+      "width": 512,
+      "height": 512
+    },
+    "lettuce": {
+      "sha256": "224bbc3dbc1f93d1f1ab2153e4f8fd1bf9353059dadf2fee261d520a5feeda76",
+      "bytes": 239669,
+      "width": 512,
+      "height": 512
+    },
+    "tomato": {
+      "sha256": "704029e1c1c6c5264804ca2501ab4efe5ccbb41929bbf794cbbae66ac0328366",
+      "bytes": 233920,
+      "width": 512,
+      "height": 512
+    },
+    "watering_can": {
+      "sha256": "3d30a279fcee70ff267d454f51ef0e21cdf3143ad563c42d3252b5678d4530b1",
+      "bytes": 212097,
+      "width": 512,
+      "height": 512
+    },
+    "watering_can_reinforced": {
+      "sha256": "f7e5157c363f90df02c19e164098f949beb751f364c3231122e555f7c96aaea7",
+      "bytes": 232150,
+      "width": 512,
+      "height": 512
+    },
+    "watering_can_professional": {
+      "sha256": "b6e9b11ecf91a5bdb898928ed6822c8800d0e7087cc48e17465ee0b3180102eb",
+      "bytes": 201428,
+      "width": 512,
+      "height": 512
+    },
+    "hand_hoe": {
+      "sha256": "671566d0845836529c70ae5b6d667fa0eb0ab237eb9f82928129871a053e656c",
+      "bytes": 129520,
+      "width": 512,
+      "height": 512
+    },
+    "hand_hoe_reinforced": {
+      "sha256": "864678a2ffdd69aa8b4ff28e5a1d8800d3c129ff4578aeb92600a01063e43696",
+      "bytes": 103276,
+      "width": 512,
+      "height": 512
+    },
+    "hand_hoe_professional": {
+      "sha256": "d16c4f085354cee2f9f542f218b318ec10538178efa3be752d6bc53abff4dc33",
+      "bytes": 98319,
+      "width": 512,
+      "height": 512
+    },
+    "fertilizer_organic": {
+      "sha256": "54cbd8c5e49ef6996c0d92eccf9257ec7ea31e685f044d544396ef0b16315ff4",
+      "bytes": 215177,
+      "width": 512,
+      "height": 512
+    },
+    "fertilizer_balanced": {
+      "sha256": "a8df92bfa3d7209c2daf4a46204ad1a8b53b31b6f635d87cf70cb41e5b6539c7",
+      "bytes": 208498,
+      "width": 512,
+      "height": 512
+    },
+    "fertilizer_chemical": {
+      "sha256": "945567d1e8aeee7a4c29ed8ecc84ed3563a6a3123825d42d902896ff05b86507",
+      "bytes": 213271,
+      "width": 512,
+      "height": 512
+    },
+    "pest_spray_organic": {
+      "sha256": "f66f68738784fd0c5753de5066e55b59bab96d20a3e717017a31d528b735b88a",
+      "bytes": 176734,
+      "width": 512,
+      "height": 512
+    },
+    "pest_spray_targeted": {
+      "sha256": "2552a0c49c1d5ed503bd2b078453b6069d09b85ef232794e83d99f7f1173b3a9",
+      "bytes": 159745,
+      "width": 512,
+      "height": 512
+    },
+    "pest_spray_chemical": {
+      "sha256": "7d2fe1287d66399dee274c8a4c8f04c65df905fef7abc7e423909197ab015197",
+      "bytes": 178013,
+      "width": 512,
+      "height": 512
+    }
+  }
+}

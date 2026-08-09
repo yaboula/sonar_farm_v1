@@ -43,7 +43,7 @@ export class NuiBridge {
 
   constructor() {
     try {
-      this.#resourceName = window.GetParentResourceName?.() ?? null
+      this.#resourceName = window.GetParentResourceName?.() ?? window.parent?.GetParentResourceName?.() ?? null
     } catch {
       this.#resourceName = null
     }

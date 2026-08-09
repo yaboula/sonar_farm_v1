@@ -21,6 +21,32 @@ local function waterAmount(score)
     return 60 + (40 * (Sonar.Utils.Clamp(score, 0, 100) / 100))
 end
 
+lib.callback.register(CALLBACKS.CARE_OPTIONS, function(source, payload)
+    payload = payload or {}
+    local runtime = Runtime.GuardPlayer(source)
+    if not runtime.ok then return reject(runtime.reason) end
+    local crop = Validation.Crop(payload.cropId)
+    if not crop.ok then return reject(crop.reason) end
+    local record = crop.record
+    local distance = Validation.Distance(source, vec3(record.pos_x, record.pos_y, record.pos_z))
+    if not distance.ok then return reject(distance.reason) end
+    local permission = Validation.CanCare(source, record)
+    if not permission.ok then return reject(permission.reason) end
+    local action = payload.action
+    if action ~= ACTIONS.WATER and action ~= ACTIONS.FERTILIZE
+        and action ~= ACTIONS.WEED and action ~= ACTIONS.TREAT_PEST then
+        return reject(REJECT.INVALID_ITEM)
+    end
+    if action ~= ACTIONS.WATER then
+        local conditionName = action == ACTIONS.FERTILIZE and 'nutrients'
+            or action == ACTIONS.WEED and 'weeds' or 'pests'
+        if not Sonar.Conditions.IsEnabled(record, conditionName) then
+            return reject(REJECT.CONDITION_DISABLED)
+        end
+    end
+    return { ok = true, data = { options = Items.ListForAction(source, action) } }
+end)
+
 lib.callback.register(CALLBACKS.WATER, function(source, payload)
     payload = payload or {}
 
@@ -48,10 +74,6 @@ lib.callback.register(CALLBACKS.WATER, function(source, payload)
         local permission = Validation.CanCare(source, record)
         if not permission.ok then return reject(permission.reason) end
 
-        local tool = Config.Farming.Tools.water
-        local hasTool = Validation.HasItem(source, tool, REJECT.MISSING_TOOL)
-        if not hasTool.ok then return reject(hasTool.reason) end
-
         -- Bring the crop up to date before deciding whether it needs water.
         local condition = Physiology.Apply(record)
 
@@ -63,8 +85,14 @@ lib.callback.register(CALLBACKS.WATER, function(source, payload)
             return reject(REJECT.ALREADY_WATERED)
         end
 
+        local selected, itemReason = Items.Resolve(source, ACTIONS.WATER, payload.itemId)
+        if not selected then return reject(itemReason) end
+        local consumed, broken = Items.Consume(source, selected)
+        if not consumed then return reject(REJECT.MISSING_TOOL) end
+
         local score = Quality.Request(source, ACTIONS.WATER, record)
-        Physiology.Water(record, waterAmount(score))
+        Physiology.Water(record, waterAmount(score) * (selected.effect.waterMultiplier or 1))
+        Items.RecordCompanyUse(source, selected, ACTIONS.WATER, broken)
 
         local updated = State.Get(record.id)
         Sync.OnCropChanged(updated or record)
@@ -84,6 +112,8 @@ lib.callback.register(CALLBACKS.WATER, function(source, payload)
                 water = updated and updated.data.water or condition.water,
                 health = condition.health,
                 state = condition.state,
+                itemId = selected.definition.id,
+                toolBroken = broken,
             },
         }
     end)

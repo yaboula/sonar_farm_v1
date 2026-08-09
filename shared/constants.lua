@@ -67,6 +67,11 @@ Constants.CALLBACKS = {
     FERTILIZE = 'sonar_farm:fertilize',
     WEED = 'sonar_farm:weed',
     TREAT_PEST = 'sonar_farm:treatPest',
+    CARE_OPTIONS = 'sonar_farm:careOptions',
+    HUB_OPEN = 'sonar_farm:hub:open',
+    HUB_LOAD = 'sonar_farm:hub:load',
+    HUB_DISPATCH = 'sonar_farm:hub:dispatch',
+    HUB_CLOSE = 'sonar_farm:hub:close',
     MINIGAME_BEGIN = 'sonar_farm:minigame:begin',
     MINIGAME_CHECKPOINT = 'sonar_farm:minigame:checkpoint',
     MINIGAME_CANCEL = 'sonar_farm:minigame:cancel',
@@ -137,6 +142,7 @@ Constants.REJECT = {
     PLANTING_INCOMPLETE = 'planting_incomplete',
     PLANTING_NOT_FAILED = 'planting_not_failed',
     INTERNAL_ERROR = 'internal_error',
+    INVALID_ITEM = 'invalid_item',
 }
 
 -- ox_lib notification types.

@@ -1344,14 +1344,54 @@ select:focus-visible {
 }
 
 .supply-market-grid .supply-card {
-  min-height: 272px;
+  min-height: 370px;
   cursor: default;
 }
+
+.supply-card-visual {
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin: -5px -3px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.supply-card-visual img {
+  width: 92px;
+  height: 92px;
+  object-fit: contain;
+}
+
+.supply-card-visual span {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 3px 7px;
+  border: 1px solid var(--border-neutral);
+  border-radius: 99px;
+  font: 600 11px/1 var(--display);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.supply-card-visual span[data-tier="basic"] { color: #a9b494; }
+.supply-card-visual span[data-tier="plus"] { color: #69c7c2; border-color: rgba(105,199,194,.35); }
+.supply-card-visual span[data-tier="pro"] { color: #e59a4d; border-color: rgba(229,154,77,.38); }
 
 .supply-crop {
   display: block;
   margin: -8px 0 10px;
   color: var(--text-muted);
+  font-size: 12px;
+}
+
+.supply-effect {
+  display: block;
+  min-height: 18px;
+  margin: -7px 0 12px;
+  color: var(--accent);
   font-size: 12px;
 }
 
@@ -1698,8 +1738,10 @@ select:focus-visible {
   text-transform: uppercase;
 }
 
+.supply-card-head small { color: var(--text-muted); font-size: 12px; }
+
 .supply-card h2 {
-  margin-top: 18px;
+  margin-top: 12px;
 }
 
 .supply-card > p {

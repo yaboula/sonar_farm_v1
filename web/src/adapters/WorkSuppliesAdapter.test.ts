@@ -68,14 +68,14 @@ describe("FixtureHubAdapter Work and Supplies", () => {
   });
 
   it("keeps Tablet purchase confirmation read-only and completes at Office", async () => {
-    const draft = await adapter.dispatch({ type: "purchase.createDraft", payer: "personal", lines: [{ productId: "tomato-seedling", quantity: 2 }] }, context("visitor", "tablet"));
+    const draft = await adapter.dispatch({ type: "purchase.createDraft", payer: "personal", lines: [{ productId: "tomato_seedling", quantity: 2 }] }, context("visitor", "tablet"));
     const tablet = await adapter.dispatch({ type: "purchase.confirm", purchaseId: draft.entityId! }, context("visitor", "tablet"));
     expect(tablet).toMatchObject({ ok: false, closeSurface: true });
     const before = await adapter.load<PurchaseReview>({ kind: "purchaseReview", purchaseId: draft.entityId! }, context("visitor", "office"));
     expect(before.data?.status).toBe("draft");
     expect((await adapter.dispatch({ type: "purchase.confirm", purchaseId: draft.entityId! }, context("visitor", "office"))).ok).toBe(true);
     const after = await adapter.load<PurchaseReview>({ kind: "purchaseReview", purchaseId: draft.entityId! }, context("visitor", "office"));
-    expect(after.data?.status).toBe("completed");
+    expect(after.data?.status).toBe("delivered");
     expect(after.data?.receiptId).toBeTruthy();
   });
 
