@@ -47,6 +47,7 @@ local function toRecord(payload)
         heading = payload.heading or 0.0,
         planted_at = payload.plantedAt,
         growth_time = payload.growthTime,
+        state = payload.state,
         isMine = payload.isMine and true or false,
         data = {
             water = payload.water,
@@ -304,8 +305,10 @@ function Crops.Refresh(coords)
 
     local candidates = {}
     for id, record in pairs(cache) do
+        local incomplete = record.state == Sonar.Constants.CROP_STATE.PLANTING
+            or record.state == Sonar.Constants.CROP_STATE.PLANTING_FAILED
         local dist = Utils.Distance(coords, { x = record.pos_x, y = record.pos_y, z = record.pos_z })
-        if dist <= radius then
+        if not incomplete and dist <= radius then
             candidates[#candidates + 1] = { id = id, dist = dist }
         end
     end

@@ -217,6 +217,9 @@ function Validation.Crop(cropId)
 
     local record = State.Get(cropId)
     if not record then return fail(REJECT.CROP_NOT_FOUND) end
+    if record.state == CROP_STATE.PLANTING or record.state == CROP_STATE.PLANTING_FAILED then
+        return fail(REJECT.PLANTING_INCOMPLETE)
+    end
 
     return { ok = true, record = record }
 end

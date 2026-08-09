@@ -6,6 +6,26 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
 
 ## [Unreleased]
 
+### Added — Etapa 5.1 · Tomato Initial Planting
+
+- NUI independiente en `minigames-ui/` con React, TypeScript y Canvas 2D; no
+  comparte build ni rutas con el Business Hub en `web/`.
+- Flujo jugable de cuatro pasos: preparar el hoyo, colocar el trasplante,
+  cubrir raíces y regar. El feedback durante el trabajo es cualitativo.
+- Contrato de trazas normalizadas a 20 Hz, payload limitado y checkpoints
+  ordenados. El servidor valida geometría/duración y recalcula profundidad,
+  alineación, aireación e hidratación.
+- Sesiones autoritativas con reserva de slot, pausa por cancelación/daño,
+  reanudación, expiración y limpieza explícita de plantados incompletos.
+- Consumo transaccional de `tomato_seedling` al commit final. Un intento
+  abandonado no crea un cultivo plantado ni consume material.
+- Estados persistentes `planting` y `planting_failed`; ambos ocupan el slot pero
+  no crecen, no se riegan y no generan un prop de cultivo.
+- La calidad validada de plantación se conserva en `record.data` e influye en la
+  calidad final de cosecha junto con habilidad de cosecha y cuidado.
+- Assets runtime verificados y aislados del golden source de `temp/`, contrato
+  versionado, pruebas TypeScript y regresiones Lua para scoring determinista.
+
 ### Stabilized — Puerta obligatoria de Etapas 1–4
 
 - Runtime fail-closed con estados explícitos `BOOTING`, `READY`, `FAILED` y
@@ -33,8 +53,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
   El pool administra cultivos y props de slots por tags independientes.
 - Restaurados tiempos de crecimiento de producción para los cuatro cultivos.
 - Suite Lua ejecutable fuera de FiveM y CI para parseo, regresiones, whitespace
-  y detección básica de secretos. `Config.Features.Minigames` continúa en
-  `false`; no se añadió código de Etapa 5.
+  y detección básica de secretos. Esta puerta cerró las Etapas 1–4 antes de
+  habilitar el primer corte de minijuegos.
 
 ### Added
 

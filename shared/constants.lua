@@ -31,6 +31,8 @@ Constants.FRAMEWORKS = {
 
 -- Crop lifecycle states (used from Stage 3+).
 Constants.CROP_STATE = {
+    PLANTING = 'planting',
+    PLANTING_FAILED = 'planting_failed',
     PLANTED = 'planted',
     GROWING = 'growing',
     MATURE = 'mature',
@@ -59,6 +61,11 @@ Constants.CALLBACKS = {
     PLANT = 'sonar_farm:plant',
     WATER = 'sonar_farm:water',
     HARVEST = 'sonar_farm:harvest',
+    MINIGAME_BEGIN = 'sonar_farm:minigame:begin',
+    MINIGAME_CHECKPOINT = 'sonar_farm:minigame:checkpoint',
+    MINIGAME_CANCEL = 'sonar_farm:minigame:cancel',
+    MINIGAME_RESUME = 'sonar_farm:minigame:resume',
+    MINIGAME_CLEAR_INCOMPLETE = 'sonar_farm:minigame:clearIncomplete',
     SUBSCRIBE = 'sonar_farm:subscribe',
     ADMIN_AUTHORIZED = 'sonar_farm:adminAuthorized',
 }
@@ -108,6 +115,14 @@ Constants.REJECT = {
     INVENTORY_FULL = 'inventory_full',
     ALREADY_IN_PROGRESS = 'already_in_progress',
     ALREADY_WATERED = 'already_watered',
+    MINIGAME_REQUIRED = 'minigame_required',
+    MINIGAME_DISABLED = 'minigame_disabled',
+    MINIGAME_SESSION_NOT_FOUND = 'minigame_session_not_found',
+    MINIGAME_SESSION_EXPIRED = 'minigame_session_expired',
+    MINIGAME_INVALID_STEP = 'minigame_invalid_step',
+    MINIGAME_INVALID_TRACE = 'minigame_invalid_trace',
+    PLANTING_INCOMPLETE = 'planting_incomplete',
+    PLANTING_NOT_FAILED = 'planting_not_failed',
     INTERNAL_ERROR = 'internal_error',
 }
 

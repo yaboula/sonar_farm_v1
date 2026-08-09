@@ -45,6 +45,9 @@ lib.callback.register(CALLBACKS.PLANT, function(source, payload)
     local cropType = payload.cropType
     local def = Config.Crops and Config.Crops[cropType]
     if not def then return reject(REJECT.UNKNOWN_CROP) end
+    if Config.Features.Minigames and def.requiresMinigame then
+        return reject(REJECT.MINIGAME_REQUIRED)
+    end
 
     local zoneKey = payload.zone
     local slotIndex = payload.slot

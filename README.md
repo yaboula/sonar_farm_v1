@@ -37,8 +37,10 @@ sonar_farm/
       state/     Hot-state en RAM + crecimiento por timestamp
       security/  Rate limiting y validacion anti-exploit
       farming/   Acciones autoritativas: plant, care, harvest
+      minigames/ Sesiones, checkpoints y scoring autoritativo
       logger/    Logging por niveles con conectores
   client/        Motor visual, interaccion y herramientas de administracion
+  minigames-ui/  NUI React/Canvas 2D aislada del Business Hub
   docs/          Documentacion tecnica (espanol)
 ```
 
@@ -47,9 +49,11 @@ sonar_farm/
 1. Clonar dentro de `resources/[local]/` de tu servidor FiveM.
 2. Asegurar que `oxmysql`, `qb-core`, `ox_lib`, `ox_inventory` y `ox_target` estan iniciados antes.
 3. Copiar los items de [`data/ox_inventory_items.lua`](data/ox_inventory_items.lua) a `ox_inventory/data/items.lua` y reiniciar `ox_inventory`.
-4. Conceder `sonar_farm.admin` solo a administradores que deban usar las
+4. Construir la NUI de minijuegos con `npm ci` y `npm run build` dentro de
+   `minigames-ui/`.
+5. Conceder `sonar_farm.admin` solo a administradores que deban usar las
    herramientas de desarrollo.
-5. Anadir `ensure sonar_farm` a tu `server.cfg`.
+6. Anadir `ensure sonar_farm` a tu `server.cfg`.
 
 ```cfg
 add_ace group.admin sonar_farm.admin allow
@@ -59,16 +63,23 @@ El esquema de base de datos se crea solo al arrancar (`Config.Database.AutoCreat
 
 ## Estado del proyecto
 
-Etapas 1–4 estabilizadas. Ver [docs/DECISIONES.md](docs/DECISIONES.md) para la vision completa, [docs/API.md](docs/API.md) para el contrato actual y [CHANGELOG.md](CHANGELOG.md) para el historial.
+Etapas 1–4 estabilizadas y primer corte vertical de la Etapa 5 implementado.
+Ver [docs/DECISIONES.md](docs/DECISIONES.md) para la vision completa,
+[docs/API.md](docs/API.md) para el contrato actual y [CHANGELOG.md](CHANGELOG.md)
+para el historial.
 
 - [x] Etapa 1 — Bootstrap del recurso + Bridge Layer
 - [x] Etapa 2 — Motor de estado + persistencia
 - [x] Etapa 3 — Logica de servidor autoritativa (plantar / cuidar / cosechar)
 - [x] Etapa 4 — Motor visual (streaming/culling + ox_target)
-- [ ] Etapa 5 — Motor de minijuegos
+- [~] Etapa 5 — Motor de minijuegos (Tomato Initial Planting)
 - [ ] ... (ver docs/DECISIONES.md)
 
-Los cultivos ya se ven y se interactuan con `ox_target`. Plantar funciona usando el item de semilla o desde el menu del campo. La barra de progreso actual es un **placeholder deliberado** que la Etapa 5 sustituye por minijuegos.
+Tomato se planta como trasplante mediante el minijuego de cuatro pasos
+Prepare → Place → Cover → Water. La NUI solo captura interaccion; el servidor
+reserva el slot, valida checkpoints, recalcula calidad y consume
+`tomato_seedling` al confirmar. Water/Harvest conservan barras placeholder hasta
+sus respectivos cortes de Etapa 5.
 
 **Requisito de la Etapa 4:** los props de plantas (`bzzz_plants_*`) viven en su propio recurso de streaming, que debe estar iniciado. Si falta, el cliente avisa por consola con el nombre exacto del modelo y usa un respaldo. Ver [docs/RUNBOOK.md](docs/RUNBOOK.md).
 

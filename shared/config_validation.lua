@@ -170,6 +170,54 @@ local function validateZones(errors, warnings)
     end
 end
 
+local function validateMinigames(errors)
+    if not Config.Features or not Config.Features.Minigames then return end
+
+    local plant = Config.Minigames and Config.Minigames.Plant
+    if type(plant) ~= 'table' then
+        errors[#errors + 1] = 'Config.Minigames.Plant must be configured when minigames are enabled.'
+        return
+    end
+
+    for cropType, crop in pairs(Config.Crops or {}) do
+        if crop.requiresMinigame then
+            local cfg = plant[cropType]
+            local path = ('Config.Minigames.Plant.%s'):format(cropType)
+            if type(cfg) ~= 'table' then
+                errors[#errors + 1] = path .. ' must exist for requiresMinigame crops.'
+            else
+                nonEmptyString(errors, path .. '.key', cfg.key)
+                nonEmptyString(errors, path .. '.contractVersion', cfg.contractVersion)
+                positive(errors, path .. '.sessionTtl', cfg.sessionTtl, false)
+                positive(errors, path .. '.incompleteTtl', cfg.incompleteTtl, false)
+                positive(errors, path .. '.maxSamplesPerStep', cfg.maxSamplesPerStep, false)
+                positive(errors, path .. '.maxPayloadBytes', cfg.maxPayloadBytes, false)
+                positive(errors, path .. '.sampleIntervalMs', cfg.sampleIntervalMs, false)
+                positive(errors, path .. '.maximumStepDurationMs', cfg.maximumStepDurationMs, false)
+
+                local total = 0
+                for _, step in ipairs({ 'prepare', 'place', 'cover', 'water' }) do
+                    local weight = cfg.stepWeights and cfg.stepWeights[step]
+                    if not finite(weight) or weight <= 0 then
+                        errors[#errors + 1] = ('%s.stepWeights.%s must be positive.'):format(path, step)
+                    else
+                        total = total + weight
+                    end
+                    positive(
+                        errors,
+                        ('%s.minimumStepDurationMs.%s'):format(path, step),
+                        cfg.minimumStepDurationMs and cfg.minimumStepDurationMs[step],
+                        false
+                    )
+                end
+                if math.abs(total - 1) > 0.001 then
+                    errors[#errors + 1] = path .. '.stepWeights must sum to 1.'
+                end
+            end
+        end
+    end
+end
+
 local function validateSection(errors, name, fn, ...)
     local ok, err = pcall(fn, errors, ...)
     if not ok then
@@ -183,6 +231,7 @@ function ConfigValidation.Validate()
     validateSection(errors, 'Framework', validateFramework)
     validateSection(errors, 'Crop', validateCrops)
     validateSection(errors, 'Zone', validateZones, warnings)
+    validateSection(errors, 'Minigame', validateMinigames)
 
     nonEmptyString(errors, 'Config.Admin.Ace', Config.Admin and Config.Admin.Ace)
     positive(errors, 'Config.SaveInterval', Config.SaveInterval, false)
@@ -191,6 +240,8 @@ function ConfigValidation.Validate()
     positive(errors, 'Config.Security.TokenBucket.refillPerSecond', Config.Security and Config.Security.TokenBucket and Config.Security.TokenBucket.refillPerSecond, false)
     positive(errors, 'Config.Security.SubscriptionBucket.capacity', Config.Security and Config.Security.SubscriptionBucket and Config.Security.SubscriptionBucket.capacity, false)
     positive(errors, 'Config.Security.SubscriptionBucket.refillPerSecond', Config.Security and Config.Security.SubscriptionBucket and Config.Security.SubscriptionBucket.refillPerSecond, false)
+    positive(errors, 'Config.Security.MinigameBucket.capacity', Config.Security and Config.Security.MinigameBucket and Config.Security.MinigameBucket.capacity, false)
+    positive(errors, 'Config.Security.MinigameBucket.refillPerSecond', Config.Security and Config.Security.MinigameBucket and Config.Security.MinigameBucket.refillPerSecond, false)
     positive(errors, 'Config.Security.RateLimitLogInterval', Config.Security and Config.Security.RateLimitLogInterval, false)
     positive(errors, 'Config.Security.MaxInteractDistance', Config.Security and Config.Security.MaxInteractDistance, false)
     positive(errors, 'Config.Security.MaxSpeedMps', Config.Security and Config.Security.MaxSpeedMps, false)
@@ -216,6 +267,10 @@ function ConfigValidation.Validate()
         or not finite(careWeight)
         or math.abs((scoreWeight + careWeight) - 1) > 0.001 then
         errors[#errors + 1] = 'Config.Quality ScoreWeight + CareWeight must equal 1.'
+    end
+    local plantingInfluence = Config.Quality and Config.Quality.PlantingInfluence
+    if not finite(plantingInfluence) or plantingInfluence < 0 or plantingInfluence > 1 then
+        errors[#errors + 1] = 'Config.Quality.PlantingInfluence must be within 0..1.'
     end
 
     if type(Config.Security and Config.Security.AllowedRoutingBuckets) ~= 'table'

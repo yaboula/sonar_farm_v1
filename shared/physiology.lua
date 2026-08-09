@@ -49,6 +49,17 @@ end
 function Physiology.Evaluate(record, now)
     now = now or Sonar.Time.Now()
 
+    if record.state == CROP_STATE.PLANTING or record.state == CROP_STATE.PLANTING_FAILED then
+        return {
+            water = 0,
+            health = 100,
+            spoilage = 0,
+            state = record.state,
+            progress = 0,
+            stageIndex = 1,
+        }
+    end
+
     local data = record.data or {}
     local water = tonumber(data.water) or 100
     local health = tonumber(data.health) or 100

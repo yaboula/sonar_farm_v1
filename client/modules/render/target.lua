@@ -20,6 +20,10 @@ function Target.Describe(cropId)
     local def = Config.Crops and Config.Crops[record.crop_type]
     local label = (def and def.label) or record.crop_type
 
+    if condition.state == CROP_STATE.PLANTING or condition.state == CROP_STATE.PLANTING_FAILED then
+        return ('%s: planting incomplete. Resume or clear this plot.'):format(label)
+    end
+
     if condition.state == CROP_STATE.DEAD then
         return ('%s: dead. Harvest to clear the plot.'):format(label)
     end

@@ -108,6 +108,7 @@ local function renderPayload(record, identifier)
         heading = record.heading or 0.0,
         plantedAt = record.planted_at,
         growthTime = record.growth_time,
+        state = record.state,
         water = data.water,
         health = data.health,
         lastCare = data.lastCare,

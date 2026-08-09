@@ -60,12 +60,22 @@ return {
         },
     },
 
+    -- Legacy inventory item retained so existing stacks remain valid. It is no
+    -- longer usable for planting once Stage 5 minigames are enabled.
     ['tomato_seed'] = {
-        label = 'Tomato Seeds',
+        label = 'Tomato Seeds (Legacy)',
         weight = 10,
         stack = true,
+        close = false,
+        description = 'Legacy tomato seed stock. Tomato planting now requires a nursery seedling.',
+    },
+
+    ['tomato_seedling'] = {
+        label = 'Tomato Seedling',
+        weight = 180,
+        stack = true,
         close = true,
-        description = 'Tomato seeds. Slow to ripen, worth the wait.',
+        description = 'A nursery-grown tomato transplant ready for careful field planting.',
         client = {
             export = 'sonar_farm.useSeed',
         },

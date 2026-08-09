@@ -18,6 +18,9 @@ local function configFor(scope)
     if scope == 'subscribe' then
         return Config.Security.SubscriptionBucket
     end
+    if scope == 'minigame' then
+        return Config.Security.MinigameBucket or Config.Security.TokenBucket
+    end
     return Config.Security.TokenBucket
 end
 

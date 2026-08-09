@@ -1,10 +1,12 @@
 # Dependencies
 node_modules/
 web/node_modules/
+minigames-ui/node_modules/
 
 # Build output (NUI SPA)
 web/build/
 web/dist/
+minigames-ui/dist/
 
 # Logs
 *.log
@@ -23,5 +25,7 @@ Thumbs.db
 !.vscode/extensions.json
 
 # Temp
+temp/
+output/
 *.tmp
 *.bak

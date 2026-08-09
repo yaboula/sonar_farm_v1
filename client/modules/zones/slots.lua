@@ -50,7 +50,7 @@ local function createSphereZone(slot, key)
         options = {
             {
                 name     = ('sonar_farm:plant:%s'):format(key),
-                label    = 'Plant seeds',
+                label    = 'Plant crop',
                 icon     = 'fa-solid fa-seedling',
                 distance = distance,
                 onSelect = function()
@@ -76,6 +76,39 @@ local function createSphereZone(slot, key)
                 end,
             },
             {
+                name     = ('sonar_farm:resume:%s'):format(key),
+                label    = 'Resume planting',
+                icon     = 'fa-solid fa-seedling',
+                distance = distance,
+                onSelect = function()
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    if cropId then Minigame.Resume(cropId) end
+                end,
+                canInteract = function()
+                    if not Sync.IsAvailable() then return false end
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    local crop = cropId and Crops.Get(cropId)
+                    return crop and crop.isMine
+                        and (crop.state == CROP_STATE.PLANTING or crop.state == CROP_STATE.PLANTING_FAILED)
+                end,
+            },
+            {
+                name     = ('sonar_farm:clear-incomplete:%s'):format(key),
+                label    = 'Clear incomplete planting',
+                icon     = 'fa-solid fa-xmark',
+                distance = distance,
+                onSelect = function()
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    if cropId then Minigame.ClearIncomplete(cropId) end
+                end,
+                canInteract = function()
+                    if not Sync.IsAvailable() then return false end
+                    local cropId = Crops.SlotOccupant(zoneKey, index)
+                    local crop = cropId and Crops.Get(cropId)
+                    return crop and crop.isMine and crop.state == CROP_STATE.PLANTING_FAILED
+                end,
+            },
+            {
                 name     = ('sonar_farm:water:%s'):format(key),
                 label    = 'Water',
                 icon     = 'fa-solid fa-droplet',
@@ -90,6 +123,10 @@ local function createSphereZone(slot, key)
                     if not Sync.IsAvailable() then return false end
                     local cropId = Crops.SlotOccupant(zoneKey, index)
                     if not cropId then return false end
+                    local crop = Crops.Get(cropId)
+                    if crop and (crop.state == CROP_STATE.PLANTING or crop.state == CROP_STATE.PLANTING_FAILED) then
+                        return false
+                    end
                     local cond = Crops.Condition(cropId)
                     if not cond then return false end
                     if cond.state == CROP_STATE.DEAD then return false end
@@ -111,6 +148,10 @@ local function createSphereZone(slot, key)
                     if not Sync.IsAvailable() then return false end
                     local cropId = Crops.SlotOccupant(zoneKey, index)
                     if not cropId then return false end
+                    local crop = Crops.Get(cropId)
+                    if crop and (crop.state == CROP_STATE.PLANTING or crop.state == CROP_STATE.PLANTING_FAILED) then
+                        return false
+                    end
                     local cond = Crops.Condition(cropId)
                     if not cond then return false end
                     return cond.progress >= 1 or cond.state == CROP_STATE.DEAD

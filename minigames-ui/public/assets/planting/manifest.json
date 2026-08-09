@@ -1,0 +1,246 @@
+{
+  "manifestVersion": "1.0.0",
+  "package": "tomato-initial-planting",
+  "coordinateSpace": {
+    "sceneWidth": 2048,
+    "sceneHeight": 1536,
+    "origin": "top-left",
+    "boundsConvention": "x-y-width-height"
+  },
+  "assets": [
+    {
+      "id": 1,
+      "name": "soil_block_01_dry_intact",
+      "file": "soil_block_01_dry_intact.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "scene.prepare.intact",
+      "alphaBounds": { "x": 205, "y": 271, "width": 1637, "height": 993 }
+    },
+    {
+      "id": 2,
+      "name": "soil_block_02_hole_shallow",
+      "file": "soil_block_02_hole_shallow.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "scene.prepare.shallow",
+      "alphaBounds": { "x": 205, "y": 271, "width": 1637, "height": 993 }
+    },
+    {
+      "id": 3,
+      "name": "soil_block_03_hole_medium",
+      "file": "soil_block_03_hole_medium.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "scene.prepare.medium",
+      "alphaBounds": { "x": 205, "y": 271, "width": 1637, "height": 993 }
+    },
+    {
+      "id": 4,
+      "name": "soil_block_04_hole_correct",
+      "file": "soil_block_04_hole_correct.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "scene.prepare.correct",
+      "alphaBounds": { "x": 205, "y": 271, "width": 1637, "height": 993 }
+    },
+    {
+      "id": 5,
+      "name": "soil_block_05_hole_overdug",
+      "file": "soil_block_05_hole_overdug.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "scene.prepare.overdug",
+      "alphaBounds": { "x": 205, "y": 271, "width": 1637, "height": 993 }
+    },
+    {
+      "id": 6,
+      "name": "soil_block_06_covered_dry",
+      "file": "soil_block_06_covered_dry.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "scene.cover.finished",
+      "alphaBounds": { "x": 205, "y": 271, "width": 1637, "height": 993 }
+    },
+    {
+      "id": 7,
+      "name": "soil_block_07_wet_partial",
+      "file": "soil_block_07_wet_partial.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "scene.water.partial",
+      "alphaBounds": { "x": 205, "y": 271, "width": 1637, "height": 993 }
+    },
+    {
+      "id": 8,
+      "name": "soil_block_08_wet_even",
+      "file": "soil_block_08_wet_even.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "scene.water.even",
+      "alphaBounds": { "x": 205, "y": 271, "width": 1637, "height": 993 }
+    },
+    {
+      "id": 9,
+      "name": "soil_block_09_overwatered",
+      "file": "soil_block_09_overwatered.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "scene.water.overwatered",
+      "alphaBounds": { "x": 205, "y": 271, "width": 1637, "height": 993 }
+    },
+    {
+      "id": 10,
+      "name": "overlay_hole_cavity_shadow",
+      "file": "overlay_hole_cavity_shadow.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "overlay.hole.shadow",
+      "alphaBounds": { "x": 831, "y": 658, "width": 300, "height": 184 }
+    },
+    {
+      "id": 11,
+      "name": "overlay_loose_soil_left",
+      "file": "overlay_loose_soil_left.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "overlay.cover.source-left",
+      "alphaBounds": { "x": 550, "y": 610, "width": 240, "height": 150 }
+    },
+    {
+      "id": 12,
+      "name": "overlay_loose_soil_right",
+      "file": "overlay_loose_soil_right.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "overlay.cover.source-right",
+      "alphaBounds": { "x": 1215, "y": 610, "width": 275, "height": 150 }
+    },
+    {
+      "id": 13,
+      "name": "overlay_soil_compacted_patch",
+      "file": "overlay_soil_compacted_patch.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "overlay.cover.compaction",
+      "alphaBounds": { "x": 901, "y": 584, "width": 238, "height": 159 }
+    },
+    {
+      "id": 14,
+      "name": "overlay_moisture_patch",
+      "file": "overlay_moisture_patch.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "overlay.water.moisture",
+      "alphaBounds": { "x": 847, "y": 550, "width": 357, "height": 191 }
+    },
+    {
+      "id": 15,
+      "name": "overlay_dry_zone",
+      "file": "overlay_dry_zone.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "overlay.water.dry-zone",
+      "alphaBounds": { "x": 808, "y": 534, "width": 387, "height": 209 }
+    },
+    {
+      "id": 16,
+      "name": "overlay_small_puddle",
+      "file": "overlay_small_puddle.png",
+      "width": 2048,
+      "height": 1536,
+      "role": "overlay.water.puddle",
+      "alphaBounds": { "x": 916, "y": 580, "width": 194, "height": 82 }
+    },
+    {
+      "id": 17,
+      "name": "tomato_seedling_complete",
+      "file": "tomato_seedling_complete.png",
+      "width": 1024,
+      "height": 1024,
+      "role": "prop.seedling.complete",
+      "alphaBounds": { "x": 172, "y": 123, "width": 678, "height": 778 },
+      "anchors": {
+        "rootBallCenter": [512, 764],
+        "crown": [512, 628],
+        "bottomContact": [512, 900]
+      }
+    },
+    {
+      "id": 18,
+      "name": "tomato_seedling_stem_leaves",
+      "file": "tomato_seedling_stem_leaves.png",
+      "width": 1024,
+      "height": 1024,
+      "role": "prop.seedling.top",
+      "alphaBounds": { "x": 175, "y": 126, "width": 666, "height": 510 },
+      "anchors": { "stemBase": [512, 628] }
+    },
+    {
+      "id": 19,
+      "name": "tomato_root_ball",
+      "file": "tomato_root_ball.png",
+      "width": 1024,
+      "height": 1024,
+      "role": "prop.seedling.root-ball",
+      "alphaBounds": { "x": 341, "y": 607, "width": 308, "height": 294 },
+      "anchors": { "topCenter": [512, 609] }
+    },
+    {
+      "id": 21,
+      "name": "tomato_roots_relaxed",
+      "file": "tomato_roots_relaxed.png",
+      "width": 1024,
+      "height": 1024,
+      "role": "prop.seedling.roots-relaxed",
+      "alphaBounds": { "x": 356, "y": 628, "width": 311, "height": 310 },
+      "anchors": { "upperRootOrigin": [511, 628] }
+    },
+    {
+      "id": 22,
+      "name": "tool_hand_shovel",
+      "file": "tool_hand_shovel.png",
+      "width": 1024,
+      "height": 1024,
+      "role": "tool.prepare.shovel",
+      "alphaBounds": { "x": 143, "y": 123, "width": 739, "height": 776 },
+      "anchors": { "gripPivot": [801, 203], "shovelTip": [203, 838] }
+    },
+    {
+      "id": 24,
+      "name": "material_loose_soil_mound",
+      "file": "material_loose_soil_mound.png",
+      "width": 1024,
+      "height": 1024,
+      "role": "material.cover.loose-soil",
+      "alphaBounds": { "x": 123, "y": 270, "width": 778, "height": 484 }
+    },
+    {
+      "id": 25,
+      "name": "tool_watering_can",
+      "file": "tool_watering_can.png",
+      "width": 1024,
+      "height": 1024,
+      "role": "tool.water.can",
+      "alphaBounds": { "x": 125, "y": 242, "width": 776, "height": 540 },
+      "anchors": {
+        "bodyPivot": [512, 600],
+        "gripPoint": [720, 480],
+        "roseCenter": [290, 440],
+        "waterEmission": [250, 420],
+        "emissionVectorDegrees": -135
+      }
+    },
+    {
+      "id": 31,
+      "name": "logo_tomato_seedling_mark",
+      "file": "logo_tomato_seedling_mark.png",
+      "width": 1024,
+      "height": 1024,
+      "role": "brand.provisional-mark",
+      "status": "provisional",
+      "usage": "Do not use as final product branding",
+      "alphaBounds": { "x": 174, "y": 123, "width": 675, "height": 778 }
+    }
+  ]
+}

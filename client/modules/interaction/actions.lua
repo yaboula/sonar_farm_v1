@@ -37,7 +37,7 @@ local MESSAGES = {
     [REJECT.SLOT_NOT_FOUND] = 'That planting plot does not exist.',
     [REJECT.SLOT_OCCUPIED] = 'Something is already growing there.',
     [REJECT.UNKNOWN_CROP] = 'Unknown crop type.',
-    [REJECT.MISSING_SEED] = 'You do not have the required seeds.',
+    [REJECT.MISSING_SEED] = 'You do not have the required planting stock.',
     [REJECT.MISSING_TOOL] = 'You need a watering can.',
     [REJECT.CROP_NOT_FOUND] = 'That crop is no longer there.',
     [REJECT.CROP_NOT_MATURE] = 'This crop is not ready to harvest.',
@@ -47,6 +47,13 @@ local MESSAGES = {
     [REJECT.INVENTORY_FULL] = 'Your inventory is full.',
     [REJECT.ALREADY_IN_PROGRESS] = 'Someone is already working on this plot.',
     [REJECT.ALREADY_WATERED] = 'This crop does not need water yet.',
+    [REJECT.MINIGAME_REQUIRED] = 'This crop must be planted by hand.',
+    [REJECT.MINIGAME_DISABLED] = 'Planting practice is temporarily unavailable.',
+    [REJECT.MINIGAME_SESSION_NOT_FOUND] = 'That planting session is no longer active.',
+    [REJECT.MINIGAME_SESSION_EXPIRED] = 'The planting session expired. You can resume the plot.',
+    [REJECT.MINIGAME_INVALID_STEP] = 'That planting step arrived out of order.',
+    [REJECT.MINIGAME_INVALID_TRACE] = 'The planting input could not be verified.',
+    [REJECT.PLANTING_INCOMPLETE] = 'This planting is incomplete.',
     [REJECT.INTERNAL_ERROR] = 'Something went wrong.',
 }
 
@@ -83,6 +90,8 @@ local function handleRejection(response)
     end
 end
 
+Actions.HandleRejection = handleRejection
+
 --- PLACEHOLDER progress feedback. Without any delay the action feels unfinished
 --- and the gameplay cannot be judged; with a pretty bar we would be building
 --- Stage 6 twice. Intentionally plain and temporary.
@@ -116,6 +125,10 @@ function Actions.Plant(cropType, zoneKey, slotIndex)
 
     if type(zoneKey) ~= 'string' or not tonumber(slotIndex) then
         return Bridge.Notify(MESSAGES[REJECT.SLOT_NOT_FOUND], NOTIFY.ERROR)
+    end
+
+    if Config.Features.Minigames and def.requiresMinigame then
+        return Minigame.Begin(cropType, zoneKey, tonumber(slotIndex))
     end
 
     if not placeholderProgress(('Planting %s...'):format(def.label), 'plant') then
@@ -199,7 +212,7 @@ function Actions.OpenPlantMenu(zoneKey, slotIndex)
             local held = Bridge.Inventory.GetItemCount(def.seedItem) or 0
             options[#options + 1] = {
                 title = def.label,
-                description = ('Seeds: %d  |  Grows in %d min'):format(held, math.floor((def.growthTime or 0) / 60)),
+                description = ('Planting stock: %d  |  Grows in %d min'):format(held, math.floor((def.growthTime or 0) / 60)),
                 icon = 'seedling',
                 disabled = held < 1,
                 onSelect = function()
@@ -215,7 +228,7 @@ function Actions.OpenPlantMenu(zoneKey, slotIndex)
 
     lib.registerContext({
         id = 'sonar_farm_plant',
-        title = 'Plant seeds',
+        title = 'Plant crop',
         options = options,
     })
     lib.showContext('sonar_farm_plant')

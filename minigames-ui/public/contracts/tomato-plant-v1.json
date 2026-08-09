@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "id": "tomato-plant-v1",
+  "contractVersion": "1.0.0",
+  "title": "Tomato Initial Planting",
+  "scene": {
+    "width": 2048,
+    "height": 1536,
+    "coordinateOrigin": "top-left",
+    "letterbox": true
+  },
+  "steps": ["prepare", "place", "cover", "water"],
+  "sampling": {
+    "intervalMs": 50,
+    "rateHz": 20,
+    "maxSamplesPerStep": 400,
+    "coordinateQuantization": 1,
+    "tiltQuantizationDegrees": 1,
+    "pressureQuantizationLevels": 255
+  },
+  "weights": {
+    "depth": 25,
+    "alignment": 30,
+    "aeration": 25,
+    "hydration": 20
+  },
+  "payloadLimits": {
+    "maxTraceBytesPerStep": 32768,
+    "maxCheckpointBytes": 49152,
+    "maxResultBytes": 8192,
+    "maxSessionBytes": 204800,
+    "maxStringLength": 128,
+    "maxErrorStringLength": 256,
+    "maxCheckpoints": 4
+  },
+  "geometry": {
+    "soilBlock": { "x": 205, "y": 271, "width": 1637, "height": 993 },
+    "prepare": {
+      "targetCenter": { "x": 1024, "y": 750 },
+      "targetRadius": 126,
+      "activeRadius": 246,
+      "shallowDepth": 0.25,
+      "correctDepth": 0.68,
+      "overdugDepth": 0.9,
+      "radialCoverageSectors": 12
+    },
+    "place": {
+      "pickupCenter": { "x": 1570, "y": 742 },
+      "pickupRadius": 205,
+      "targetCenter": { "x": 1024, "y": 720 },
+      "targetRadius": 128,
+      "depthBand": { "minY": 675, "maxY": 765 },
+      "maxHealthyTiltDegrees": 9,
+      "maxAcceptedTiltDegrees": 28
+    },
+    "cover": {
+      "leftSource": { "x": 550, "y": 610, "width": 240, "height": 150 },
+      "rightSource": { "x": 1215, "y": 610, "width": 275, "height": 150 },
+      "targetCenter": { "x": 1024, "y": 686 },
+      "targetRadius": 196,
+      "minimumContributionsPerSide": 2,
+      "maximumHealthyPresses": 5
+    },
+    "water": {
+      "target": { "x": 804, "y": 520, "width": 440, "height": 250 },
+      "gridColumns": 8,
+      "gridRows": 5,
+      "absorptionPerSecond": 0.008,
+      "pourPerSecond": 0.9,
+      "puddleCellThreshold": 1.15
+    }
+  },
+  "thresholds": {
+    "depth": {
+      "excellent": { "min": 0.78 },
+      "good": { "min": 0.58 },
+      "needsAttention": { "min": 0 }
+    },
+    "alignment": {
+      "excellent": { "min": 0.82 },
+      "good": { "min": 0.62 },
+      "needsAttention": { "min": 0 }
+    },
+    "aeration": {
+      "excellent": { "min": 0.76 },
+      "good": { "min": 0.55 },
+      "needsAttention": { "min": 0 }
+    },
+    "hydration": {
+      "excellent": { "min": 0.78 },
+      "good": { "min": 0.57 },
+      "needsAttention": { "min": 0 }
+    }
+  },
+  "checkpoint": {
+    "required": ["contractVersion", "sessionId", "step", "trace", "signals"],
+    "forbidden": ["quality", "score", "weightedScore"],
+    "traceTuple": [
+      "elapsed50ms",
+      "x",
+      "y",
+      "flags",
+      "tiltDegrees",
+      "pressure0to255"
+    ],
+    "flags": {
+      "pointerDown": 1,
+      "primaryAction": 2,
+      "keyboardInput": 4,
+      "errorContact": 8
+    },
+    "signals": {
+      "prepare": ["depthProgress", "radialCoverage", "overdig"],
+      "place": ["dropDistance", "tiltDegrees", "rootRelaxation"],
+      "cover": ["leftContribution", "rightContribution", "compaction"],
+      "water": ["meanMoisture", "moistureVariance", "puddleExposure"]
+    }
+  },
+  "result": {
+    "required": ["contractVersion", "sessionId", "outcome", "metrics"],
+    "outcomes": ["completed", "cancelled", "failed"],
+    "metricLabels": ["excellent", "good", "needs-attention"],
+    "metrics": ["depth", "alignment", "aeration", "hydration"],
+    "note": "The server returns qualitative metric labels after recomputing every checkpoint."
+  },
+  "callbacks": {
+    "ready": "tomatoPlant:ready",
+    "checkpoint": "tomatoPlant:checkpoint",
+    "cancel": "tomatoPlant:cancel",
+    "close": "tomatoPlant:close",
+    "error": "tomatoPlant:error"
+  }
+}

@@ -60,6 +60,8 @@ server_scripts {
     'server/modules/farming/lock.lua',
     'server/modules/farming/physiology.lua',
     'server/modules/farming/quality.lua',
+    'server/modules/minigames/tomato_plant_scoring.lua',
+    'server/modules/minigames/sessions.lua',
     'server/modules/farming/plant.lua',
     'server/modules/farming/care.lua',
     'server/modules/farming/harvest.lua',
@@ -75,6 +77,7 @@ client_scripts {
     'client/modules/render/target.lua',
     -- Actions before sync/slots: those bind to Actions on select.
     'client/modules/interaction/actions.lua',
+    'client/modules/minigames/controller.lua',
     'client/modules/zones/slots.lua',
     'client/modules/sync/client.lua',
     'client/modules/zones/blips.lua',
@@ -84,9 +87,11 @@ client_scripts {
     'client/modules/debug/commands.lua',
 }
 
--- NUI SPA (React + Vite + Tailwind). Enabled from Stage 9.
--- ui_page 'web/build/index.html'
--- files {
---     'web/build/index.html',
---     'web/build/**/*',
--- }
+-- Stage 5 minigames own the resource's single NUI page. The Business Hub stays
+-- isolated in `web/` until the two surfaces receive an explicit shared shell.
+ui_page 'minigames-ui/dist/index.html'
+files {
+    'minigames-ui/dist/index.html',
+    'minigames-ui/dist/assets/**/*',
+    'minigames-ui/dist/contracts/**/*',
+}

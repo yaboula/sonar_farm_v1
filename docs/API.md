@@ -110,6 +110,79 @@ del cultivo salen del slot en config, nunca del cliente.
 `unknown_crop`, `slot_not_found`, `slot_occupied`, `crop_not_allowed_here`,
 `too_far`, `crop_limit_reached`, `missing_seed`, `already_in_progress`
 
+Cuando `Config.Features.Minigames = true`, un cultivo con
+`requiresMinigame = true` rechaza este callback con `minigame_required`. Debe
+usar el lifecycle siguiente.
+
+---
+
+### Lifecycle `sonar_farm:minigame:*`
+
+El primer contrato registrado es `tomato_initial_planting` v1. Ningún callback
+acepta coordenadas del mundo ni una puntuación calculada por el navegador.
+
+**Inicio**
+
+```lua
+local response = lib.callback.await('sonar_farm:minigame:begin', false, {
+    cropType = 'tomato',
+    zone = 'zone1',
+    slot = 4,
+})
+```
+
+El servidor valida jugador, distancia, inventario y límite; reserva el slot con
+un registro `planting` y responde con `sessionId`, `cropId`, `nextStep` y límites
+del contrato. Todavía no consume `tomato_seedling`.
+
+**Checkpoint**
+
+```lua
+local response = lib.callback.await('sonar_farm:minigame:checkpoint', false, {
+    sessionId = sessionId,
+    contractVersion = '1.0.0',
+    step = 'prepare', -- prepare | place | cover | water
+    trace = {
+        durationMs = 4200,
+        samples = {
+            { t = 0, x = 0.50, y = 0.56, down = true, pressure = 0.4 },
+            -- Máximo configurado: 400 muestras normalizadas.
+        },
+    },
+})
+```
+
+Los checkpoints deben llegar en orden. Lua comprueba versión, tamaño, duración,
+frecuencia, coordenadas y tipos; después recalcula la métrica. El cuarto
+checkpoint consume el trasplante una vez, cambia el registro a `planted` y
+devuelve únicamente bandas cualitativas (`depth`, `alignment`, `aeration`,
+`hydration`).
+
+**Cancelar, reanudar y limpiar**
+
+```lua
+lib.callback.await('sonar_farm:minigame:cancel', false, {
+    sessionId = sessionId,
+    reason = 'escape',
+})
+
+lib.callback.await('sonar_farm:minigame:resume', false, {
+    cropId = cropId,
+})
+
+lib.callback.await('sonar_farm:minigame:clearIncomplete', false, {
+    cropId = cropId,
+})
+```
+
+Cancelar conserva checkpoints validados y deja `planting_failed`. Solo el
+propietario puede reanudar o limpiar. La limpieza solo acepta
+`planting_failed`; no puede borrar un cultivo normal.
+
+**Rechazos específicos:** `minigame_disabled`, `minigame_session_not_found`,
+`minigame_session_expired`, `minigame_invalid_step`,
+`minigame_invalid_trace`, `planting_incomplete`, `planting_not_failed`
+
 ---
 
 ### `sonar_farm:water`

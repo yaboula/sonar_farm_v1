@@ -51,6 +51,15 @@ end
 function Growth.Evaluate(record, now)
     now = now or Sonar.Time.Now()
 
+    if record.state == CROP_STATE.PLANTING or record.state == CROP_STATE.PLANTING_FAILED then
+        return {
+            elapsed = 0,
+            progress = 0,
+            stageIndex = 1,
+            state = record.state,
+        }
+    end
+
     local elapsed = math.max(0, now - (record.planted_at or now))
     local growthTime = record.growth_time or 0
 

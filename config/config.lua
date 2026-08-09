@@ -64,7 +64,7 @@ Config.Locale = 'en'
 -- Toggle whole subsystems without touching code. Useful for staged rollout.
 -- ---------------------------------------------------------------------------
 Config.Features = {
-    Minigames = false,     -- Stage 5: intentionally disabled until approved
+    Minigames = true,      -- Stage 5: authoritative tomato planting enabled
     Machinery = false,     -- Stage 9+: not implemented
     Progression = false,   -- Stage 7: not implemented
     Economy = false,       -- Stage 8: not implemented
@@ -86,6 +86,12 @@ Config.Security = {
     SubscriptionBucket = {
         capacity = 3,
         refillPerSecond = 1,
+    },
+    -- Checkpoints carry bounded interaction evidence and use an independent
+    -- budget so they cannot exhaust ordinary farming or subscription actions.
+    MinigameBucket = {
+        capacity = 6,
+        refillPerSecond = 2,
     },
     -- Avoid one console/webhook entry per packet during a flood.
     RateLimitLogInterval = 5000,
@@ -134,6 +140,9 @@ Config.Farming = {
     Tools = {
         water = 'watering_can',
     },
+    -- A minigame is cancelled when the ped loses at least this much health
+    -- during one active interaction. Death always cancels regardless.
+    MinigameDamageThreshold = 15,
 }
 
 -- ---------------------------------------------------------------------------
@@ -148,6 +157,8 @@ Config.Quality = {
     -- Weight of the action score vs. the crop's care state in final quality.
     ScoreWeight = 0.6,
     CareWeight = 0.4,
+    -- Share of the skill component inherited from authoritative planting.
+    PlantingInfluence = 0.3,
 }
 
 -- ---------------------------------------------------------------------------

@@ -4,17 +4,37 @@
     minigame that gates its quality/XP outcome. The server always validates the
     final score; the client cannot self-report a perfect result.
 
-    NOTE: Placeholder schema for Stage 1.
-
-    Schema per action:
-      minigame   string   Registered minigame key (see Stage 5 framework).
-      difficulty number   0.0 .. 1.0 base difficulty.
-      qualityCap number   Max quality (0..100) achievable via this action.
+    Tomato Initial Planting is the first Stage 5 slice. The client renders the
+    interaction, but every world mutation and score is validated on the server.
 ]]
 
 Config.Minigames = {
-    -- Example (disabled until Stage 5):
-    -- plant   = { minigame = 'precision_press', difficulty = 0.3, qualityCap = 100 },
-    -- water   = { minigame = 'timing_bar',      difficulty = 0.4, qualityCap = 100 },
-    -- harvest = { minigame = 'rhythm_pick',     difficulty = 0.5, qualityCap = 100 },
+    Plant = {
+        tomato = {
+            key = 'tomato_initial_planting',
+            contractVersion = '1.0.0',
+            qualityCap = 100,
+            sessionTtl = 180,
+            incompleteTtl = 1800,
+            maxSamplesPerStep = 400,
+            maxPayloadBytes = 49152,
+            sampleIntervalMs = 50,
+            stepWeights = {
+                prepare = 0.25,
+                place = 0.30,
+                cover = 0.25,
+                water = 0.20,
+            },
+            minimumStepDurationMs = {
+                prepare = 3000,
+                place = 2500,
+                cover = 3000,
+                water = 5000,
+            },
+            maximumStepDurationMs = 120000,
+            interruptionPenalty = 8,
+            maxInterruptionPenalty = 20,
+            initialWater = { min = 55, max = 100 },
+        },
+    },
 }

@@ -62,7 +62,10 @@ lib.callback.register(CALLBACKS.HARVEST, function(source, payload)
         if not permission.ok then return reject(permission.reason) end
 
         local score = Quality.Request(source, ACTIONS.HARVEST, record)
-        local quality = Quality.Resolve(score, condition, { theft = permission.theft })
+        local quality = Quality.Resolve(score, condition, {
+            theft = permission.theft,
+            plantingQuality = record.data and record.data.plantingQuality,
+        })
         local units = Quality.Yield(record, quality)
         local metadata = Quality.Metadata(record, quality)
 

@@ -56,3 +56,26 @@ jobs:
         run: npm run build
       - name: Test Sites worker artifact
         run: npm run test:sites
+
+  minigames-ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: minigames-ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: minigames-ui/package-lock.json
+      - name: Install minigame dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Test minigames
+        run: npm test
+      - name: Build FiveM NUI
+        run: npm run build

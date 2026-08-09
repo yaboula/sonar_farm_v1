@@ -60,6 +60,7 @@ dofile('shared/growth.lua')
 dofile('shared/physiology.lua')
 dofile('shared/zones.lua')
 dofile('shared/config_validation.lua')
+dofile('server/modules/minigames/tomato_plant_scoring.lua')
 
 test('production config validates', function()
     local errors = Sonar.ConfigValidation.Validate()
@@ -119,6 +120,111 @@ test('physiology derives drought and spoilage without mutation', function()
     assert(condition.health < 100, 'dry crop should lose health')
     assert(condition.spoilage > 0, 'mature crop should spoil')
     equal(record.data.health, 100, 'evaluation must be pure')
+end)
+
+test('incomplete planting never progresses or dries out', function()
+    local record = {
+        crop_type = 'tomato',
+        state = Sonar.Constants.CROP_STATE.PLANTING_FAILED,
+        planted_at = 1000,
+        growth_time = 100,
+        data = { water = 0, health = 100, lastCare = 1000 },
+    }
+    local condition = Physiology.Evaluate(record, 9999)
+    equal(condition.state, Sonar.Constants.CROP_STATE.PLANTING_FAILED, 'incomplete state')
+    equal(condition.progress, 0, 'incomplete progress')
+    equal(condition.health, 100, 'incomplete health')
+end)
+
+test('tomato planting traces are bounded and scored deterministically', function()
+    local cfg = Config.Minigames.Plant.tomato
+    local prepare = { durationMs = 4000, samples = {} }
+    for index = 1, 32 do
+        local angle = (index - 1) / 32 * math.pi * 2
+        prepare.samples[index] = {
+            t = (index - 1) * 100,
+            x = 0.5 + math.cos(angle) * 0.083,
+            y = (750 / 1536) + math.sin(angle) * 0.083,
+            down = true,
+            pressure = 0.4,
+        }
+    end
+
+    local place = { durationMs = 3000, samples = {} }
+    for index = 1, 12 do
+        place.samples[index] = {
+            t = (index - 1) * 200,
+            x = 0.70 - (index - 1) / 11 * 0.20,
+            y = 0.35 + (index - 1) / 11 * ((720 / 1536) - 0.35),
+            down = true,
+            tilt = 0,
+        }
+    end
+
+    local cover = { durationMs = 4000, samples = {} }
+    for index = 1, 32 do
+        cover.samples[index] = {
+            t = (index - 1) * 100,
+            x = ((index - 1) % 8 + 0.5) / 8,
+            y = 0.45 + (math.floor((index - 1) / 8) + 0.5) / 4 * 0.30,
+            down = true,
+            pressure = 0.35,
+            side = index % 2 == 0 and 1 or -1,
+        }
+    end
+
+    local water = { durationMs = 6000, samples = {} }
+    for index = 1, 54 do
+        local gx = (index - 1) % 6
+        local gy = math.floor((index - 1) / 6) % 4
+        water.samples[index] = {
+            t = (index - 1) * 100,
+            x = 0.405 + gx / 5 * 0.19,
+            y = 0.35 + gy / 3 * 0.14,
+            pouring = true,
+            tilt = 0.5,
+        }
+    end
+
+    local steps = {}
+    for step, trace in pairs({ prepare = prepare, place = place, cover = cover, water = water }) do
+        local result, reason = TomatoPlantScoring.ScoreStep(step, trace, cfg)
+        assert(result, reason)
+        steps[step] = result
+    end
+    local final, reason = TomatoPlantScoring.Finalize(steps, cfg, 0)
+    assert(final, reason)
+    assert(final.score >= 70 and final.score <= 100, 'good evidence should produce bounded quality')
+    equal(final.outcomes.depth ~= nil, true, 'depth outcome')
+    equal(final.outcomes.alignment ~= nil, true, 'alignment outcome')
+
+    local compact = { durationMs = 4000, samples = {} }
+    for index, sample in ipairs(prepare.samples) do
+        compact.samples[index] = {
+            (index - 1) * 2,
+            math.floor(sample.x * 2048 + 0.5),
+            math.floor(sample.y * 1536 + 0.5),
+            3,
+            0,
+            102,
+        }
+    end
+    local compactResult, compactReason = TomatoPlantScoring.ScoreStep('prepare', compact, cfg)
+    assert(compactResult, compactReason)
+    assert(math.abs(compactResult.score - steps.prepare.score) < 2, 'compact trace matches object trace')
+
+    prepare.samples[1].x = 2
+    local invalid = TomatoPlantScoring.ScoreStep('prepare', prepare, cfg)
+    equal(invalid, nil, 'out-of-bounds sample rejected')
+end)
+
+dofile('server/modules/farming/quality.lua')
+
+test('validated planting quality contributes to final harvest quality', function()
+    local condition = { health = 100, spoilage = 0 }
+    local poorPlanting = Quality.Resolve(50, condition, { plantingQuality = 0 })
+    local strongPlanting = Quality.Resolve(50, condition, { plantingQuality = 100 })
+    assert(strongPlanting > poorPlanting, 'planting quality must remain economically meaningful')
 end)
 
 Database = {

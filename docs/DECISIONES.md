@@ -113,6 +113,38 @@
 
 ---
 
+## Decisiones de la Etapa 5.1 — Tomato Initial Planting
+
+- **Primer corte vertical:** Tomato · Plant cubre Prepare, Place, Cover y Water
+  dentro de una sola sesión. Los demás minijuegos se añaden después sobre el
+  mismo lifecycle, no como barras hardcodeadas.
+- **NUI aislada:** `minigames-ui/` es un paquete React/Vite propio. `web/`
+  continúa reservado al Business Hub; el recurso FiveM usa su único `ui_page`
+  para el runtime de minijuegos hasta diseñar un shell compartido explícito.
+- **Canvas 2D determinista:** los assets raster forman la escena y Canvas dibuja
+  partículas, agua y transiciones. React controla shell, accesibilidad, copy y
+  estados; no se usa Canvas como sustituto de controles semánticos.
+- **Servidor autoritativo:** el navegador no envía calidad. Envía evidencia
+  normalizada, cuantizada a 20 Hz y acotada por tamaño/muestras; Lua valida
+  orden, duración, geometría y recalcula las cuatro métricas.
+- **Reserva antes de abrir:** el servidor crea un registro `planting` para
+  reservar el slot. Ese registro no crece ni se renderiza como planta. Una
+  interrupción lo deja `planting_failed` durante una ventana de reanudación.
+- **Commit único:** `tomato_seedling` se verifica al empezar y se consume una
+  sola vez en el checkpoint final, inmediatamente antes de convertir el registro
+  a `planted`. Cancelar o expirar no consume el trasplante.
+- **Interrupciones reales:** ESC, muerte, daño significativo, distancia inválida,
+  desconexión y expiración cierran la sesión. Las reanudaciones conservan los
+  checkpoints validados y aplican una penalización limitada.
+- **Calidad durable:** profundidad, alineación, aireación, hidratación y calidad
+  total quedan en `record.data.planting`; la calidad de plantación participa en
+  la calidad final de cosecha sin reemplazar cuidado ni spoilage.
+- **Assets:** `temp/assets` es fuente golden de trabajo y permanece inmutable. El
+  runtime usa únicamente el paquete verificado bajo
+  `minigames-ui/public/assets/planting`.
+
+---
+
 ## Decisiones de la Etapa 3 (implementación)
 
 Tomadas al construir la lógica autoritativa. Se documentan porque condicionan las etapas siguientes.
