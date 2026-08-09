@@ -27,6 +27,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
   glow, área real y forecast discontinuo para acercar el HUD a la referencia.
 - El frontend de producción ahora arranca vacío y el build rechaza cualquier
   fixture compilado; solo `inspection:open` autoritativo puede mostrar datos.
+- Sustituido el diagnóstico dominante y eliminada la acción recomendada por una
+  Field Guide pasiva de seis lecciones agronómicas que rota sin tráfico adicional.
+- Las curvas ahora comunican el estado autoritativo mediante tonos semánticos:
+  riesgo, vigilancia, correcto y un gris neutro para condiciones no afectadas.
 
 ## [0.3.0] - 2026-08-09
 

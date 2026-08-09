@@ -6,6 +6,22 @@ import type { InspectionMessage, InspectionMetric, InspectionPayloadV1, MetricKe
 
 const ICONS: Record<MetricKey, typeof Drop> = { water: Drop, nutrients: Leaf, weeds: Plant, pests: Bug };
 
+const FIELD_GUIDES = [
+  { key: "water", headline: "LOW WATER SLOWS GROWTH", detail: "Water stress delays maturity and weakens the crop." },
+  { key: "nutrients", headline: "KEEP NUTRIENTS BALANCED", detail: "Deficit and excess both create avoidable stress." },
+  { key: "weeds", headline: "WEEDS DRAIN WATER AND NUTRIENTS", detail: "Competition increases resource loss around the crop." },
+  { key: "pests", headline: "PESTS REDUCE FINAL PRODUCTION", detail: "Untreated pressure lowers the eventual harvest." },
+  { key: "protection", headline: "PROTECTION ENDS AT ITS MARKER", detail: "Residual care only works while its timer is active." },
+  { key: "forecast", headline: "DASHED CURVES ASSUME NO CARE", detail: "They project the next ten minutes without intervention." },
+] as const;
+
+function orderedGuides(cause: string) {
+  const normalized = cause.toLowerCase();
+  const priority = FIELD_GUIDES.findIndex((guide) => normalized.includes(guide.key));
+  if (priority <= 0) return FIELD_GUIDES;
+  return [FIELD_GUIDES[priority], ...FIELD_GUIDES.slice(0, priority), ...FIELD_GUIDES.slice(priority + 1)];
+}
+
 function duration(seconds?: number) {
   if (seconds === undefined) return "STALLED";
   const value = Math.max(0, Math.floor(seconds));
@@ -39,6 +55,7 @@ function Metric({ metric, payload }: { metric: InspectionMetric; payload: Inspec
 
 export function App() {
   const [payload, setPayload] = useState<InspectionPayloadV1 | null>(null);
+  const [guideIndex, setGuideIndex] = useState(0);
 
   useEffect(() => {
     const receive = (event: MessageEvent<InspectionMessage>) => {
@@ -51,6 +68,13 @@ export function App() {
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
   }, []);
+
+  useEffect(() => {
+    setGuideIndex(0);
+    if (!payload) return;
+    const interval = window.setInterval(() => setGuideIndex((current) => (current + 1) % FIELD_GUIDES.length), 6500);
+    return () => window.clearInterval(interval);
+  }, [payload?.subject.id, payload?.diagnosis.cause]);
 
   const timeCopy = useMemo(() => {
     if (!payload) return "";
@@ -65,6 +89,8 @@ export function App() {
     "--rail-right": `${payload.layout?.rightInset ?? 18}px`,
   } as React.CSSProperties;
   const historySeconds = Math.max(0, payload.timing.serverNow - payload.timing.lastCareAt);
+  const guides = orderedGuides(payload.diagnosis.cause);
+  const guide = guides[guideIndex % guides.length];
 
   return <main className={import.meta.env.DEV ? "inspection-world is-preview" : "inspection-world"}>
     <article className="inspection-rail" style={style} aria-label={`${payload.subject.label} crop inspection`}>
@@ -76,8 +102,12 @@ export function App() {
 
       <div className="metric-grid">{payload.metrics.map((metric) => <Metric key={metric.key} metric={metric} payload={payload} />)}</div>
 
-      <section className="diagnosis"><span>Dominant diagnosis</span><strong>{payload.diagnosis.headline}</strong><small>{payload.timing.readySinceSeconds !== undefined ? `SPOILAGE ${Math.round(payload.spoilage)}%` : "Projected with no additional care"}</small></section>
-      <section className="recommendation"><span>Recommended action</span><strong>{payload.diagnosis.recommendation}</strong><small>Use ox_target to perform care</small></section>
+      <section className="field-guide" aria-live="polite">
+        <div className="field-guide__eyebrow"><span>Field guide</span><b>{String(guideIndex + 1).padStart(2, "0")} / {String(guides.length).padStart(2, "0")}</b></div>
+        <strong>{guide.headline}</strong>
+        <small>{guide.detail}</small>
+        <div className="curve-legend" aria-label="Curve color meaning"><span data-tone="risk">Risk</span><span data-tone="watch">Watch</span><span data-tone="good">Good</span></div>
+      </section>
 
       <footer>
         <span className="footer-time footer-time--care"><Clock size={15} /><small>LAST CARE</small><strong>{duration(historySeconds)} AGO</strong></span>

@@ -1,11 +1,18 @@
 import type { InspectionMetric, InspectionSample } from "./types";
 
 const COLORS = {
-  water: "#5f9cd8",
-  nutrients: "#96a950",
-  weeds: "#f2b72d",
-  pests: "#73964c",
+  risk: "#e46f3f",
+  watch: "#efb72c",
+  good: "#79a84d",
+  unaffected: "#74796f",
 } as const;
+
+export function curveTone(status: InspectionMetric["status"]) {
+  if (status === "unaffected") return "unaffected" as const;
+  if (status === "stable") return "good" as const;
+  if (status === "low" || status === "elevated") return "watch" as const;
+  return "risk" as const;
+}
 
 type Point = { x: number; y: number };
 
@@ -83,7 +90,8 @@ export function MetricChart({ metric, samples, start, now, end, lastCareAt }: {
   const protectionX = metric.protectionUntil && metric.protectionUntil > now && metric.protectionUntil < end
     ? ((metric.protectionUntil - start) / duration) * width
     : undefined;
-  const color = COLORS[metric.key];
+  const tone = curveTone(metric.status);
+  const color = COLORS[tone];
   const careX = lastCareAt >= start && lastCareAt <= now
     ? ((lastCareAt - start) / duration) * width
     : undefined;
@@ -93,7 +101,7 @@ export function MetricChart({ metric, samples, start, now, end, lastCareAt }: {
     ? `${historyPath} L ${history[history.length - 1].x.toFixed(2)} ${height} L ${history[0].x.toFixed(2)} ${height} Z`
     : "";
 
-  return <svg className="metric-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${metric.label} trend`}>
+  return <svg className="metric-chart" data-tone={tone} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${metric.label} trend`}>
     <title>{`${metric.label}: solid history, current marker, dashed no-care forecast`}</title>
     <line className="chart-baseline" x1="0" y1={height - 1} x2={width} y2={height - 1} />
     {careX !== undefined ? <line className="chart-care" x1={careX} y1="0" x2={careX} y2={height} /> : null}
