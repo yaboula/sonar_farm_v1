@@ -68,6 +68,7 @@ Constants.CALLBACKS = {
     WEED = 'sonar_farm:weed',
     TREAT_PEST = 'sonar_farm:treatPest',
     CARE_OPTIONS = 'sonar_farm:careOptions',
+    INSPECT = 'sonar_farm:inspect',
     HUB_OPEN = 'sonar_farm:hub:open',
     HUB_LOAD = 'sonar_farm:hub:load',
     HUB_DISPATCH = 'sonar_farm:hub:dispatch',

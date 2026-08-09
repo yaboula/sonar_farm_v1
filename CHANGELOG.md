@@ -6,6 +6,19 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
 
 ## [Unreleased]
 
+### Added — Crop Inspection Pulse Rail
+
+- Añadido un HUD agronómico transparente y sin foco que sustituye la
+  notificación genérica de Inspect.
+- Añadido `Sonar.Inspection.Build`, evaluador compartido de historial, forecast,
+  ETA, protecciones, estados especiales y diagnóstico causal.
+- Añadido el callback autoritativo `sonar_farm:inspect` con validación de runtime,
+  instancia, distancia, existencia y rate limit.
+- Añadida una tercera superficie React/Vite al shell NUI único, con actualización
+  local, cierre exhaustivo y adaptación al minimapa/safe-zone.
+- Añadidas pruebas Lua, frontend, shell, CI, packaging y QA visual a 720p, 1080p
+  y ultrawide.
+
 ## [0.3.0] - 2026-08-09
 
 ### Added — Supplies Runtime, Warehouse e Items V2

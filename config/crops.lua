@@ -38,9 +38,9 @@ Config.Crops = {
         productItem = 'carrot',
         growthTime = 900,
         stages = {
-            { model = 'bzzz_plants_carrot_01', ratio = 0.0 },
-            { model = 'bzzz_plants_carrot_02', ratio = 0.45 },
-            { model = 'bzzz_plants_carrot_03', ratio = 1.0 },
+            { model = 'bzzz_plants_carrot_01', ratio = 0.0, label = 'Establishing' },
+            { model = 'bzzz_plants_carrot_02', ratio = 0.45, label = 'Root development' },
+            { model = 'bzzz_plants_carrot_03', ratio = 1.0, label = 'Harvest ready' },
         },
         -- Tuber: stores water underground, tolerates neglect.
         water = { decayPerHour = 12, droughtTolerance = 0.7 },
@@ -61,9 +61,9 @@ Config.Crops = {
         productItem = 'potato',
         growthTime = 1200,
         stages = {
-            { model = 'bzzz_plants_potato_01', ratio = 0.0 },
-            { model = 'bzzz_plants_potato_02', ratio = 0.5 },
-            { model = 'bzzz_plants_potato_03', ratio = 1.0 },
+            { model = 'bzzz_plants_potato_01', ratio = 0.0, label = 'Sprouting' },
+            { model = 'bzzz_plants_potato_02', ratio = 0.5, label = 'Tuber bulking' },
+            { model = 'bzzz_plants_potato_03', ratio = 1.0, label = 'Harvest ready' },
         },
         -- Hardiest of the four: slowest water decay, highest tolerance.
         water = { decayPerHour = 10, droughtTolerance = 0.8 },
@@ -84,9 +84,9 @@ Config.Crops = {
         productItem = 'lettuce',
         growthTime = 600,
         stages = {
-            { model = 'bzzz_plants_lettuce_01', ratio = 0.0 },
-            { model = 'bzzz_plants_lettuce_02', ratio = 0.5 },
-            { model = 'bzzz_plants_lettuce_03', ratio = 1.0 },
+            { model = 'bzzz_plants_lettuce_01', ratio = 0.0, label = 'Seedling' },
+            { model = 'bzzz_plants_lettuce_02', ratio = 0.5, label = 'Head formation' },
+            { model = 'bzzz_plants_lettuce_03', ratio = 1.0, label = 'Harvest ready' },
         },
         -- Leafy: fast cycle but very thirsty and quick to wilt.
         water = { decayPerHour = 28, droughtTolerance = 0.2 },
@@ -109,9 +109,9 @@ Config.Crops = {
         productItem = 'tomato',
         growthTime = 1500,
         stages = {
-            { model = 'bzzz_plants_tomato_01', ratio = 0.0 },
-            { model = 'bzzz_plants_tomato_02', ratio = 0.4 },
-            { model = 'bzzz_plants_tomato_03', ratio = 1.0 },
+            { model = 'bzzz_plants_tomato_01', ratio = 0.0, label = 'Establishing' },
+            { model = 'bzzz_plants_tomato_02', ratio = 0.4, label = 'Flowering' },
+            { model = 'bzzz_plants_tomato_03', ratio = 1.0, label = 'Harvest ready' },
         },
         -- Fruit: slow and demanding, the most valuable of the four.
         water = { decayPerHour = 20, droughtTolerance = 0.4 },
@@ -119,7 +119,7 @@ Config.Crops = {
         weeds = { growthPerHour = 20, resistance = 0.3 },
         pests = { onsetHours = 0.2, susceptibility = 0.9 },
         criticalWindow = { from = 0.38, to = 0.72 },
-        conditionEffects = { weeds = false, pests = false },
+        conditionEffects = { weeds = true, pests = true },
         yield = { min = 3, max = 6 },
         xpReward = 15,
         requiredLevel = 0,

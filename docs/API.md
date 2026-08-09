@@ -51,6 +51,32 @@ triviales.
 
 ## 2. Callbacks
 
+### `sonar_farm:inspect`
+
+Abre la snapshot autoritativa que alimenta el Crop Inspection Pulse Rail. El
+cliente envía únicamente el identificador del cultivo; coordenadas, instancia,
+distancia, existencia y reloj se resuelven en servidor.
+
+```lua
+local response = lib.callback.await('sonar_farm:inspect', false, {
+    cropId = 'a3f1c9e2-...',
+})
+```
+
+La respuesta de éxito incluye `serverTime` y el mismo payload mínimo de cultivo
+que usa la sincronización espacial. El cliente construye localmente las series
+mediante `Sonar.Inspection.Build`; no vuelve a consultar al servidor mientras la
+barra permanece abierta.
+
+**Validaciones:** runtime READY, jugador listo, routing bucket público, rate
+limit, `cropId` válido, cultivo existente y distancia real del ped al cultivo.
+
+**Rechazos posibles:** `service_unavailable`, `player_not_ready`,
+`wrong_instance`, `rate_limited`, `crop_not_found`, `too_far`.
+
+El contrato NUI v1 usa `inspection:open`, `inspection:update` e
+`inspection:close`. Es informativo y no concede ninguna acción agrícola.
+
 ### `sonar_farm:plant`
 
 Planta un cultivo en un **slot** configurado. El cliente no elige coordenadas:

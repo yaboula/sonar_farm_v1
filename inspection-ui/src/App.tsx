@@ -1,0 +1,92 @@
+import { Bug, Clock, Drop, Leaf, Plant, ShieldCheck } from "@phosphor-icons/react";
+import { useEffect, useMemo, useState } from "react";
+import { cropImages } from "./cropImages";
+import { inspectionFixture } from "./fixture";
+import { MetricChart } from "./MetricChart";
+import type { InspectionMessage, InspectionMetric, InspectionPayloadV1, MetricKey } from "./types";
+
+const ICONS: Record<MetricKey, typeof Drop> = { water: Drop, nutrients: Leaf, weeds: Plant, pests: Bug };
+
+function duration(seconds?: number) {
+  if (seconds === undefined) return "STALLED";
+  const value = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+  const secs = value % 60;
+  return hours ? `${hours}h ${String(minutes).padStart(2, "0")}m` : `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
+function clock(unix: number) {
+  return new Date(unix * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function Stat({ label, value, tone }: { label: string; value: number; tone: "growth" | "health" }) {
+  return <div className={`identity-stat is-${tone}`}><span>{label}</span><strong>{Math.round(value)}%</strong><i><b style={{ width: `${Math.max(0, Math.min(100, value))}%` }} /></i></div>;
+}
+
+function Metric({ metric, payload }: { metric: InspectionMetric; payload: InspectionPayloadV1 }) {
+  const Icon = ICONS[metric.key];
+  const series = payload.series;
+  const protection = metric.protectionUntil && metric.protectionUntil > payload.timing.serverNow
+    ? `${metric.protectionTier?.toUpperCase() ?? "ACTIVE"} · ${duration(metric.protectionUntil - payload.timing.serverNow)}`
+    : undefined;
+  return <section className={`metric metric--${metric.key}`} data-status={metric.status}>
+    <header><Icon size={18} weight="regular" /><span>{metric.label}</span></header>
+    <div className="metric-reading"><strong>{Math.round(metric.value)}%</strong><em>{metric.status}</em></div>
+    {series ? <MetricChart metric={metric} samples={series.samples} start={series.historyStart} now={series.now} end={series.forecastEnd} lastCareAt={payload.timing.lastCareAt} /> : null}
+    {protection ? <small><ShieldCheck size={12} />{protection}</small> : <small>{metric.enabled ? "LIVE CONDITION" : "NO CROP EFFECT"}</small>}
+  </section>;
+}
+
+export function App() {
+  const [payload, setPayload] = useState<InspectionPayloadV1 | null>(() => import.meta.env.DEV ? inspectionFixture() : null);
+
+  useEffect(() => {
+    const receive = (event: MessageEvent<InspectionMessage>) => {
+      const message = event.data;
+      if (!message || typeof message.type !== "string" || !message.type.startsWith("inspection:")) return;
+      if (message.type === "inspection:close") return setPayload(null);
+      if (message.payload.version !== 1) return;
+      setPayload((current) => ({ ...message.payload, series: message.payload.series ?? current?.series }));
+    };
+    window.addEventListener("message", receive);
+    return () => window.removeEventListener("message", receive);
+  }, []);
+
+  const timeCopy = useMemo(() => {
+    if (!payload) return "";
+    if (payload.timing.readySinceSeconds !== undefined) return `READY FOR ${duration(payload.timing.readySinceSeconds)}`;
+    if (payload.timing.readyAt) return `READY ${clock(payload.timing.readyAt)} · IN ${duration(payload.timing.readyInSeconds)}`;
+    return "GROWTH STALLED";
+  }, [payload]);
+
+  if (!payload) return null;
+  const style = {
+    "--rail-left": `${payload.layout?.leftInset ?? 335}px`,
+    "--rail-right": `${payload.layout?.rightInset ?? 18}px`,
+  } as React.CSSProperties;
+  const historySeconds = Math.max(0, payload.timing.serverNow - payload.timing.lastCareAt);
+
+  return <main className={import.meta.env.DEV ? "inspection-world is-preview" : "inspection-world"}>
+    <article className="inspection-rail" style={style} aria-label={`${payload.subject.label} crop inspection`}>
+      <section className="crop-identity">
+        <img src={cropImages[payload.subject.crop]} alt="" />
+        <div className="crop-copy"><h1>{payload.subject.label}<small>· {payload.subject.stage}</small></h1><span>{payload.subject.slot}</span></div>
+        <div className="identity-stats"><Stat label="Growth" value={payload.growth} tone="growth" /><Stat label="Health" value={payload.health} tone="health" /></div>
+      </section>
+
+      <div className="metric-grid">{payload.metrics.map((metric) => <Metric key={metric.key} metric={metric} payload={payload} />)}</div>
+
+      <section className="diagnosis"><span>Dominant diagnosis</span><strong>{payload.diagnosis.headline}</strong><small>{payload.timing.readySinceSeconds !== undefined ? `SPOILAGE ${Math.round(payload.spoilage)}%` : "Projected with no additional care"}</small></section>
+      <section className="recommendation"><span>Recommended action</span><strong>{payload.diagnosis.recommendation}</strong><small>Use ox_target to perform care</small></section>
+
+      <footer>
+        <span><Clock size={13} />LAST CARE {duration(historySeconds)} AGO</span>
+        <span>NOW {clock(payload.timing.serverNow)}</span>
+        <strong>{timeCopy}</strong>
+        <span>+{duration(payload.timing.forecastSeconds)} · NO CARE FORECAST</span>
+        <kbd>BACKSPACE</kbd><span>CLOSE</span>
+      </footer>
+    </article>
+  </main>;
+}

@@ -308,6 +308,27 @@ El plantado libre dentro de un radio se sustituyó por surcos configurados:
 
 ---
 
+## Decisiones de Crop Inspection Pulse Rail
+
+- Inspect es un HUD diagnóstico y no un menú. Nunca toma foco ni sustituye las
+  acciones de `ox_target`.
+- `Sonar.Inspection.Build` es el único evaluador de presentación y reutiliza
+  Growth, Physiology y Conditions; la NUI no inventa valores ni trayectorias.
+- Cada curva combina hasta diez minutos de historial real desde la última
+  atención con diez minutos discontinuos de previsión **sin cuidado**.
+- El servidor autoriza una única snapshot inicial. Mientras el HUD está abierto,
+  reloj, valores, ETA y curvas se evalúan localmente; cerrado no existe ningún
+  loop ni tráfico adicional.
+- El HUD mantiene cuatro columnas estables. Una condición desactivada muestra
+  `0% · UNAFFECTED` y nunca crea estado persistente falso.
+- La referencia visual durable es
+  `codex-clipboard-908dece2-35e5-4ef0-89eb-28b30b95c287.png`: rail agronómico
+  horizontal, compacto, oscuro, amarillo cálido y curvas temporales legibles.
+- `inspection-ui/` es la tercera superficie del shell NUI único. Es transparente
+  y no interactiva; Hub y minijuego la cierran antes de adquirir foco.
+
+---
+
 ## Principios de ingeniería (no negociables)
 
 - **Server-authoritative** en todo lo que da valor.

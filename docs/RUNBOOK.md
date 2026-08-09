@@ -193,6 +193,26 @@ Para rollback, vuelve a `AdvancedCare = false` y reinicia. Los campos JSON ya
 persistidos quedan ignorados y los payloads/targets regresan al contrato
 anterior; no es necesario limpiar datos.
 
+### Crop Inspection Pulse Rail
+
+1. Construye `inspection-ui/` con `npm ci && npm run build` antes de arrancar el
+   recurso. El artefacto requerido es `inspection-ui/dist/index.html`.
+2. Mantén `Config.Features.InspectionHud = true`. Si necesitas un rollback
+   inmediato, ponlo en `false`: Inspect volverá al texto anterior.
+3. Ajusta `Config.Inspection.MinimapWidthRatio`, `MinimapGapPixels` y
+   `RightInsetPixels` si el servidor reemplaza el radar estándar. La barra debe
+   empezar después del minimapa y terminar dentro del safe-zone.
+4. `CloseDistance` debe ser igual o superior a la distancia de interacción. El
+   servidor valida la snapshot inicial y el cliente cierra al superar esa
+   distancia.
+5. Inspect no usa `SetNuiFocus`. Backspace, una segunda inspección, muerte,
+   eliminación del cultivo, reset de sync, Hub, minijuego o stop del recurso
+   cierran la barra.
+
+El HUD no genera tráfico periódico: recibe una snapshot autoritativa al abrir y
+después evalúa localmente con el mismo motor compartido. Los valores se publican
+cada segundo y las curvas se reconstruyen cada cinco segundos o tras un delta.
+
 ---
 
 ## 7. Herramientas administrativas y de debug
@@ -333,8 +353,8 @@ de `0.05 ms`.
    Advanced Crop Care 0.2.0.
 2. Copia las 21 definiciones generadas de `data/ox_inventory_items.lua` y las 21
    imágenes de `inventory_images/` a la carpeta de imágenes de `ox_inventory`.
-3. Construye `minigames-ui/` y `web/`; `nui-shell/index.html` es el único
-   `ui_page` y necesita ambos artefactos.
+3. Construye `inspection-ui/`, `minigames-ui/` y `web/`; `nui-shell/index.html`
+   es el único `ui_page` y necesita los tres artefactos.
 4. Concede `sonar_farm.company_admin` al grupo administrativo. En juego ejecuta
    `/farmcompany bootstrap <nombre>` como futuro Owner; registra $25.000 de
    crédito inicial en el ledger de forma idempotente.
@@ -350,7 +370,8 @@ de `0.05 ms`.
 
 Antes del rollout ejecuta `lua scripts/generate_items.lua --check`,
 `python scripts/process_item_assets.py --check`, las pruebas Lua, y todas las
-puertas de `web/` y `minigames-ui/`. Mantén el flag apagado si falla cualquiera.
+puertas de `web/`, `minigames-ui/` e `inspection-ui/`. Mantén el flag apagado
+si falla cualquiera.
 
 ---
 

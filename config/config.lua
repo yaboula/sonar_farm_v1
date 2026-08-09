@@ -66,12 +66,29 @@ Config.Locale = 'en'
 Config.Features = {
     Minigames = true,      -- Stage 5: authoritative tomato planting enabled
     AdvancedCare = false,  -- Causal nutrients/weeds/pests model; opt-in rollout
+    InspectionHud = true,  -- Focus-free authoritative crop inspection rail
     Supplies = false,      -- Authoritative Company procurement and Warehouse
     Machinery = false,     -- Stage 9+: not implemented
     Progression = false,   -- Stage 7: not implemented
     Economy = false,       -- Stage 8: not implemented
     Discord = false,       -- Stage 3: Discord webhook logging connector
     DatabaseLogs = false,  -- Stage 3: database logging connector
+}
+
+Config.Inspection = {
+    HistorySeconds = 10 * 60,
+    ForecastSeconds = 10 * 60,
+    SampleSeconds = 30,
+    CurveRefreshSeconds = 5,
+    ValueRefreshSeconds = 1,
+    MaxEtaSeconds = 24 * 60 * 60,
+    CloseDistance = 4.0,
+    -- Standard GTA radar width plus a small breathing gap. Servers using a
+    -- custom HUD can tune these values without changing the inspection UI.
+    MinimapWidthRatio = 0.168,
+    MinimapGapPixels = 18,
+    RightInsetPixels = 18,
+    SevereConditionPercent = 50,
 }
 
 -- ---------------------------------------------------------------------------

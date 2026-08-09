@@ -120,6 +120,7 @@ RegisterNetEvent(EVENTS.CROP_SYNC, function(payload, serverTime)
     end
 
     Crops.Upsert(payload)
+    if Inspection then Inspection.OnCropChanged(payload.id) end
     available = true
     -- Force an immediate render pass so the prop appears without waiting for the
     -- next loop tick (which could be up to TickFar = 2000ms away).
@@ -133,6 +134,7 @@ RegisterNetEvent(EVENTS.CROP_REMOVE, function(cropId)
     end
 
     Crops.Remove(cropId)
+    if Inspection then Inspection.OnCropRemoved(cropId) end
     -- Refresh immediately so the despawned prop disappears without delay.
     Crops.Refresh(GetEntityCoords(PlayerPedId()))
 end)
@@ -147,6 +149,7 @@ RegisterNetEvent(EVENTS.SYNC_RESET, function()
     currentCell = nil
     available = false
     Crops.Reset()
+    if Inspection then Inspection.OnSyncReset() end
 end)
 
 -- ---------------------------------------------------------------------------

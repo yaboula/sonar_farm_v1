@@ -95,6 +95,9 @@ local function validateCrops(errors)
                     if type(stage.model) ~= 'string' or stage.model == '' then
                         errors[#errors + 1] = stagePath .. '.model must be a non-empty string.'
                     end
+                    if type(stage.label) ~= 'string' or stage.label == '' then
+                        errors[#errors + 1] = stagePath .. '.label must be a non-empty string.'
+                    end
                     if not finite(stage.ratio) or stage.ratio < 0 or stage.ratio > 1 or stage.ratio < previous then
                         errors[#errors + 1] = stagePath .. '.ratio must be ordered within 0..1.'
                     else
@@ -382,6 +385,24 @@ local function validateAdvancedCare(errors)
     end
 end
 
+local function validateInspection(errors)
+    local cfg = Config.Inspection
+    if type(cfg) ~= 'table' then
+        errors[#errors + 1] = 'Config.Inspection must be a table.'
+        return
+    end
+    for _, key in ipairs({ 'HistorySeconds', 'ForecastSeconds', 'SampleSeconds', 'CurveRefreshSeconds',
+        'ValueRefreshSeconds', 'MaxEtaSeconds', 'CloseDistance', 'MinimapGapPixels', 'RightInsetPixels' }) do
+        positive(errors, ('Config.Inspection.%s'):format(key), cfg[key], key == 'MinimapGapPixels' or key == 'RightInsetPixels')
+    end
+    range(errors, 'Config.Inspection.MinimapWidthRatio', cfg.MinimapWidthRatio, 0.05, 0.4)
+    range(errors, 'Config.Inspection.SevereConditionPercent', cfg.SevereConditionPercent, 1, 100)
+    if finite(cfg.CloseDistance) and finite(Config.Security and Config.Security.MaxInteractDistance)
+        and cfg.CloseDistance < Config.Security.MaxInteractDistance then
+        errors[#errors + 1] = 'Config.Inspection.CloseDistance must be at least Config.Security.MaxInteractDistance.'
+    end
+end
+
 local function validateSection(errors, name, fn, ...)
     local ok, err = pcall(fn, errors, ...)
     if not ok then
@@ -419,6 +440,7 @@ function ConfigValidation.Validate()
     validateSection(errors, 'Zone', validateZones, warnings)
     validateSection(errors, 'Minigame', validateMinigames)
     validateSection(errors, 'AdvancedCare', validateAdvancedCare)
+    validateSection(errors, 'Inspection', validateInspection)
     validateSection(errors, 'Supplies', validateSupplies)
 
     nonEmptyString(errors, 'Config.Admin.Ace', Config.Admin and Config.Admin.Ace)

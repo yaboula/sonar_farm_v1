@@ -17,6 +17,7 @@ end
 
 function Hub.Open(surface, presence)
     if active or Minigame.IsActive() then return end
+    if Inspection and Inspection.IsActive() then Inspection.Close('hub_open') end
     local response = lib.callback.await(CALLBACKS.HUB_OPEN, false, { surface = surface, presence = presence })
     if not response or not response.ok then
         return Bridge.Notify(response and response.reason == 'unavailable' and 'Company Supplies is not enabled.' or 'The Business Hub is unavailable.', 'error')

@@ -85,3 +85,26 @@ jobs:
         run: npm test
       - name: Build FiveM NUI
         run: npm run build
+
+  inspection-ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: inspection-ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: inspection-ui/package-lock.json
+      - name: Install inspection HUD dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Test inspection HUD and shell contract
+        run: npm test
+      - name: Build inspection HUD NUI
+        run: npm run build

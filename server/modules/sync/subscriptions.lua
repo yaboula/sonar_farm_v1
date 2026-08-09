@@ -93,7 +93,7 @@ end
 ---@param record table
 ---@param identifier string|nil recipient identifier
 ---@return table
-local function renderPayload(record, identifier)
+function Sync.RenderPayload(record, identifier)
     local data = record.data or {}
 
     local payload = {
@@ -121,6 +121,10 @@ local function renderPayload(record, identifier)
             payload.nutrients = data.nutrients
             payload.nutrientStressAccumulated = data.nutrientStressAccumulated
             payload.overfertilizeExcess = data.overfertilizeExcess
+            payload.nutrientProtectionStrength = data.nutrientProtectionStrength
+            payload.nutrientProtectionUntil = data.nutrientProtectionUntil
+            payload.nutrientProtectionTier = data.nutrientProtectionTier
+            payload.nutrientProtectionItem = data.nutrientProtectionItem
         end
         if Sonar.Conditions.IsEnabled(record, 'weeds') then
             payload.weedCover = data.weedCover
@@ -128,6 +132,10 @@ local function renderPayload(record, identifier)
         if Sonar.Conditions.IsEnabled(record, 'pests') then
             payload.pestPressure = data.pestPressure
             payload.pestDamageAccumulated = data.pestDamageAccumulated
+            payload.pestProtectionStrength = data.pestProtectionStrength
+            payload.pestProtectionUntil = data.pestProtectionUntil
+            payload.pestProtectionTier = data.pestProtectionTier
+            payload.pestProtectionItem = data.pestProtectionItem
         end
     end
     return payload
@@ -150,7 +158,7 @@ function Sync.OnCropChanged(record)
     for source in pairs(bucket) do
         local runtime = Runtime.GuardPlayer(source)
         if runtime.ok then
-            TriggerClientEvent(EVENTS.CROP_SYNC, source, renderPayload(record, runtime.identifier), now)
+            TriggerClientEvent(EVENTS.CROP_SYNC, source, Sync.RenderPayload(record, runtime.identifier), now)
         else
             invalid[#invalid + 1] = source
         end
@@ -275,7 +283,7 @@ lib.callback.register(CALLBACKS.SUBSCRIBE, function(source)
     local identifier = runtime.identifier
     local crops = {}
     for _, record in ipairs(State.GetByCells(cellKeys)) do
-        crops[#crops + 1] = renderPayload(record, identifier)
+        crops[#crops + 1] = Sync.RenderPayload(record, identifier)
     end
 
     -- serverTime lets the client align its clock, so a wrong local system clock

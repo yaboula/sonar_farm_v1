@@ -67,9 +67,7 @@ local function createSphereZone(slot, key)
                 distance = distance,
                 onSelect = function()
                     local cropId = Crops.SlotOccupant(zoneKey, index)
-                    if cropId then
-                        Bridge.Notify(Target.Describe(cropId), Sonar.Constants.NOTIFY.INFO)
-                    end
+                    if cropId then Inspection.Toggle(cropId) end
                 end,
                 canInteract = function()
                     return Sync.IsAvailable() and Crops.IsSlotOccupied(zoneKey, index)

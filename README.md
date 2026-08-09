@@ -41,6 +41,7 @@ sonar_farm/
       minigames/ Sesiones, checkpoints y scoring autoritativo
       logger/    Logging por niveles con conectores
   client/        Motor visual, interaccion y herramientas de administracion
+  inspection-ui/ HUD agronomico React/Vite, transparente y sin foco
   minigames-ui/  NUI React/Canvas 2D aislada del Business Hub
   nui-shell/     Punto de entrada NUI unico y control de foco entre superficies
   web/           Business Hub React (runtime FiveM + fixtures de navegador)
@@ -52,8 +53,10 @@ sonar_farm/
 1. Clonar dentro de `resources/[local]/` de tu servidor FiveM.
 2. Asegurar que `oxmysql`, `qb-core`, `ox_lib`, `ox_inventory` y `ox_target` estan iniciados antes.
 3. Copiar los items de [`data/ox_inventory_items.lua`](data/ox_inventory_items.lua) a `ox_inventory/data/items.lua` y reiniciar `ox_inventory`.
-4. Construir `minigames-ui/` y `web/` con `npm ci` y `npm run build` en cada
-   directorio. El shell carga ambos artefactos sin compartir foco.
+4. Construir `inspection-ui/`, `minigames-ui/` y `web/` con `npm ci` y
+   `npm run build` en cada directorio. El shell carga los tres artefactos; el
+   HUD de inspeccion nunca toma foco y las otras dos superficies lo comparten
+   de forma excluyente.
 5. Conceder `sonar_farm.admin` y `sonar_farm.company_admin` solo a los
    administradores correspondientes.
    herramientas de desarrollo.
@@ -81,6 +84,7 @@ para el historial.
 - [~] Etapa 5 — Motor de minijuegos (Tomato Initial Planting)
 - [x] Advanced Crop Care — modelo causal opcional (`AdvancedCare = false`)
 - [x] Supplies Runtime V2 - Treasury, pedidos y Warehouse (`Supplies = false`)
+- [x] Crop Inspection Pulse Rail - diagnostico temporal sin foco (`InspectionHud = true`)
 - [ ] ... (ver docs/DECISIONES.md)
 
 Tomato se planta como trasplante mediante el minijuego de cuatro pasos
@@ -99,6 +103,12 @@ Tablet prepara, Office confirma contra Company Treasury y Warehouse entrega tras
 el plazo configurado. Los objetos empresariales conservan custodia y durabilidad.
 La validacion dentro de un servidor real se ejecuta con
 [`docs/TEST_SUPPLIES_RUNTIME_V2.md`](docs/TEST_SUPPLIES_RUNTIME_V2.md).
+
+Inspect abre una barra agronomica autoritativa junto al minimapa. Muestra diez
+minutos de historial, diez minutos de prevision sin cuidado, ETA, protecciones y
+una recomendacion causal. Se cierra sin bloquear movimiento, camara ni combate.
+La aceptación dentro del servidor está detallada en
+[`docs/TEST_CROP_INSPECTION_PULSE_RAIL.md`](docs/TEST_CROP_INSPECTION_PULSE_RAIL.md).
 
 La versión actual del recurso se encuentra en `VERSION`. El contrato frontend
 mantiene versionado independiente; el proceso de tags y paquetes está en

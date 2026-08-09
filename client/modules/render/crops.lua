@@ -61,6 +61,14 @@ local function toRecord(payload)
             nutrientStressAccumulated = payload.nutrientStressAccumulated,
             pestDamageAccumulated = payload.pestDamageAccumulated,
             overfertilizeExcess = payload.overfertilizeExcess,
+            nutrientProtectionStrength = payload.nutrientProtectionStrength,
+            nutrientProtectionUntil = payload.nutrientProtectionUntil,
+            nutrientProtectionTier = payload.nutrientProtectionTier,
+            nutrientProtectionItem = payload.nutrientProtectionItem,
+            pestProtectionStrength = payload.pestProtectionStrength,
+            pestProtectionUntil = payload.pestProtectionUntil,
+            pestProtectionTier = payload.pestProtectionTier,
+            pestProtectionItem = payload.pestProtectionItem,
         },
     }
 end

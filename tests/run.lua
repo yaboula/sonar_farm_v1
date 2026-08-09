@@ -66,6 +66,7 @@ dofile('shared/time.lua')
 dofile('shared/conditions.lua')
 dofile('shared/growth.lua')
 dofile('shared/physiology.lua')
+dofile('shared/inspection.lua')
 dofile('shared/zones.lua')
 dofile('shared/config_validation.lua')
 dofile('server/modules/minigames/tomato_plant_scoring.lua')
@@ -188,7 +189,10 @@ test('advanced condition gating respects global and per-crop ceilings', function
     local enabled = Config.Features.AdvancedCare
     Config.Features.AdvancedCare = true
     equal(Sonar.Conditions.IsEnabled('carrot', 'nutrients'), true, 'configured crop inherits global gate')
+    local tomatoEffects = Config.Crops.tomato.conditionEffects
+    Config.Crops.tomato.conditionEffects = { weeds = false, pests = false }
     equal(Sonar.Conditions.IsEnabled('tomato', 'weeds'), false, 'crop override narrows global gate')
+    Config.Crops.tomato.conditionEffects = tomatoEffects
     local global = Config.Farming.ConditionEffects.Pests
     Config.Farming.ConditionEffects.Pests = false
     equal(Sonar.Conditions.IsEnabled('carrot', 'pests'), false, 'global off and crop unset stays off')
@@ -198,6 +202,67 @@ test('advanced condition gating respects global and per-crop ceilings', function
     Config.Crops.carrot.conditionEffects = override
     Config.Farming.ConditionEffects.Pests = global
     Config.Features.AdvancedCare = enabled
+end)
+
+test('inspection builds real history forecast timing and disabled conditions', function()
+    local enabled = Config.Features.AdvancedCare
+    local pests = Config.Farming.ConditionEffects.Pests
+    Config.Features.AdvancedCare = true
+    local record = {
+        id = 'inspection-crop', crop_type = 'carrot', zone = 'east', slot = 7,
+        planted_at = 1000, growth_time = 900, state = Sonar.Constants.CROP_STATE.GROWING,
+        isMine = true,
+        data = { lastCare = 1000, water = 44, health = 92, nutrients = 62, weedCover = 38,
+            pestPressure = 12, nutrientProtectionTier = 'plus', nutrientProtectionUntil = 1900 },
+    }
+    local payload = Sonar.Inspection.Build(record, 1600)
+    equal(payload.version, 1, 'inspection contract version')
+    equal(payload.series.historyStart, 1000, 'history starts at last care')
+    equal(payload.series.now, 1600, 'series marks server now')
+    equal(payload.series.forecastEnd, 2200, 'forecast uses configured horizon')
+    equal(#payload.series.samples, 41, 'thirty-second history and forecast samples')
+    equal(payload.subject.stage, 'Root development', 'data-driven stage label')
+    assert(payload.timing.readyAt and payload.timing.readyAt > 1600, 'stress-aware ETA resolved')
+    equal(payload.metrics[2].protectionTier, 'plus', 'protection tier exposed')
+
+    Config.Farming.ConditionEffects.Pests = false
+    local withoutPests = Sonar.Inspection.Build(record, 1600, { includeSeries = false })
+    equal(withoutPests.metrics[4].value, 0, 'disabled condition is a real flat zero')
+    equal(withoutPests.metrics[4].status, 'unaffected', 'disabled condition is labelled unaffected')
+    equal(withoutPests.series, nil, 'lightweight refresh omits series')
+    Config.Farming.ConditionEffects.Pests = pests
+    Config.Features.AdvancedCare = enabled
+end)
+
+test('inspection diagnoses immediate water stress and can report stalled growth', function()
+    local enabled = Config.Features.AdvancedCare
+    local rates = Config.Farming.AdvancedCare.GrowthPenaltyPerDeficitHour
+    Config.Features.AdvancedCare = true
+    local record = {
+        id = 'stressed-crop', crop_type = 'lettuce', zone = 'east', slot = 8,
+        planted_at = 1000, growth_time = 600, state = Sonar.Constants.CROP_STATE.GROWING,
+        data = { lastCare = 1000, water = 0, health = 100, nutrients = 0, weedCover = 0, pestPressure = 0 },
+    }
+    local urgent = Sonar.Inspection.Build(record, 1060, { includeSeries = false })
+    equal(urgent.diagnosis.cause, 'water', 'immediate deficit wins deterministic diagnosis')
+    Config.Farming.AdvancedCare.GrowthPenaltyPerDeficitHour = { water = 0.5, nutrients = 0.5 }
+    local stalled = Sonar.Inspection.Build(record, 1060, { includeSeries = false })
+    equal(stalled.timing.readyAt, nil, 'fully stalled crop has no fake ETA')
+    Config.Farming.AdvancedCare.GrowthPenaltyPerDeficitHour = rates
+    Config.Features.AdvancedCare = enabled
+end)
+
+test('inspection callback accepts only crop identity and revalidates authority', function()
+    local file = assert(io.open('server/modules/farming/inspection.lua', 'rb'))
+    local source = file:read('*a')
+    file:close()
+    assert(source:find('Runtime.GuardPlayer(source)', 1, true), 'runtime gate')
+    assert(source:find("Security.Consume(source, 1, 'inspection')", 1, true), 'inspection rate limit')
+    assert(source:find('local cropId = request and request.cropId', 1, true), 'crop id is the only request input')
+    assert(source:find('State.Get(cropId)', 1, true), 'authoritative crop lookup')
+    assert(source:find('Validation.Distance(source', 1, true), 'server distance validation')
+    assert(source:find('Sync.RenderPayload(record, runtime.identifier)', 1, true), 'minimal synchronized snapshot')
+    assert(not source:find('request.coords', 1, true), 'client coordinates are never trusted')
 end)
 
 test('advanced trajectories are causal and old records stay compatible', function()

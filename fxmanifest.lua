@@ -32,6 +32,7 @@ shared_scripts {
     -- with the exact same formula the server validates with.
     'shared/growth.lua',
     'shared/physiology.lua',
+    'shared/inspection.lua',
     -- Zone/slot resolver: same list on client (targets) and server (validation).
     'shared/zones.lua',
     'shared/config_validation.lua',
@@ -66,6 +67,7 @@ server_scripts {
     'server/modules/sync/subscriptions.lua',
     -- Farming: shared helpers first, then one file per action.
     'server/modules/farming/lock.lua',
+    'server/modules/farming/inspection.lua',
     'server/modules/farming/physiology.lua',
     'server/modules/farming/quality.lua',
     'server/modules/minigames/tomato_plant_scoring.lua',
@@ -88,6 +90,7 @@ client_scripts {
     'client/modules/interaction/actions.lua',
     'client/modules/minigames/controller.lua',
     'client/modules/hub/controller.lua',
+    'client/modules/inspection/controller.lua',
     'client/modules/zones/slots.lua',
     'client/modules/sync/client.lua',
     'client/modules/zones/blips.lua',
@@ -105,6 +108,8 @@ files {
     'minigames-ui/dist/index.html',
     'minigames-ui/dist/assets/**/*',
     'minigames-ui/dist/contracts/**/*',
+    'inspection-ui/dist/index.html',
+    'inspection-ui/dist/assets/**/*',
     'web/build/index.html',
     'web/build/assets/**/*',
 }

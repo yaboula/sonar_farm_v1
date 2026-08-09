@@ -32,8 +32,17 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: |
+            inspection-ui/package-lock.json
             minigames-ui/package-lock.json
             web/package-lock.json
+      - name: Build and test inspection HUD NUI
+        working-directory: inspection-ui
+        run: |
+          npm ci
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run build
       - name: Build and test minigame NUI
         working-directory: minigames-ui
         run: |
@@ -53,8 +62,9 @@ jobs:
           npm run test:sites
       - name: Package FiveM resource
         run: |
-          mkdir -p release/sonar_farm/minigames-ui release/sonar_farm/web
+          mkdir -p release/sonar_farm/inspection-ui release/sonar_farm/minigames-ui release/sonar_farm/web
           cp -R bridge client config data database docs inventory_images nui-shell server shared release/sonar_farm/
+          cp -R inspection-ui/dist release/sonar_farm/inspection-ui/dist
           cp -R minigames-ui/dist release/sonar_farm/minigames-ui/dist
           cp -R web/build release/sonar_farm/web/build
           cp fxmanifest.lua README.md CHANGELOG.md VERSION release/sonar_farm/
