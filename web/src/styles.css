@@ -1379,14 +1379,28 @@ select:focus-visible {
   cursor: default;
 }
 
+.supply-card-intro {
+  min-height: 96px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px;
+  align-items: center;
+  gap: 14px;
+  margin: -5px -3px 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.supply-card-title {
+  min-width: 0;
+}
+
 .supply-card-visual {
+  width: 108px;
   height: 96px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  margin: -5px -3px 12px;
-  border-bottom: 1px solid var(--border-subtle);
 }
 
 .supply-card-visual img {
@@ -1856,6 +1870,7 @@ select:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   color: var(--text-secondary);
 }
 
@@ -1873,6 +1888,7 @@ select:focus-visible {
 
 .supply-card h2 {
   margin-top: 12px;
+  overflow-wrap: anywhere;
 }
 
 .supply-card > p {
