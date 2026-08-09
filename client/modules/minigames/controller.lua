@@ -88,7 +88,9 @@ end
 local function preparePed(step)
     local ped = PlayerPedId()
     FreezeEntityPosition(ped, true)
-    TaskStartScenarioInPlace(ped, 'WORLD_HUMAN_GARDENER_PLANT', 0, true)
+    if not IsPedUsingScenario(ped, 'WORLD_HUMAN_GARDENER_PLANT') then
+        TaskStartScenarioInPlace(ped, 'WORLD_HUMAN_GARDENER_PLANT', 0, true)
+    end
     attachTool(step)
 end
 
@@ -231,7 +233,7 @@ RegisterNUICallback('tomatoPlant:checkpoint', function(data, callback)
 
     if response.complete then
         local result = response.data
-        releasePed()
+        deleteProp()
         SetNuiFocus(true, true)
         active.completed = true
         active.result = result
