@@ -209,6 +209,24 @@ function Validation.HasItem(source, item, reason, count)
     return OK
 end
 
+--- Resolve and check the seed item held by the player for `def`.
+--- Checks primary `def.seedItem` first, then fallback `def.legacySeedItem`.
+---@param source number
+---@param def table
+---@return table result with `item` (string) on success
+function Validation.GetSeedItem(source, def)
+    if not def then return fail(REJECT.UNKNOWN_CROP) end
+    local primary = def.seedItem
+    if primary and Bridge.Inventory.HasItem(source, primary, 1) then
+        return { ok = true, item = primary }
+    end
+    local legacy = def.legacySeedItem
+    if legacy and Bridge.Inventory.HasItem(source, legacy, 1) then
+        return { ok = true, item = legacy }
+    end
+    return fail(REJECT.MISSING_SEED)
+end
+
 --- Reject if the crop id does not exist in hot state.
 ---@param cropId string
 ---@return table result with `record` on success

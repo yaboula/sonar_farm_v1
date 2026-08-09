@@ -91,7 +91,8 @@ Config.Crops = {
 
     tomato = {
         label = 'Tomato',
-        seedItem = 'tomato_seed',
+        seedItem = 'tomato_seedling',
+        legacySeedItem = 'tomato_seed',
         requiresMinigame = true,
         productItem = 'tomato',
         growthTime = 1500,

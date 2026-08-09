@@ -73,6 +73,9 @@ for cropType, def in pairs(Config.Crops or {}) do
     if def.seedItem then
         seedToCrop[def.seedItem] = cropType
     end
+    if def.legacySeedItem then
+        seedToCrop[def.legacySeedItem] = cropType
+    end
 end
 
 -- ---------------------------------------------------------------------------
@@ -209,7 +212,9 @@ function Actions.OpenPlantMenu(zoneKey, slotIndex)
     for _, cropType in ipairs(Target.AllowedCrops(zoneKey)) do
         local def = Config.Crops[cropType]
         if def then
-            local held = Bridge.Inventory.GetItemCount(def.seedItem) or 0
+            local primaryCount = def.seedItem and Bridge.Inventory.GetItemCount(def.seedItem) or 0
+            local legacyCount = def.legacySeedItem and Bridge.Inventory.GetItemCount(def.legacySeedItem) or 0
+            local held = primaryCount + legacyCount
             options[#options + 1] = {
                 title = def.label,
                 description = ('Planting stock: %d  |  Grows in %d min'):format(held, math.floor((def.growthTime or 0) / 60)),
