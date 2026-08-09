@@ -1985,6 +1985,58 @@ select:focus-visible {
 .company-check-field:has(input:checked) { border-color: var(--border-accent); color: var(--accent); background: rgba(245, 195, 49, 0.045); }
 .company-check-field input { accent-color: var(--accent); }
 .company-check-field span { display: flex; align-items: center; gap: 7px; font-size: 11px; }
+
+.treasury-balance-grid { display: grid; grid-template-columns: 1.35fr repeat(3, 1fr); gap: 7px; margin-bottom: 9px; }
+.treasury-balance-grid article { min-height: 72px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border-subtle); color: var(--text-muted); background: rgba(255, 255, 255, 0.018); }
+.treasury-balance-grid article.is-primary { border-color: var(--border-accent); color: var(--accent); background: rgba(245, 195, 49, 0.055); }
+.treasury-balance-grid article span { min-width: 0; display: grid; gap: 1px; }
+.treasury-balance-grid small { color: var(--text-muted); font-size: 9px; text-transform: uppercase; }
+.treasury-balance-grid strong { color: var(--text-primary); font-family: var(--display); font-size: 22px; line-height: 1; }
+.treasury-balance-grid em { color: var(--text-muted); font-size: 9px; font-style: normal; }
+.treasury-layout { grid-template-columns: minmax(0, 1fr) minmax(290px, 0.74fr); }
+.treasury-boundary,
+.ledger-immutable-note { display: flex; align-items: center; gap: 9px; margin-top: 10px; padding: 8px 9px; border: 1px solid var(--border-subtle); color: var(--accent); background: rgba(245, 195, 49, 0.03); }
+.treasury-boundary span,
+.ledger-immutable-note span { display: grid; gap: 1px; }
+.treasury-boundary strong,
+.ledger-immutable-note strong { color: var(--text-primary); font-size: 10px; text-transform: uppercase; }
+.treasury-boundary small,
+.ledger-immutable-note small { color: var(--text-muted); font-size: 9px; }
+.treasury-valuation { margin: 4px 0 6px; color: var(--text-primary); font-family: var(--display); font-size: 34px; line-height: 1; }
+.ledger-compact-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+.ledger-compact-list button { min-width: 0; min-height: 54px; display: grid; grid-template-columns: 19px minmax(0, 1fr) auto 14px; align-items: center; gap: 7px; padding: 7px 8px; border: 1px solid var(--border-subtle); color: var(--text-secondary); background: rgba(255, 255, 255, 0.018); text-align: left; cursor: pointer; }
+.ledger-compact-list button:hover { border-color: var(--border-accent); }
+.ledger-compact-list button > svg:first-child { color: var(--accent); }
+.ledger-compact-list span { min-width: 0; display: grid; gap: 1px; }
+.ledger-compact-list strong,
+.ledger-compact-list small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ledger-compact-list strong { color: var(--text-primary); font-size: 10px; }
+.ledger-compact-list small { color: var(--text-muted); font-size: 8px; }
+.ledger-compact-list em,
+.ledger-entry-list em { color: var(--success); font-family: var(--display); font-size: 11px; font-style: normal; }
+.ledger-compact-list em[data-direction="debit"],
+.ledger-entry-list em[data-direction="debit"] { color: var(--error); }
+.ledger-compact-list em[data-direction="reserve"],
+.ledger-entry-list em[data-direction="reserve"] { color: var(--accent); }
+.treasury-contribution-review { display: grid; gap: 12px; }
+.ledger-filterbar { display: grid; grid-template-columns: minmax(230px, 1fr) 160px 150px 150px; align-items: end; gap: 7px; margin-bottom: 9px; }
+.ledger-filterbar > label { height: 34px; display: flex; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid var(--border-neutral); color: var(--text-muted); background: rgba(4, 6, 5, 0.65); }
+.ledger-filterbar > label:focus-within { border-color: var(--border-accent); }
+.ledger-filterbar input { min-width: 0; flex: 1; border: 0; color: var(--text-primary); background: transparent; font: 11px var(--body); outline: none; }
+.ledger-layout { grid-template-columns: minmax(0, 1.34fr) minmax(290px, 0.66fr); }
+.ledger-entry-list { max-height: 337px; overflow-y: auto; display: grid; gap: 4px; padding-right: 3px; scrollbar-width: thin; }
+.ledger-entry-list button { min-height: 48px; display: grid; grid-template-columns: 22px minmax(0, 1fr) auto 82px; align-items: center; gap: 9px; padding: 7px 9px; border: 1px solid var(--border-subtle); color: var(--text-secondary); background: rgba(255, 255, 255, 0.018); text-align: left; cursor: pointer; }
+.ledger-entry-list button:hover,
+.ledger-entry-list button.is-selected { border-color: var(--border-accent); background: rgba(245, 195, 49, 0.045); }
+.ledger-entry-list button > svg { color: var(--accent); }
+.ledger-entry-list span { min-width: 0; display: grid; gap: 1px; }
+.ledger-entry-list strong { color: var(--text-primary); font-size: 11px; }
+.ledger-entry-list small { overflow: hidden; color: var(--text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.ledger-entry-list b { padding: 3px 5px; border: 1px solid var(--border-neutral); color: var(--text-muted); font-size: 8px; font-weight: 500; text-transform: uppercase; }
+.ledger-entry-list em { text-align: right; }
+.ledger-route { min-height: 58px; display: grid; grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr); align-items: center; gap: 7px; padding: 8px; border: 1px solid var(--border-subtle); color: var(--accent); font-size: 10px; }
+.ledger-route span { color: var(--text-muted); }
+.ledger-route strong { color: var(--text-primary); font-weight: 600; }
 .company-inline-link { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 12px; padding: 9px 0; border-top: 1px solid var(--border-neutral); color: var(--accent); font-family: var(--display); font-weight: 600; text-transform: uppercase; }
 
 .company-tabbar { display: flex; gap: 4px; margin-bottom: 13px; border-bottom: 1px solid var(--border-neutral); }

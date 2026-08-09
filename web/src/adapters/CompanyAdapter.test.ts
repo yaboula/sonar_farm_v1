@@ -103,4 +103,26 @@ describe("Company domain adapter", () => {
     expect((await adapter.dispatch({ type: "staff.transition", memberId: "staff-elijah", action: "remove" }, owner)).ok).toBe(false);
     expect((await adapter.dispatch({ type: "staff.transition", memberId: "staff-noah", action: "remove" }, owner)).message).toMatch(/Resolve active Work/);
   });
+
+  it("allows only the on-site Owner to contribute without creating withdrawals", async () => {
+    const owner = context("owner");
+    const remoteOwner = context("owner", "remote", "tablet");
+    const manager = context("manager");
+    const before = await adapter.load<TreasurySnapshot>({ kind: "companyTreasury" }, owner);
+    expect((await adapter.dispatch({ type: "treasury.contribute", amount: 1000 }, remoteOwner)).ok).toBe(false);
+    expect((await adapter.dispatch({ type: "treasury.contribute", amount: 1000 }, manager)).ok).toBe(false);
+    const contributed = await adapter.dispatch({ type: "treasury.contribute", amount: 1000 }, owner);
+    const after = await adapter.load<TreasurySnapshot>({ kind: "companyTreasury" }, owner);
+    expect(contributed.ok).toBe(true);
+    expect(after.data?.available).toBe(before.data!.available + 1000);
+    expect(after.data?.personalBalance).toBe(before.data!.personalBalance! - 1000);
+    expect((await adapter.load<LedgerEntry[]>({ kind: "companyLedger" }, owner)).data?.[0]).toMatchObject({ type: "owner_contribution", amount: 1000, direction: "credit" });
+  });
+
+  it("redacts Procurement Ledger to purchases made by that actor", async () => {
+    const procurement = context("procurement");
+    const ledger = await adapter.load<LedgerEntry[]>({ kind: "companyLedger" }, procurement);
+    expect(ledger.data?.length).toBeGreaterThan(0);
+    expect(ledger.data?.every((entry) => entry.type === "purchase" && entry.actorId === procurement.actorId)).toBe(true);
+  });
 });
