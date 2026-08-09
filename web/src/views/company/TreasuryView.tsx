@@ -7,7 +7,7 @@ import { StatePanel } from "../../components/StatePanel";
 import type { TreasurySnapshot } from "../../types";
 import { useCompanyData } from "./useCompanyData";
 
-const money = (value: number) => `$${value.toLocaleString()}`;
+const money = (value: number) => `$${value.toLocaleString("en-US")}`;
 
 export function TreasuryView() {
   const request = useMemo(() => ({ kind: "companyTreasury" } as const), []);

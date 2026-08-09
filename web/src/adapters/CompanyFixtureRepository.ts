@@ -68,7 +68,7 @@ export class CompanyFixtureRepository {
     if (context.capabilities.viewOwnCompanyCargo && cargo.length) modules.push({ id: "cargo", area: "operations", title: "Company Cargo", detail: "Produce currently in custody", value: `${cargo.reduce((sum, item) => sum + item.quantity, 0)} units`, path: "/company/cargo", priority: cargo.some((item) => item.status === "mismatch") ? "critical" : "attention", badge: cargo.some((item) => item.status === "mismatch") ? "Mismatch" : "Deposit due" });
     if (context.capabilities.viewWarehouse) modules.push({ id: "warehouse", area: "operations", title: "Warehouse", detail: "Stock, reservations and incoming cargo", value: `${this.state.warehouseItems.reduce((sum, item) => sum + item.total, 0)} items`, path: "/company/warehouse", priority: this.state.warehouseItems.some((item) => item.status === "discrepancy") ? "attention" : "normal", badge: "1 discrepancy" });
     if (context.capabilities.viewStaff) modules.push({ id: "staff", area: "people", title: "Staff", detail: "Members, applications and invitations", value: `${this.state.staff.filter((item) => item.status === "active").length} active`, path: "/company/staff", priority: this.state.applications.some((item) => item.status === "submitted") ? "attention" : "normal", badge: `${this.state.applications.filter((item) => ["submitted", "under_review"].includes(item.status)).length} pending` });
-    if (context.capabilities.viewTreasury) modules.push({ id: "treasury", area: "finance", title: "Treasury", detail: "Available and committed company funds", value: `$${this.state.treasury.available.toLocaleString()}`, path: "/company/treasury", priority: "normal" });
+    if (context.capabilities.viewTreasury) modules.push({ id: "treasury", area: "finance", title: "Treasury", detail: "Available and committed company funds", value: `$${this.state.treasury.available.toLocaleString("en-US")}`, path: "/company/treasury", priority: "normal" });
     if (context.capabilities.viewCompanyLedger || context.capabilities.viewProcurementLedger) modules.push({ id: "ledger", area: "finance", title: "Transaction Ledger", detail: "Immutable business movements", value: `${this.safeLedger(context).length} entries`, path: "/company/ledger", priority: "normal" });
     if (context.capabilities.viewLeases) {
       const grace = this.state.leases.filter((item) => item.status === "grace").length;
@@ -79,7 +79,7 @@ export class CompanyFixtureRepository {
     if (context.capabilities.sellBusiness) modules.push({ id: "sale", area: "ownership", title: "Business Sale", detail: "Assets, obligations and ownership transfer", value: this.state.listing.status === "draft" ? "Draft" : this.state.listing.status, path: "/company/sale", priority: ["reserved", "awaiting_seller", "listing_changed"].includes(this.state.listing.status) ? "critical" : "normal", badge: this.state.listing.status === "awaiting_seller" ? "Seller confirmation" : undefined });
     if (context.role === "visitor") {
       modules.push({ id: "application", area: "people", title: "Job Application", detail: "Apply for verified farming work", value: this.ownApplication(context)?.status ?? "Open", path: "/company/jobs/apply", priority: "normal" });
-      if (["published", "reserved", "awaiting_seller"].includes(this.state.listing.status)) modules.push({ id: "public-sale", area: "ownership", title: "Business for Sale", detail: "Review the complete company listing", value: `$${this.state.listing.askingPrice.toLocaleString()}`, path: "/company/business-for-sale", priority: "attention" });
+      if (["published", "reserved", "awaiting_seller"].includes(this.state.listing.status)) modules.push({ id: "public-sale", area: "ownership", title: "Business for Sale", detail: "Review the complete company listing", value: `$${this.state.listing.askingPrice.toLocaleString("en-US")}`, path: "/company/business-for-sale", priority: "attention" });
     }
     return { company: clone(this.state.company), headline: this.headline(context, modules), modules, procurementLink: context.capabilities.companyProcurement ? { remaining: this.state.treasury.procurementBudget, pending: 2, path: "/supplies?area=procurement" } : undefined };
   }
@@ -149,7 +149,7 @@ export class CompanyFixtureRepository {
     if (context.capabilities.buyBusiness && this.state.listing.buyerId !== context.actorId) return null;
     if (context.capabilities.sellBusiness && this.state.listing.sellerId !== context.actorId) return null;
     if (!["reserved", "awaiting_seller", "completed"].includes(this.state.listing.status)) return null;
-    return { listing: clone(this.state.listing), company: clone(this.state.company), buyerFunds: this.getPersonalBalance(context.actorId), assets: [`Treasury · $${this.state.treasury.available.toLocaleString()}`, `Warehouse · $${this.state.treasury.warehouseValuation.toLocaleString()}`, `${this.state.leases.filter((item) => ["starter", "active", "grace"].includes(item.status)).length} operated Fields`], liabilities: [`Escrow · $${this.state.treasury.escrowReserved.toLocaleString()}`, `Active obligations · $${this.state.listing.activeObligations.toLocaleString()}`, "Existing Buyer Orders and Contracts"], staffContinuity: `${this.state.staff.length} Staff members remain employed`, formerOwnerExit: "The former Owner leaves the company after atomic transfer" };
+    return { listing: clone(this.state.listing), company: clone(this.state.company), buyerFunds: this.getPersonalBalance(context.actorId), assets: [`Treasury · $${this.state.treasury.available.toLocaleString("en-US")}`, `Warehouse · $${this.state.treasury.warehouseValuation.toLocaleString("en-US")}`, `${this.state.leases.filter((item) => ["starter", "active", "grace"].includes(item.status)).length} operated Fields`], liabilities: [`Escrow · $${this.state.treasury.escrowReserved.toLocaleString("en-US")}`, `Active obligations · $${this.state.listing.activeObligations.toLocaleString("en-US")}`, "Existing Buyer Orders and Contracts"], staffContinuity: `${this.state.staff.length} Staff members remain employed`, formerOwnerExit: "The former Owner leaves the company after atomic transfer" };
   }
 
   setCargoRoute(cargoId: string, context: HubContextModel): IntentResult {
@@ -190,7 +190,7 @@ export class CompanyFixtureRepository {
     item.total -= sale.quantity; item.available -= sale.quantity; sale.status = "completed";
     const ledger = this.postLedger({ key: `wholesale:${sale.id}`, type: "wholesale", amount: sale.payout, direction: "credit", actorId: context.actorId, actor: this.actorName(context.actorId), source: "San Andreas Produce Wholesaler", destination: `${this.state.company.name} Treasury`, linkedKind: "wholesale", linkedId: sale.id, status: "completed" });
     sale.ledgerEntryId = ledger.id;
-    return { ok: true, changed: true, receiptId: ledger.id, message: `$${sale.payout.toLocaleString()} credited to Treasury.`, invalidated: ["warehouse", "treasury", "ledger"] };
+    return { ok: true, changed: true, receiptId: ledger.id, message: `$${sale.payout.toLocaleString("en-US")} credited to Treasury.`, invalidated: ["warehouse", "treasury", "ledger"] };
   }
 
   saveApplication(input: JobApplicationInput, context: HubContextModel, submit: boolean): IntentResult {
@@ -270,7 +270,7 @@ export class CompanyFixtureRepository {
     this.state.personalBalances[context.actorId] -= amount;
     const ledger = this.postLedger({ key: `contribution:${context.actorId}:${this.ledgerSequence}`, type: "owner_contribution", amount, direction: "credit", actorId: context.actorId, actor: this.actorName(context.actorId), source: "Owner Personal Funds", destination: `${this.state.company.name} Treasury`, status: "completed" });
     this.invalidateListing();
-    return { ok: true, changed: true, receiptId: ledger.id, message: `$${amount.toLocaleString()} contributed to Treasury.`, invalidated: ["treasury", "ledger", "business-sale"] };
+    return { ok: true, changed: true, receiptId: ledger.id, message: `$${amount.toLocaleString("en-US")} contributed to Treasury.`, invalidated: ["treasury", "ledger", "business-sale"] };
   }
 
   transitionLease(leaseId: string, action: "start" | "pay" | "end", context: HubContextModel): IntentResult {

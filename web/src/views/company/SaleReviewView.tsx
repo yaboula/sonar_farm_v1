@@ -7,7 +7,7 @@ import { StatePanel } from "../../components/StatePanel";
 import type { BusinessSaleListing } from "../../types";
 import { useCompanyData } from "./useCompanyData";
 
-const money = (value: number) => `$${value.toLocaleString()}`;
+const money = (value: number) => `$${value.toLocaleString("en-US")}`;
 
 export function SaleReviewView() {
   const request = useMemo(() => ({ kind: "companySaleReview" } as const), []);

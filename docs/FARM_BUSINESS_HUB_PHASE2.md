@@ -356,3 +356,107 @@ Completion requires role and surface redaction, deterministic aggregation,
 exclusive Crop Plans, stable Work scope, ordered delta/resync tests, all shared
 states, mouse/keyboard access, Office/Tablet visual QA, build/Sites/Lua regression
 and no dead actions.
+
+## Increment 2.4 — Company business center
+
+### Authority model
+
+Company is the source of truth for identity, people, assets, obligations,
+Treasury and ownership. `Sonar Farm` is the immutable product brand;
+`Grapeseed Farm Co.` is the initial player company and can be renamed.
+
+The Company dashboard removes unauthorized areas before render and groups real
+destinations under Operations, People, Finance and Ownership. Procurement stays
+owned by Supplies. Company exposes only its budget summary and route.
+
+`HubSurface` describes Office or Tablet. `HubPresence` independently describes
+remote, office, warehouse or registry presence. Available actions require both
+the relevant capability and, where applicable, the physical presence supplied
+by the adapter.
+
+### Public and operational routes
+
+- `/company/profile` exposes public identity, opportunities and allowed paths.
+- `/company/jobs/apply` owns one persistent application per character.
+- `/company/business-for-sale` presents an immutable public listing.
+- `/company/cargo` redacts custody to the actor unless team access is granted.
+- `/company/warehouse` owns Stock, Reservations, Incoming and Discrepancies.
+- `/company/warehouse/wholesale/:saleId/review` settles unreserved surplus.
+- `/company/staff` and member/application routes own employment authority.
+- `/company/treasury` separates cash, commitments, income and valuation.
+- `/company/ledger` is immutable, filterable and actor-redacted.
+- `/company/leases` and detail synchronize territorial access with Fields.
+- `/company/roles` and `/company/identity` are Owner-only governance.
+- `/company/sale`, review and transfer own the complete resale lifecycle.
+
+Unknown identifiers render an explicit unavailable/not-found state. Permission
+loss increments `capabilitiesRevision`; the open view reloads against the new
+template and becomes Restricted without retaining private data or actions.
+
+### Cargo, Warehouse and money
+
+Company Cargo retains product, quality, origin, custodian, linked Work,
+destination and restrictions. Warehouse stock separates total, available,
+reserved and incoming quantities. Buyer Order reservations are never eligible
+for wholesale sale.
+
+Wholesale confirmation requires Warehouse presence and commits stock reduction,
+Treasury credit and one idempotent Ledger settlement together. Work and Supplies
+use the same `CompanyFixtureRepository`; final company purchases no longer own a
+parallel balance.
+
+Treasury separates available balance, Contract escrow, Assignment pay, Lease
+obligations and pending Buyer income. Warehouse valuation is explicitly not
+cash. There is no withdrawal action. An Owner contribution requires Office
+surface and presence, debits personal funds, credits Treasury and writes Ledger.
+
+All Company money uses deterministic English-US separators regardless of host
+locale. Reloading the page resets the in-memory fixture state.
+
+### People and land
+
+Applications support draft, submit, withdraw, interview, accept and reject with
+one active record per character. Invitations grant no access until the invited
+character accepts. Normal onboarding is Worker; elevated initial roles are
+provided by adapter authority. The Owner cannot be removed outside transfer,
+and active Work, cargo or issued materials block Staff removal.
+
+Leases distinguish permanent starter land, active recurring land, available
+land and the 24-hour Grace Period. During grace, planting is suspended while
+care and harvest remain valid. Paying Orchard Annex removes its Field
+restriction; starting Riverside creates its stable topology; ending a Lease
+makes the Field inaccessible. Treasury, Ledger, Company and Fields update from
+one adapter mutation.
+
+### Governance, identity and ownership
+
+Role policies contain editable capability templates, financial limits and
+locked protections. Manager never inherits Owner controls. Gameplay role
+transitions preserve the stable actor identity; the development role selector
+alone changes to another fixture actor.
+
+Rename changes only the player company name. It requires Owner, Office, a valid
+name, Treasury fee and inactive cooldown. The Registry fee, new name, Ledger
+entry and listing invalidation commit together.
+
+A Business Sale listing captures a versioned snapshot of asking price,
+Treasury, Warehouse valuation, Staff, Leases, obligations, fee and proceeds.
+Reservation moves buyer personal funds into escrow once. Material changes refund
+escrow and invalidate the public version. Buyer and seller confirmations occur
+at the Registry. Final settlement atomically releases escrow, changes Owner,
+keeps Staff/Warehouse/Treasury, removes the former Owner and writes one released
+sale entry. A second buyer or stale confirmation changes no state.
+
+### Completion gate
+
+- Visitor, Contractor, every Staff role, Manager and Owner receive only their
+  authorized data and routes.
+- Office and Tablet share the opaque 1440 × 810 canvas; internal scrolling keeps
+  persistent actions visible.
+- Every mutation has adapter-provided confirmation copy and stale-action
+  revalidation; no `Coming Soon`, decorative buttons or empty modules exist.
+- Shared loading, empty, error, restricted and unavailable states cover every
+  Company family.
+- Adapter tests prove custody redaction, atomic wholesale, employment uniqueness,
+  Treasury authority, Ledger filtering, Lease/Field synchronization, live
+  permission loss, rename cooldown, escrow refund and atomic ownership transfer.

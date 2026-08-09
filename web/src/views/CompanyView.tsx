@@ -27,7 +27,7 @@ export function CompanyView() {
     <HubScaffold eyebrow={hub.role === "visitor" || hub.role === "contractor" ? "Public business record" : "Business administration"} title="Company" subtitle={data.headline}>
       <div className="company-dashboard-head">
         <div><Buildings size={29} weight="thin" /><span><strong>{data.company.name} · {data.company.status === "for_sale" ? "Operating · For Sale" : "Operating"}</strong><small>{data.company.officeLocation}</small></span></div>
-        {data.procurementLink ? <button type="button" onClick={() => navigate(data.procurementLink!.path)}><ShoppingCartSimple size={19} /><span><strong>${data.procurementLink.remaining.toLocaleString()}</strong><small>Procurement remaining</small></span><CaretRight size={17} /></button> : null}
+        {data.procurementLink ? <button type="button" onClick={() => navigate(data.procurementLink!.path)}><ShoppingCartSimple size={19} /><span><strong>${data.procurementLink.remaining.toLocaleString("en-US")}</strong><small>Procurement remaining</small></span><CaretRight size={17} /></button> : null}
       </div>
       <div className="company-area-stack">
         {areas.map((area) => <section className="company-area" key={area}>

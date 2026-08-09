@@ -22,5 +22,10 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Worker and Supervisor are the explicit Assignment Detail perspectives. Manager and Owner inherit Supervisor behavior until dedicated variants are designed.
 - Deep-view actions come from adapter-provided `availableActions`; components do not infer business rules from role labels or status copy.
 - Product selection controls use the reusable `FarmSelect` component. Never expose the operating system's native select popup inside the Sonar Farm product UI.
+- Sonar Farm is the immutable system brand; Grapeseed Farm Co. is the mutable player-company fixture.
+- Company is the authority for Treasury, Warehouse, Staff, Leases, identity and ownership. Work and Supplies publish final money movements into Company instead of maintaining independent balances.
+- Surface (`office` or `tablet`) and presence (`remote`, `office`, `warehouse`, `registry`) are independent. Physical mutations must be derived from adapter-provided actions after both are evaluated.
+- Runtime role transitions preserve `actorId`. Only the development preview role selector swaps to a different fixture actor.
+- Business Sale transfers the complete company atomically through buyer escrow and Registry confirmations; Staff, Warehouse and Treasury remain with the company while the former Owner exits.
 - Field operating maps use a fixed 0° Row grid with no zoom or free pan. The map owns a vertical scroll viewport showing 10 Rows at a time; selecting a Row reveals up to 20 Slots across the same fixed-width rectangle.
 - Each Field Row owns an independent, authoritative topology of 2–20 Slots. The UI must use stable Slot IDs and each Row's `slotIds`; it must never assume that adjacent Rows have equal Slot counts.

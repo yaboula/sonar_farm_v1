@@ -252,4 +252,47 @@ describe("Farm Business Hub", () => {
     expect(screen.getByRole("heading", { name: "Complete at Office Terminal" })).toBeInTheDocument();
     expect(screen.getByText(/No funds or stock changed/)).toBeInTheDocument();
   });
+
+  it("renders every Owner Company deep view without an empty module", async () => {
+    const routes = [
+      ["/company/profile", "Grapeseed Farm Co."],
+      ["/company/cargo", "Company Cargo"],
+      ["/company/warehouse", "Warehouse"],
+      ["/company/staff", "Staff"],
+      ["/company/applications", "Applications"],
+      ["/company/treasury", "Treasury"],
+      ["/company/ledger", "Transaction Ledger"],
+      ["/company/leases", "Leases"],
+      ["/company/leases/lease-orchard", "Orchard Annex"],
+      ["/company/roles", "Roles & Permissions"],
+      ["/company/identity", "Company Identity"],
+      ["/company/sale", "Business Sale"],
+      ["/company/sale/review", "Sale Listing Review"],
+    ] as const;
+    for (const [path, heading] of routes) {
+      fixtureHubAdapter.reset();
+      const view = renderApp(path);
+      expect(await screen.findByRole("heading", { level: 1, name: heading })).toBeInTheDocument();
+      expect(screen.queryByText("Coming Soon")).not.toBeInTheDocument();
+      view.unmount();
+    }
+  });
+
+  it("exposes public Company Profile and Job Application to a Visitor", async () => {
+    const user = userEvent.setup();
+    renderApp("/company/profile");
+    await user.selectOptions(screen.getByLabelText("Preview role"), "visitor");
+    expect(await screen.findByRole("heading", { name: "Grapeseed Farm Co." })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /apply for a job/i }));
+    expect(await screen.findByRole("heading", { name: "Job Application" })).toBeInTheDocument();
+    expect(screen.queryByText(/Treasury balance/i)).not.toBeInTheDocument();
+  });
+
+  it("uses shared unavailable state for a Company deep view", async () => {
+    const user = userEvent.setup();
+    renderApp("/company/warehouse");
+    expect(await screen.findByRole("heading", { name: "Warehouse" })).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Preview state"), "unavailable");
+    expect(await screen.findByRole("heading", { name: "Farm service is unavailable" })).toBeInTheDocument();
+  });
 });

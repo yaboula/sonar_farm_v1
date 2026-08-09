@@ -7,7 +7,7 @@ import { StatePanel } from "../../components/StatePanel";
 import type { LedgerEntry } from "../../types";
 import { useCompanyData } from "./useCompanyData";
 
-const money = (value: number) => `$${value.toLocaleString()}`;
+const money = (value: number) => `$${value.toLocaleString("en-US")}`;
 
 export function LedgerView() {
   const request = useMemo(() => ({ kind: "companyLedger" } as const), []);
