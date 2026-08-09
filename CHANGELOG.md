@@ -6,6 +6,19 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
 
 ## [Unreleased]
 
+### Closed — Farm Business Hub Frontend V1
+
+- Congelado el contrato frontend `1.0.0`: canvas 1440×810, 35 rutas, siete
+  roles, dos superficies, cuatro presencias, estados compartidos y los 11
+  flujos esenciales del producto.
+- Centralizado el catálogo de rutas en `web/src/frontendV1Contract.ts` para que
+  React y el futuro adapter FiveM compartan una única fuente de verdad.
+- Añadida la puerta de release con límites de autoridad, deuda aceptada y
+  condiciones de entrada a integración en
+  `docs/FARM_BUSINESS_HUB_FRONTEND_V1_RELEASE.md`.
+- Cierre validado con 80 tests frontend, build/Sites, 51 archivos Lua parseados,
+  18 regresiones Lua, revisión de secretos y QA visual Office/Tablet.
+
 ### Added — Etapa 5.1 · Tomato Initial Planting
 
 - NUI independiente en `minigames-ui/` con React, TypeScript y Canvas 2D; no

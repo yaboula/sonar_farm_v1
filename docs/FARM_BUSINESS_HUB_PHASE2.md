@@ -1,5 +1,9 @@
 # Farm Business Hub — Phase 2
 
+Status: **complete**. Frontend V1 is frozen as version `1.0.0` in
+`web/src/frontendV1Contract.ts`; the release gate and integration boundary are
+recorded in `docs/FARM_BUSINESS_HUB_FRONTEND_V1_RELEASE.md`.
+
 ## Purpose
 
 Phase 2 completes the deep frontend experiences defined by the product contract.

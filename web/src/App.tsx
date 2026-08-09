@@ -33,13 +33,14 @@ import { BusinessSaleView } from "./views/company/BusinessSaleView";
 import { SaleReviewView } from "./views/company/SaleReviewView";
 import { PublicBusinessSaleView } from "./views/company/PublicBusinessSaleView";
 import { OwnershipTransferView } from "./views/company/OwnershipTransferView";
+import { FRONTEND_V1_PATHS } from "./frontendV1Contract";
 
 const PATH_TO_ROUTE: Record<string, HubRoute> = {
-  "/today": "today",
-  "/fields": "fields",
-  "/work": "work",
-  "/supplies": "supplies",
-  "/company": "company",
+  [FRONTEND_V1_PATHS.today]: "today",
+  [FRONTEND_V1_PATHS.fields]: "fields",
+  [FRONTEND_V1_PATHS.work]: "work",
+  [FRONTEND_V1_PATHS.supplies]: "supplies",
+  [FRONTEND_V1_PATHS.company]: "company",
 };
 
 export function App() {
@@ -57,41 +58,41 @@ export function App() {
   return (
     <SurfaceStage>
       <Routes>
-        <Route path="/today" element={<TodayView />} />
-        <Route path="/fields" element={<FieldsView />} />
-        <Route path="/fields/:fieldId" element={<FieldDetailView />} />
-        <Route path="/work" element={<WorkView />} />
-        <Route path="/supplies" element={<SuppliesView />} />
-        <Route path="/company" element={<CompanyView />} />
-        <Route path="/company/profile" element={<CompanyProfileView />} />
-        <Route path="/company/cargo" element={<CompanyCargoView />} />
-        <Route path="/company/warehouse" element={<WarehouseView />} />
-        <Route path="/company/warehouse/wholesale/:saleId/review" element={<WholesaleReviewView />} />
-        <Route path="/company/staff" element={<StaffView />} />
-        <Route path="/company/staff/:memberId" element={<StaffMemberView />} />
-        <Route path="/company/applications" element={<ApplicationsView />} />
-        <Route path="/company/applications/:applicationId" element={<ApplicationReviewView />} />
-        <Route path="/company/jobs/apply" element={<JobApplicationView />} />
-        <Route path="/company/treasury" element={<TreasuryView />} />
-        <Route path="/company/ledger" element={<LedgerView />} />
-        <Route path="/company/leases" element={<LeasesView />} />
-        <Route path="/company/leases/:leaseId" element={<LeaseDetailView />} />
-        <Route path="/company/roles" element={<RolePoliciesView />} />
-        <Route path="/company/identity" element={<CompanyIdentityView />} />
-        <Route path="/company/sale" element={<BusinessSaleView />} />
-        <Route path="/company/sale/review" element={<SaleReviewView />} />
-        <Route path="/company/sale/transfer/:listingId" element={<OwnershipTransferView />} />
-        <Route path="/company/business-for-sale" element={<PublicBusinessSaleView />} />
-        <Route path="/company/business-for-sale/transfer/:listingId" element={<OwnershipTransferView />} />
-        <Route path="/work/assignments/:assignmentId" element={<AssignmentDetailView />} />
-        <Route path="/work/assignments/new" element={<WorkCreateView kind="assignment" />} />
-        <Route path="/work/orders/:orderId" element={<BuyerOrderDetailView />} />
-        <Route path="/work/contracts/new" element={<WorkCreateView kind="contract" />} />
-        <Route path="/work/contracts/:contractId" element={<ContractDetailView mode="public" />} />
-        <Route path="/work/contracts/active/:contractId" element={<ContractDetailView mode="active" />} />
-        <Route path="/work/contracts/active/:contractId/progress" element={<ContractDetailView mode="progress" />} />
-        <Route path="/work/contracts/active/:contractId/completion" element={<ContractDetailView mode="completion" />} />
-        <Route path="/supplies/purchases/:purchaseId/review" element={<PurchaseReviewView />} />
+        <Route path={FRONTEND_V1_PATHS.today} element={<TodayView />} />
+        <Route path={FRONTEND_V1_PATHS.fields} element={<FieldsView />} />
+        <Route path={FRONTEND_V1_PATHS.fieldDetail} element={<FieldDetailView />} />
+        <Route path={FRONTEND_V1_PATHS.work} element={<WorkView />} />
+        <Route path={FRONTEND_V1_PATHS.supplies} element={<SuppliesView />} />
+        <Route path={FRONTEND_V1_PATHS.company} element={<CompanyView />} />
+        <Route path={FRONTEND_V1_PATHS.companyProfile} element={<CompanyProfileView />} />
+        <Route path={FRONTEND_V1_PATHS.companyCargo} element={<CompanyCargoView />} />
+        <Route path={FRONTEND_V1_PATHS.companyWarehouse} element={<WarehouseView />} />
+        <Route path={FRONTEND_V1_PATHS.companyWholesaleReview} element={<WholesaleReviewView />} />
+        <Route path={FRONTEND_V1_PATHS.companyStaff} element={<StaffView />} />
+        <Route path={FRONTEND_V1_PATHS.companyStaffMember} element={<StaffMemberView />} />
+        <Route path={FRONTEND_V1_PATHS.companyApplications} element={<ApplicationsView />} />
+        <Route path={FRONTEND_V1_PATHS.companyApplicationReview} element={<ApplicationReviewView />} />
+        <Route path={FRONTEND_V1_PATHS.companyJobApplication} element={<JobApplicationView />} />
+        <Route path={FRONTEND_V1_PATHS.companyTreasury} element={<TreasuryView />} />
+        <Route path={FRONTEND_V1_PATHS.companyLedger} element={<LedgerView />} />
+        <Route path={FRONTEND_V1_PATHS.companyLeases} element={<LeasesView />} />
+        <Route path={FRONTEND_V1_PATHS.companyLeaseDetail} element={<LeaseDetailView />} />
+        <Route path={FRONTEND_V1_PATHS.companyRolePolicies} element={<RolePoliciesView />} />
+        <Route path={FRONTEND_V1_PATHS.companyIdentity} element={<CompanyIdentityView />} />
+        <Route path={FRONTEND_V1_PATHS.companyBusinessSale} element={<BusinessSaleView />} />
+        <Route path={FRONTEND_V1_PATHS.companySaleReview} element={<SaleReviewView />} />
+        <Route path={FRONTEND_V1_PATHS.companySaleTransfer} element={<OwnershipTransferView />} />
+        <Route path={FRONTEND_V1_PATHS.companyPublicSale} element={<PublicBusinessSaleView />} />
+        <Route path={FRONTEND_V1_PATHS.companyPublicSaleTransfer} element={<OwnershipTransferView />} />
+        <Route path={FRONTEND_V1_PATHS.assignmentDetail} element={<AssignmentDetailView />} />
+        <Route path={FRONTEND_V1_PATHS.assignmentCreate} element={<WorkCreateView kind="assignment" />} />
+        <Route path={FRONTEND_V1_PATHS.buyerOrderDetail} element={<BuyerOrderDetailView />} />
+        <Route path={FRONTEND_V1_PATHS.contractCreate} element={<WorkCreateView kind="contract" />} />
+        <Route path={FRONTEND_V1_PATHS.contractDetail} element={<ContractDetailView mode="public" />} />
+        <Route path={FRONTEND_V1_PATHS.activeContract} element={<ContractDetailView mode="active" />} />
+        <Route path={FRONTEND_V1_PATHS.contractProgress} element={<ContractDetailView mode="progress" />} />
+        <Route path={FRONTEND_V1_PATHS.contractCompletion} element={<ContractDetailView mode="completion" />} />
+        <Route path={FRONTEND_V1_PATHS.purchaseReview} element={<PurchaseReviewView />} />
         <Route path="*" element={<Navigate to={"/" + capabilities.routes[0]} replace />} />
       </Routes>
     </SurfaceStage>
