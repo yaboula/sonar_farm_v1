@@ -59,11 +59,14 @@ export function SuppliesView() {
       const soldOut = item.stock === 0;
       return <article className={quantity ? "supply-card is-selected" : "supply-card"} key={item.id}>
         <div className="supply-card-intro">
-          <div className="supply-card-title">
-            <div className="supply-card-head"><span>{item.category}</span><small>{item.leadMinutes ?? 5}m ETA</small></div>
-            <h2>{item.name}</h2>
+          <div className="supply-card-head">
+            <span>{item.category}</span>
+            <div className="supply-card-delivery"><small>{item.leadMinutes ?? 5}m ETA</small><span className="supply-card-tier" data-tier={item.tier}>{item.tier ?? "basic"}</span></div>
           </div>
-          <div className="supply-card-visual">{item.image ? <img src={item.image} alt="" /> : <ShoppingCartSimple size={38} />}<span data-tier={item.tier}>{item.tier ?? "basic"}</span></div>
+          <div className="supply-card-title-row">
+            <h2>{item.name}</h2>
+            <div className="supply-card-visual">{item.image ? <img src={item.image} alt="" /> : <ShoppingCartSimple size={38} />}</div>
+          </div>
         </div>
         <p>{item.detail}</p>
         <small className="supply-effect">{item.effect}</small>
