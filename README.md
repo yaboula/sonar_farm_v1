@@ -97,6 +97,8 @@ necesarios se documentan en [docs/RUNBOOK.md](docs/RUNBOOK.md).
 Supplies Runtime convierte el Business Hub en una superficie autoritativa:
 Tablet prepara, Office confirma contra Company Treasury y Warehouse entrega tras
 el plazo configurado. Los objetos empresariales conservan custodia y durabilidad.
+La validacion dentro de un servidor real se ejecuta con
+[`docs/TEST_SUPPLIES_RUNTIME_V2.md`](docs/TEST_SUPPLIES_RUNTIME_V2.md).
 
 La versión actual del recurso se encuentra en `VERSION`. El contrato frontend
 mantiene versionado independiente; el proceso de tags y paquetes está en
