@@ -47,8 +47,9 @@ end
 --- Evaluate a crop's growth at a point in time.
 ---@param record table state record (needs planted_at, growth_time, crop_type)
 ---@param now? number unix seconds (defaults to server-aligned now)
+---@param trajectory? table precomputed Conditions.Evaluate result for this record/time
 ---@return table result { elapsed, progress, stageIndex, state }
-function Growth.Evaluate(record, now)
+function Growth.Evaluate(record, now, trajectory)
     now = now or Sonar.Time.Now()
 
     if record.state == CROP_STATE.PLANTING or record.state == CROP_STATE.PLANTING_FAILED then
@@ -65,7 +66,7 @@ function Growth.Evaluate(record, now)
     local cycleV2 = Sonar.CropClock and Sonar.CropClock.IsV2(record)
     if cycleV2 then
         local data = record.data or {}
-        local pending = Sonar.Conditions.Evaluate(record, now)
+        local pending = trajectory or Sonar.Conditions.Evaluate(record, now)
         local nominalProgress = elapsed / Sonar.CropClock.GrowthSeconds(record)
         local bonus = tonumber(Config.Farming and Config.Farming.AdvancedCare
             and Config.Farming.AdvancedCare.Cycle
@@ -79,7 +80,7 @@ function Growth.Evaluate(record, now)
         effectiveElapsed = math.max(0, (nominalProgress - adjustment) * Sonar.CropClock.GrowthSeconds(record))
     elseif Sonar.Conditions and Sonar.Conditions.IsAdvancedCareEnabled() then
         local data = record.data or {}
-        local pending = Sonar.Conditions.Evaluate(record, now)
+        local pending = trajectory or Sonar.Conditions.Evaluate(record, now)
         local elapsedHours = elapsed / 3600
         local adjustmentHours = Sonar.Utils.Clamp(
             (tonumber(data.growthPenaltyHours) or 0) + (tonumber(pending.growthPenaltyHoursDelta) or 0),

@@ -507,6 +507,9 @@ function ConfigValidation.Validate()
     positive(errors, 'Config.Render.Radius', Config.Render and Config.Render.Radius, false)
     positive(errors, 'Config.Render.TargetDistance', Config.Render and Config.Render.TargetDistance, false)
     positive(errors, 'Config.Render.MaxProps', Config.Render and Config.Render.MaxProps, false)
+    positive(errors, 'Config.Render.InteractionCacheMs', Config.Render and Config.Render.InteractionCacheMs, false)
+    positive(errors, 'Config.Render.VisualStageCacheMs', Config.Render and Config.Render.VisualStageCacheMs, false)
+    positive(errors, 'Config.Render.VisualStageJitterMs', Config.Render and Config.Render.VisualStageJitterMs, true)
 
     if Config.Render and Config.Security
         and finite(Config.Render.TargetDistance)

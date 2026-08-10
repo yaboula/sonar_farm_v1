@@ -24,6 +24,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
   la duración real resuelta para el cultivo seleccionado.
 - Las curvas de inspección conservan únicamente historial hasta `NOW`; el
   horizonte diagnóstico equivale al 10 % del ciclo.
+- Optimizada la ruta caliente de `ox_target`: todas las acciones de un cultivo
+  reutilizan una snapshot agronómica breve y booleans precomputados.
+- `Growth` y `Physiology` comparten una única trayectoria V2; la madurez histórica
+  se memoiza, persiste y sincroniza para no repetir búsquedas binarias.
+- El render conserva la etapa visual durante cinco segundos y dispersa por crop
+  las reevaluaciones, sin modificar la autoridad fresca de las acciones servidor.
 
 ### Added — Crop Inspection Pulse Rail
 

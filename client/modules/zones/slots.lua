@@ -121,14 +121,8 @@ local function createSphereZone(slot, key)
                     if not Sync.IsAvailable() then return false end
                     local cropId = Crops.SlotOccupant(zoneKey, index)
                     if not cropId then return false end
-                    local crop = Crops.Get(cropId)
-                    if crop and (crop.state == CROP_STATE.PLANTING or crop.state == CROP_STATE.PLANTING_FAILED) then
-                        return false
-                    end
-                    local cond = Crops.Condition(cropId)
-                    if not cond then return false end
-                    if cond.state == CROP_STATE.DEAD then return false end
-                    return cond.water < Config.Farming.WaterRefillThreshold
+                    local state = Crops.InteractionState(cropId)
+                    return state and state.canWater or false
                 end,
             },
             {
@@ -146,13 +140,8 @@ local function createSphereZone(slot, key)
                     if not Sync.IsAvailable() then return false end
                     local cropId = Crops.SlotOccupant(zoneKey, index)
                     if not cropId then return false end
-                    local crop = Crops.Get(cropId)
-                    if crop and (crop.state == CROP_STATE.PLANTING or crop.state == CROP_STATE.PLANTING_FAILED) then
-                        return false
-                    end
-                    local cond = Crops.Condition(cropId)
-                    if not cond then return false end
-                    return cond.progress >= 1 or cond.state == CROP_STATE.DEAD
+                    local state = Crops.InteractionState(cropId)
+                    return state and state.canHarvest or false
                 end,
             },
             {
@@ -167,15 +156,8 @@ local function createSphereZone(slot, key)
                 canInteract = function()
                     if not Sync.IsAvailable() then return false end
                     local cropId = Crops.SlotOccupant(zoneKey, index)
-                    local crop = cropId and Crops.Get(cropId)
-                    if not crop or not Sonar.Conditions.IsEnabled(crop, 'nutrients')
-                        or crop.state == CROP_STATE.PLANTING or crop.state == CROP_STATE.PLANTING_FAILED then
-                        return false
-                    end
-                    local condition = Crops.Condition(cropId)
-                    local def = Config.Crops[crop.crop_type]
-                    return condition and condition.state ~= CROP_STATE.DEAD
-                        and condition.nutrients < def.nutrients.overfertilizeCeiling
+                    local state = cropId and Crops.InteractionState(cropId)
+                    return state and state.canFertilize or false
                 end,
             },
             {
@@ -190,14 +172,8 @@ local function createSphereZone(slot, key)
                 canInteract = function()
                     if not Sync.IsAvailable() then return false end
                     local cropId = Crops.SlotOccupant(zoneKey, index)
-                    local crop = cropId and Crops.Get(cropId)
-                    if not crop or not Sonar.Conditions.IsEnabled(crop, 'weeds')
-                        or crop.state == CROP_STATE.PLANTING or crop.state == CROP_STATE.PLANTING_FAILED then
-                        return false
-                    end
-                    local condition = Crops.Condition(cropId)
-                    return condition and condition.state ~= CROP_STATE.DEAD
-                        and condition.weedCover >= Config.Farming.AdvancedCare.MinimumWeedCover
+                    local state = cropId and Crops.InteractionState(cropId)
+                    return state and state.canWeed or false
                 end,
             },
             {
@@ -212,14 +188,8 @@ local function createSphereZone(slot, key)
                 canInteract = function()
                     if not Sync.IsAvailable() then return false end
                     local cropId = Crops.SlotOccupant(zoneKey, index)
-                    local crop = cropId and Crops.Get(cropId)
-                    if not crop or not Sonar.Conditions.IsEnabled(crop, 'pests')
-                        or crop.state == CROP_STATE.PLANTING or crop.state == CROP_STATE.PLANTING_FAILED then
-                        return false
-                    end
-                    local condition = Crops.Condition(cropId)
-                    return condition and condition.state ~= CROP_STATE.DEAD
-                        and condition.pestPressure >= Config.Farming.AdvancedCare.MinimumPestPressure
+                    local state = cropId and Crops.InteractionState(cropId)
+                    return state and state.canTreatPests or false
                 end,
             },
         },

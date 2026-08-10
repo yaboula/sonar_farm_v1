@@ -18,6 +18,11 @@ local Utils = Sonar.Utils
 -- [cropId] = record (shaped like a server state record so the shared evaluators
 -- can consume it unchanged)
 local cache = {}
+-- Short-lived agronomic snapshots for repeated ox_target predicates. They are
+-- client presentation only; server actions always evaluate fresh authority.
+local conditionCache = {}
+-- Longer-lived stage indices keep the 500 ms render reconciliation cheap.
+local visualStageCache = {}
 -- [ "zone:slot" ] = cropId  — occupancy for empty-slot targeting
 local occupancy = {}
 -- Models already reported as missing, so the warning is logged once each.
@@ -55,6 +60,7 @@ local function toRecord(payload)
             lastCare = payload.lastCare,
             simulationVersion = payload.simulationVersion,
             growthAdjustmentRatio = payload.growthAdjustmentRatio,
+            maturedAt = payload.maturedAt,
             nutrients = payload.nutrients,
             weedCover = payload.weedCover,
             pestPressure = payload.pestPressure,
@@ -84,6 +90,11 @@ local function toRecord(payload)
     }
 end
 
+local function invalidateDerived(cropId)
+    conditionCache[cropId] = nil
+    visualStageCache[cropId] = nil
+end
+
 local function indexOccupancy(record)
     local key = occupancyKey(record.zone, record.slot)
     if key then
@@ -110,6 +121,7 @@ function Crops.Upsert(payload)
 
     local record = toRecord(payload)
     cache[payload.id] = record
+    invalidateDerived(payload.id)
     indexOccupancy(record)
 end
 
@@ -124,6 +136,7 @@ function Crops.Remove(cropId)
     end
 
     cache[cropId] = nil
+    invalidateDerived(cropId)
     Crops.Despawn(cropId)
 end
 
@@ -134,6 +147,8 @@ end
 function Crops.ReplaceAll(payloads)
     cache = {}
     occupancy = {}
+    conditionCache = {}
+    visualStageCache = {}
 
     for _, payload in ipairs(payloads or {}) do
         if payload.id then
@@ -182,13 +197,59 @@ function Crops.Count()
     return Utils.TableSize(cache)
 end
 
---- Current condition of a cached crop, derived locally.
+--- Current condition of a cached crop, derived locally and reused briefly.
 ---@param cropId string
+---@param fresh? boolean bypass the presentation cache
 ---@return table|nil condition
-function Crops.Condition(cropId)
+function Crops.Condition(cropId, fresh)
     local record = cache[cropId]
     if not record then return nil end
-    return Physiology.Evaluate(record)
+    local nowMs = GetGameTimer()
+    local cached = conditionCache[cropId]
+    if not fresh and cached and nowMs < cached.expiresAt then
+        return cached.value
+    end
+    local condition = Physiology.Evaluate(record)
+    conditionCache[cropId] = {
+        value = condition,
+        expiresAt = nowMs + math.max(100, tonumber(Config.Render.InteractionCacheMs) or 750),
+    }
+    return condition
+end
+
+--- Precomputed booleans consumed by every ox_target option for a crop. The
+--- first predicate evaluates V2 once; all sibling predicates become O(1).
+---@param cropId string
+---@return table|nil state
+function Crops.InteractionState(cropId)
+    local record = cache[cropId]
+    if not record then return nil end
+    local condition = Crops.Condition(cropId)
+    if not condition then return nil end
+    local entry = conditionCache[cropId]
+    if entry.interactions then return entry.interactions end
+
+    local dead = condition.state == Sonar.Constants.CROP_STATE.DEAD
+    local incomplete = record.state == Sonar.Constants.CROP_STATE.PLANTING
+        or record.state == Sonar.Constants.CROP_STATE.PLANTING_FAILED
+    local definition = Config.Crops and Config.Crops[record.crop_type] or {}
+    local advanced = Config.Farming.AdvancedCare or {}
+    entry.interactions = {
+        canWater = not incomplete and not dead
+            and (tonumber(condition.water) or 0) < (tonumber(Config.Farming.WaterRefillThreshold) or 100),
+        canHarvest = not incomplete and ((tonumber(condition.progress) or 0) >= 1 or dead),
+        canFertilize = not incomplete and not dead
+            and Sonar.Conditions.IsEnabled(record, 'nutrients')
+            and (tonumber(condition.nutrients) or 0)
+                < (tonumber(definition.nutrients and definition.nutrients.overfertilizeCeiling) or 100),
+        canWeed = not incomplete and not dead
+            and Sonar.Conditions.IsEnabled(record, 'weeds')
+            and (tonumber(condition.weedCover) or 0) >= (tonumber(advanced.MinimumWeedCover) or 0),
+        canTreatPests = not incomplete and not dead
+            and Sonar.Conditions.IsEnabled(record, 'pests')
+            and (tonumber(condition.pestPressure) or 0) >= (tonumber(advanced.MinimumPestPressure) or 0),
+    }
+    return entry.interactions
 end
 
 --- Closest cached crop to a position, within `radius`.
@@ -239,6 +300,23 @@ local function hashOf(id)
         hash = (hash * 33 + id:byte(i)) % 4294967296
     end
     return hash
+end
+
+--- Stage lookup has a deliberately longer cache than interaction values. A
+--- deterministic per-id jitter spreads reevaluations across sync ticks.
+---@param cropId string
+---@return number stageIndex
+function Crops.VisualStage(cropId)
+    local nowMs = GetGameTimer()
+    local cached = visualStageCache[cropId]
+    if cached and nowMs < cached.expiresAt then return cached.stageIndex end
+    local condition = Crops.Condition(cropId)
+    local stageIndex = condition and condition.stageIndex or 1
+    local base = math.max(500, tonumber(Config.Render.VisualStageCacheMs) or 5000)
+    local jitterMax = math.max(0, tonumber(Config.Render.VisualStageJitterMs) or 1500)
+    local jitter = jitterMax > 0 and (hashOf(tostring(cropId)) % (jitterMax + 1)) or 0
+    visualStageCache[cropId] = { stageIndex = stageIndex, expiresAt = nowMs + base + jitter }
+    return stageIndex
 end
 
 --- Heading for a crop, with deterministic variation so fields do not look like
@@ -350,8 +428,7 @@ function Crops.Refresh(coords)
         local id = candidates[i].id
         wanted[id] = true
 
-        local condition = Crops.Condition(id)
-        spawn(id, condition and condition.stageIndex or 1)
+        spawn(id, Crops.VisualStage(id))
     end
 
     -- Anything rendered but no longer wanted (out of range, over budget, gone).
@@ -376,6 +453,8 @@ function Crops.Reset()
     Crops.DespawnAll()
     cache = {}
     occupancy = {}
+    conditionCache = {}
+    visualStageCache = {}
 end
 
 -- ---------------------------------------------------------------------------

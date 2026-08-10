@@ -11,6 +11,21 @@ Sonar = Sonar or {}
 local Inspection = {}
 local Utils = Sonar.Utils
 local CROP_STATE = Sonar.Constants.CROP_STATE
+local etaMemo = setmetatable({}, { __mode = 'k' })
+
+local function etaSignature(record)
+    local data = record.data or {}
+    return table.concat({
+        tostring(record.state), tostring(record.planted_at), tostring(record.growth_time),
+        tostring(data.lastCare), tostring(data.growthAdjustmentRatio), tostring(data.growthPenaltyHours),
+        tostring(data.water), tostring(data.health), tostring(data.nutrients),
+        tostring(data.weedCover), tostring(data.pestPressure),
+        tostring(data.waterProtectionStrength), tostring(data.waterProtectionUntil),
+        tostring(data.nutrientProtectionStrength), tostring(data.nutrientProtectionUntil),
+        tostring(data.weedProtectionStrength), tostring(data.weedProtectionUntil),
+        tostring(data.pestProtectionStrength), tostring(data.pestProtectionUntil),
+    }, '|')
+end
 
 local METRIC_KEYS = { 'water', 'nutrients', 'weeds', 'pests' }
 
@@ -228,22 +243,27 @@ local function readyAt(record, now, current)
             local penalty = (tonumber(current.growthPenaltyHours) or 0) * 3600
             return math.floor(plantedAt + (tonumber(record.growth_time) or 0) + penalty)
         end
-        local low, high = plantedAt, now
-        for _ = 1, 24 do
-            local middle = math.floor((low + high) * 0.5)
-            if Growth.Evaluate(record, middle).progress >= 1 then high = middle else low = middle + 1 end
-        end
-        return high
+        return tonumber(current.maturedAt) or tonumber(record.data and record.data.maturedAt)
+    end
+    local useMemo = Sonar.CropClock.IsV2(record)
+    local signature = useMemo and etaSignature(record) or nil
+    local cached = useMemo and etaMemo[record] or nil
+    if cached and cached.signature == signature then
+        return cached.value ~= false and cached.value or nil
     end
     local maxEta = Sonar.CropClock.ScaledConfigSeconds(record,
         config().MaxEtaSeconds or 86400, config().MaxEtaCycles or 4)
     local high = now + math.max(60, maxEta)
-    if (Growth.Evaluate(record, high).progress or 0) < 1 then return nil end
+    if (Growth.Evaluate(record, high).progress or 0) < 1 then
+        if useMemo then etaMemo[record] = { signature = signature, value = false } end
+        return nil
+    end
     local low = now
     for _ = 1, 24 do
         local middle = math.floor((low + high) * 0.5)
         if Growth.Evaluate(record, middle).progress >= 1 then high = middle else low = middle + 1 end
     end
+    if useMemo then etaMemo[record] = { signature = signature, value = high } end
     return high
 end
 

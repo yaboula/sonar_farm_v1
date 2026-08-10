@@ -114,6 +114,7 @@ function Sync.RenderPayload(record, identifier)
         lastCare = data.lastCare,
         simulationVersion = Sonar.CropClock.Version(record),
         growthAdjustmentRatio = data.growthAdjustmentRatio,
+        maturedAt = data.maturedAt,
         isMine = (record.owner == nil) or (record.owner == identifier),
     }
     if Sonar.Conditions.IsAdvancedCareEnabled() then

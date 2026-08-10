@@ -977,6 +977,60 @@ test('V2 biology is invariant across 20 minute 40 minute and 6 hour cycles', fun
     end
 end)
 
+test('V2 physiology reuses one trajectory and memoizes historical maturity', function()
+    local originalEvaluate = Sonar.Conditions.Evaluate
+    local calls = 0
+    Sonar.Conditions.Evaluate = function(...)
+        calls = calls + 1
+        return originalEvaluate(...)
+    end
+
+    local ok, err = pcall(function()
+        local plantedAt, duration = 100000, 2400
+        local growing = v2Record('tomato', duration, plantedAt)
+        local at = plantedAt + duration * 0.20
+        Physiology.Evaluate(growing, at)
+        equal(calls, 1, 'physiology must integrate Conditions only once')
+
+        local trajectory = originalEvaluate(growing, at)
+        calls = 0
+        Growth.Evaluate(growing, at, trajectory)
+        equal(calls, 0, 'Growth must accept its caller precomputed trajectory')
+
+        local mature = v2Record('tomato', duration, plantedAt, {
+            waterProtectionStrength = 1, waterProtectionUntil = plantedAt + duration * 4,
+            nutrientProtectionStrength = 1, nutrientProtectionUntil = plantedAt + duration * 4,
+            weedProtectionStrength = 1, weedProtectionUntil = plantedAt + duration * 4,
+            pestProtectionStrength = 1, pestProtectionUntil = plantedAt + duration * 4,
+        })
+        local matureAt = plantedAt + duration * 0.90
+        local first = Physiology.Evaluate(mature, matureAt)
+        assert(first.maturedAt, 'V2 maturity timestamp is derived')
+        calls = 0
+        local second = Physiology.Evaluate(mature, matureAt + 1)
+        equal(calls, 1, 'repeated mature evaluation must not repeat the binary search')
+        equal(second.maturedAt, first.maturedAt, 'historical maturity timestamp remains stable')
+    end)
+    Sonar.Conditions.Evaluate = originalEvaluate
+    if not ok then error(err) end
+end)
+
+test('client target and render paths use bounded presentation caches', function()
+    local function read(path)
+        local file = assert(io.open(path, 'rb'))
+        local value = file:read('*a')
+        file:close()
+        return value
+    end
+    local crops = read('client/modules/render/crops.lua')
+    local slots = read('client/modules/zones/slots.lua')
+    assert(crops:find('function Crops.InteractionState', 1, true), 'interaction snapshot cache is required')
+    assert(crops:find('function Crops.VisualStage', 1, true), 'visual stage cache is required')
+    assert(crops:find('spawn(id, Crops.VisualStage(id))', 1, true), 'render refresh must use cached stages')
+    assert(not slots:find('Crops.Condition(', 1, true), 'ox_target predicates must not run physiology directly')
+    assert(slots:find('Crops.InteractionState(cropId)', 1, true), 'ox_target must consume cached booleans')
+end)
+
 test('V2 protection duration and inspection windows scale with the selected crop', function()
     local plantedAt = 100000
     for _, duration in ipairs({ 1200, 2400, 21600 }) do

@@ -312,6 +312,13 @@ Config.Render = {
     -- Interaction radius (meters) of an empty slot's target point. Slightly
     -- larger than a crop's, since there may be nothing visible to aim at.
     SlotTargetRadius = 1.2,
+    -- Shared V2 condition math is cached briefly because ox_target evaluates
+    -- every visible option repeatedly. Server actions never use this cache.
+    InteractionCacheMs = 750,
+    -- Crop models only need reevaluation when a visual stage can have changed.
+    -- Each crop gets deterministic jitter to avoid a periodic all-field spike.
+    VisualStageCacheMs = 5000,
+    VisualStageJitterMs = 1500,
 }
 
 -- ---------------------------------------------------------------------------

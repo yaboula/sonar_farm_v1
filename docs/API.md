@@ -521,6 +521,9 @@ sigue interpolando desde calidad exactamente como antes.
 | `Config.Render.TargetDistance`       | `2.2`   | Distancia de ox_target (bajo el límite servidor)|
 | `Config.Render.GroundSnap`           | `true`  | Asentar props con raycast al suelo              |
 | `Config.Render.FallbackModel`        | —       | Modelo usado si el prop configurado no existe   |
+| `Config.Render.InteractionCacheMs`   | `750`   | TTL local de la snapshot usada por ox_target    |
+| `Config.Render.VisualStageCacheMs`   | `5000`  | TTL local de la etapa visual del cultivo        |
+| `Config.Render.VisualStageJitterMs`  | `1500`  | Dispersión determinista de recálculos visuales  |
 
 ---
 

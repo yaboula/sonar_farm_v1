@@ -26,6 +26,7 @@ function Physiology.Apply(record, now)
     }
     if Sonar.CropClock.IsV2(record) then
         dataPatch.growthAdjustmentRatio = condition.growthAdjustmentRatio
+        if condition.maturedAt then dataPatch.maturedAt = condition.maturedAt end
     elseif Sonar.Conditions.IsAdvancedCareEnabled() then
         dataPatch.growthPenaltyHours = condition.growthPenaltyHours
     end

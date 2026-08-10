@@ -31,14 +31,23 @@ local MAX_HEALTH_LOSS_PER_HOUR = 20
 -- Below this health the crop looks withered but is still recoverable.
 local WITHERED_HEALTH = 40
 
-local function matureAtFor(record, now)
+-- Maturity is historical. Once a specific in-memory record has crossed 100%,
+-- its first mature timestamp cannot move unless that record is replaced by a
+-- server delta. Weak keys keep this memo bounded by the record cache lifecycle.
+local maturityMemo = setmetatable({}, { __mode = 'k' })
+
+local function matureAtFor(record, now, isMature)
+    local persisted = tonumber(record.data and record.data.maturedAt)
+    if persisted then return persisted end
+    if maturityMemo[record] then return maturityMemo[record] end
     local plantedAt = tonumber(record.planted_at) or now
-    if (Growth.Evaluate(record, now).progress or 0) < 1 then return nil end
+    if not isMature and (Growth.Evaluate(record, now).progress or 0) < 1 then return nil end
     local low, high = plantedAt, now
-    for _ = 1, 32 do
+    while low < high do
         local middle = math.floor((low + high) * 0.5)
         if Growth.Evaluate(record, middle).progress >= 1 then high = middle else low = middle + 1 end
     end
+    maturityMemo[record] = high
     return high
 end
 
@@ -119,15 +128,19 @@ function Physiology.Evaluate(record, now)
 
     -- Advanced Care subtracts persisted and pending stress penalties. With the
     -- feature disabled this remains the original care-independent formula.
-    local growth = Growth.Evaluate(record, now)
+    -- Reuse the already computed trajectory. This is important on the client:
+    -- target predicates may ask for a condition frequently, and V2 trajectory
+    -- integration is the expensive part of the calculation.
+    local growth = Growth.Evaluate(record, now, trajectory)
 
     -- Spoilage accrues only after maturity.
+    local maturedAt
     if growth.progress >= 1 then
         if cycleV2 then
-            local matureAt = matureAtFor(record, now) or now
+            maturedAt = matureAtFor(record, now, true) or now
             local cycleDef = Config.Crops and Config.Crops[record.crop_type]
                 and Config.Crops[record.crop_type].cycle or {}
-            spoilage = Utils.Clamp(Sonar.CropClock.Between(record, matureAt, now)
+            spoilage = Utils.Clamp(Sonar.CropClock.Between(record, maturedAt, now)
                 * (tonumber(cycleDef.spoilage) or 0), 0, 100)
         else
             local penaltySeconds = advanced
@@ -161,6 +174,7 @@ function Physiology.Evaluate(record, now)
         state = state,
         progress = growth.progress,
         stageIndex = growth.stageIndex,
+        maturedAt = maturedAt,
     }
     if advanced then
         result.nutrients = trajectory.nutrients and stored(trajectory.nutrients, 1) or nil

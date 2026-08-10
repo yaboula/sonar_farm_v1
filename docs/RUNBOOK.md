@@ -340,8 +340,11 @@ alcance de cualquier surco, avisa y no planta.
 
 Con `/farm_render` confirma que los props no pasan de `Config.Render.MaxProps`.
 En reposo fuera de zona el recurso debe marcar `0.00 ms` (un solo hilo con espera
-de `TickFar`). Dentro de zona, con props dibujados, deberia mantenerse por debajo
-de `0.05 ms`.
+de `TickFar`). Con 40–50 cultivos visibles y apuntando a un cultivo V2, mide al
+menos 30 segundos: el valor estable esperado es `0.00–0.01 ms`. Un pico breve al
+cargar los props por primera vez es aceptable; un valor sostenido superior indica
+que una ruta de target volvió a llamar `Crops.Condition` directamente. Las acciones
+del servidor siempre recalculan el estado y no dependen de esta caché visual.
 
 ### Pruebas de seguridad que deberian fallar
 
