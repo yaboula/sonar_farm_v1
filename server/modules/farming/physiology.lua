@@ -95,12 +95,39 @@ function Physiology.Fertilize(record, effect, item)
 end
 
 ---@param record table
----@param amount number
+---@param effect table|number
+---@param item? table
 ---@return number weedCover
-function Physiology.Weed(record, amount)
+function Physiology.Weed(record, effect, item)
     local data = record.data or {}
-    local weedCover = Utils.Clamp((tonumber(data.weedCover) or 0) - (amount or 0), 0, 100)
-    State.Update(record.id, { data = { weedCover = Utils.Round(weedCover, 1), lastCare = Sonar.Time.Now() } })
+    local removal = 55
+    local protectionHours, protectionStrength = 0, 0
+    if type(effect) == 'table' then
+        removal = tonumber(effect.weedRemoval) or 55
+        protectionHours = tonumber(effect.protectionHours) or 0
+        protectionStrength = tonumber(effect.protectionStrength) or 0
+    elseif type(effect) == 'number' then
+        removal = effect
+    end
+    item = item or { tier = data and data.weedProtectionTier, id = data and data.weedProtectionItem }
+    local weedCover = Utils.Clamp((tonumber(data.weedCover) or 0) - removal, 0, 100)
+
+    local now = Sonar.Time.Now()
+    local oldUntil = tonumber(data.weedProtectionUntil) or 0
+    local oldStrength = Utils.Clamp(tonumber(data.weedProtectionStrength) or 0, 0, 1)
+    local oldScore = oldStrength * math.max(0, oldUntil - now)
+    local newUntil = now + math.max(0, protectionHours) * 3600
+    local newStrength = Utils.Clamp(protectionStrength, 0, 1)
+    local keepNew = newStrength * math.max(0, newUntil - now) >= oldScore
+
+    State.Update(record.id, { data = {
+        weedCover = Utils.Round(weedCover, 1),
+        weedProtectionStrength = keepNew and newStrength or oldStrength,
+        weedProtectionUntil = keepNew and newUntil or oldUntil,
+        weedProtectionTier = keepNew and item and item.tier or data.weedProtectionTier,
+        weedProtectionItem = keepNew and item and item.id or data.weedProtectionItem,
+        lastCare = now,
+    } })
     return weedCover
 end
 
@@ -133,20 +160,39 @@ end
 
 --- Water a crop: restore water and record the care for quality purposes.
 ---@param record table
----@param amount? number water points restored (default 100 = full)
+---@param effect? table|number
+---@param item? table
 ---@param now? number
-function Physiology.Water(record, amount, now)
+function Physiology.Water(record, effect, item, now)
     now = now or Sonar.Time.Now()
-
     local data = record.data or {}
-    local newWater = Utils.Clamp((tonumber(data.water) or 0) + (amount or 100), 0, 100)
+    local amount = 100
+    local protectionHours, protectionStrength = 0, 0
+    if type(effect) == 'table' then
+        amount = tonumber(effect.amount) or 100
+        protectionHours = tonumber(effect.protectionHours) or 0
+        protectionStrength = tonumber(effect.protectionStrength) or 0
+    elseif type(effect) == 'number' then
+        amount = effect
+    end
+    item = item or { tier = data and data.waterProtectionTier, id = data and data.waterProtectionItem }
+    local newWater = Utils.Clamp((tonumber(data.water) or 0) + amount, 0, 100)
+
+    local oldUntil = tonumber(data.waterProtectionUntil) or 0
+    local oldStrength = Utils.Clamp(tonumber(data.waterProtectionStrength) or 0, 0, 1)
+    local oldScore = oldStrength * math.max(0, oldUntil - now)
+    local newUntil = now + math.max(0, protectionHours) * 3600
+    local newStrength = Utils.Clamp(protectionStrength, 0, 1)
+    local keepNew = newStrength * math.max(0, newUntil - now) >= oldScore
 
     State.Update(record.id, {
         data = {
             water = newWater,
+            waterProtectionStrength = keepNew and newStrength or oldStrength,
+            waterProtectionUntil = keepNew and newUntil or oldUntil,
+            waterProtectionTier = keepNew and item and item.tier or data.waterProtectionTier,
+            waterProtectionItem = keepNew and item and item.id or data.waterProtectionItem,
             lastCare = now,
-            -- Care count feeds the quality formula: an actively tended crop
-            -- yields better produce than a neglected one.
             careCount = (tonumber(data.careCount) or 0) + 1,
         },
     })

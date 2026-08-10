@@ -92,7 +92,7 @@ return {
         weight = 800,
         stack = false,
         close = false,
-        description = "A compact watering can rated for 20 field uses.",
+        description = "A compact watering can that restores +40% water (20 field uses).",
         consume = 0,
     },
 
@@ -101,7 +101,7 @@ return {
         weight = 950,
         stack = false,
         close = false,
-        description = "A reinforced watering can rated for 50 field uses.",
+        description = "Restores +70% water with 8 minutes of 40% soil moisture retention (50 uses).",
         consume = 0,
     },
 
@@ -110,7 +110,7 @@ return {
         weight = 1100,
         stack = false,
         close = false,
-        description = "A professional watering can rated for 100 field uses.",
+        description = "Restores +100% water with 15 minutes of 75% soil moisture retention (100 uses).",
         consume = 0,
     },
 
@@ -119,7 +119,7 @@ return {
         weight = 900,
         stack = false,
         close = false,
-        description = "A basic hand hoe rated for 20 uses and 55% weed removal.",
+        description = "Basic hoe for 55% weed removal (20 uses).",
         consume = 0,
     },
 
@@ -128,7 +128,7 @@ return {
         weight = 1050,
         stack = false,
         close = false,
-        description = "A reinforced hoe rated for 50 uses and 75% weed removal.",
+        description = "Reinforced hoe for 80% weed removal with 5m of 40% weed resistance (50 uses).",
         consume = 0,
     },
 
@@ -137,7 +137,7 @@ return {
         weight = 1200,
         stack = false,
         close = false,
-        description = "A professional hoe rated for 100 uses and complete weed removal.",
+        description = "Professional hoe for 100% weed removal with 12m of 80% weed resistance (100 uses).",
         consume = 0,
     },
 
@@ -146,7 +146,7 @@ return {
         weight = 350,
         stack = true,
         close = false,
-        description = "A gentle nutrient treatment with two hours of light retention.",
+        description = "Gentle fertilizer (+25% nutrients) with 4 minutes of 20% retention.",
     },
 
     ["fertilizer_balanced"] = {
@@ -154,7 +154,7 @@ return {
         weight = 400,
         stack = true,
         close = false,
-        description = "A balanced treatment with six hours of nutrient retention.",
+        description = "Balanced treatment (+40% nutrients) with 10 minutes of 45% retention.",
     },
 
     ["fertilizer_chemical"] = {
@@ -162,7 +162,7 @@ return {
         weight = 250,
         stack = true,
         close = false,
-        description = "A concentrated treatment with twelve hours of strong retention.",
+        description = "Concentrated treatment (+60% nutrients) with 18 minutes of 75% retention.",
     },
 
     ["pest_spray_organic"] = {
@@ -170,7 +170,7 @@ return {
         weight = 300,
         stack = true,
         close = false,
-        description = "A crop-safe treatment that suppresses new pest growth for three hours.",
+        description = "Crop-safe treatment (-40% pests) with 4 minutes of 30% pest suppression.",
     },
 
     ["pest_spray_targeted"] = {
@@ -178,7 +178,7 @@ return {
         weight = 350,
         stack = true,
         close = false,
-        description = "A targeted treatment with eight hours of active suppression.",
+        description = "Targeted treatment (-70% pests) with 10 minutes of 60% pest suppression.",
     },
 
     ["pest_spray_chemical"] = {
@@ -186,7 +186,7 @@ return {
         weight = 400,
         stack = true,
         close = false,
-        description = "A professional treatment with sixteen hours of strong suppression.",
+        description = "Professional treatment (-100% pests) with 18 minutes of 90% pest suppression.",
     },
 
 }

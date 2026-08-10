@@ -324,9 +324,15 @@ function Inspection.Build(record, now, options)
             enabled = enabled,
             status = statusFor(record, key, currentValue, enabled),
         }
-        if key == 'nutrients' then
+        if key == 'water' then
+            metric.protectionTier = current.waterProtectionTier
+            metric.protectionUntil = current.waterProtectionUntil
+        elseif key == 'nutrients' then
             metric.protectionTier = current.nutrientProtectionTier
             metric.protectionUntil = current.nutrientProtectionUntil
+        elseif key == 'weeds' then
+            metric.protectionTier = current.weedProtectionTier
+            metric.protectionUntil = current.weedProtectionUntil
         elseif key == 'pests' then
             metric.protectionTier = current.pestProtectionTier
             metric.protectionUntil = current.pestProtectionUntil

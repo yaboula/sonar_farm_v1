@@ -91,7 +91,12 @@ lib.callback.register(CALLBACKS.WATER, function(source, payload)
         if not consumed then return reject(REJECT.MISSING_TOOL) end
 
         local score = Quality.Request(source, ACTIONS.WATER, record)
-        Physiology.Water(record, waterAmount(score) * (selected.effect.waterMultiplier or 1))
+        local waterEff = {
+            amount = (selected.effect.amount or 100) * (waterAmount(score) / 100),
+            protectionHours = selected.effect.protectionHours or 0,
+            protectionStrength = selected.effect.protectionStrength or 0,
+        }
+        Physiology.Water(record, waterEff, selected.definition)
         Items.RecordCompanyUse(source, selected, ACTIONS.WATER, broken)
 
         local updated = State.Get(record.id)

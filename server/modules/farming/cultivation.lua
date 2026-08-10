@@ -92,7 +92,7 @@ lib.callback.register(CALLBACKS.WEED, function(source, payload)
         if not selected then return reject(itemReason) end
         local consumed, broken = Items.Consume(source, selected)
         if not consumed then return reject(REJECT.MISSING_TOOL) end
-        local weedCover = Physiology.Weed(record, selected.effect.weedRemoval)
+        local weedCover = Physiology.Weed(record, selected.effect, selected.definition)
         Items.RecordCompanyUse(source, selected, ACTIONS.WEED, broken)
         Sync.OnCropChanged(State.Get(record.id))
         TriggerEvent(PUBLIC.CROP_WEEDED, {
