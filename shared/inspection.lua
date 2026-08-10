@@ -52,10 +52,13 @@ end
 
 local function statusFor(record, key, current, enabled)
     if not enabled then return 'unaffected' end
+    local cycleV2 = Sonar.CropClock.IsV2(record)
+    local cycleCfg = Config.Farming.AdvancedCare.Cycle or {}
     if key == 'water' then
-        -- 0-30 risk, 31-60 watch, 61-100 good
-        if current <= 30 then return 'critical' end
-        if current <= 60 then return 'low' end
+        local critical = cycleV2 and tonumber(cycleCfg.Water and cycleCfg.Water.critical) or 30
+        local green = cycleV2 and tonumber(cycleCfg.Water and cycleCfg.Water.green) or 60
+        if current < (critical or 35) then return 'critical' end
+        if current < (green or 60) then return 'low' end
         return 'stable'
     end
     if key == 'nutrients' then
@@ -63,13 +66,18 @@ local function statusFor(record, key, current, enabled)
         local params = definition(record).nutrients or {}
         local minimum = tonumber(params.optimalMin) or 30
         local maximum = tonumber(params.optimalMax) or 75
-        if current > maximum then return 'high' end
-        if current < minimum then return 'critical' end
+        if cycleV2 then
+            local margin = tonumber(cycleCfg.NutrientWatchMargin) or 20
+            if current < minimum - margin or current > maximum + margin then return 'critical' end
+            if current < minimum or current > maximum then return current > maximum and 'high' or 'low' end
+        elseif current > maximum then return 'high'
+        elseif current < minimum then return 'critical' end
         return 'stable'
     end
-    -- weeds and pests: 0-30 good, 31-60 watch, 61-100 risk
-    if current >= 61 then return 'severe' end
-    if current >= 31 then return 'elevated' end
+    local green = cycleV2 and tonumber(cycleCfg.Pressure and cycleCfg.Pressure.green) or 30
+    local critical = cycleV2 and tonumber(cycleCfg.Pressure and cycleCfg.Pressure.critical) or 60
+    if current > (critical or 50) then return 'severe' end
+    if current > (green or 20) then return 'elevated' end
     return 'low'
 end
 
@@ -90,7 +98,8 @@ local function seriesFor(record, now)
     local cfg = config()
     local data = record.data or {}
     local plantedAt = tonumber(record.planted_at) or now
-    local historySeconds = math.max(0, tonumber(cfg.HistorySeconds) or 600)
+    local historySeconds = Sonar.CropClock.ScaledConfigSeconds(record,
+        cfg.HistorySeconds or 600, cfg.HistoryCycleRatio or 0.25)
     -- Records persist a condition baseline at lastCare. Values before that
     -- baseline cannot be reconstructed truthfully, so the historical chart
     -- starts at the newest reliable boundary and ends at the current sample.
@@ -150,8 +159,9 @@ local function projectOutcome(record, current)
 
     -- Mirror Quality.Resolve using the default future harvest score plus the
     -- already-authoritative planting score when one exists.
-    local quality = skillScore  * (tonumber(cfg.ScoreWeight) or 0.6)
-                  + health      * (tonumber(cfg.CareWeight)  or 0.4)
+    local cycleV2 = Sonar.CropClock.IsV2(record)
+    local quality = skillScore  * (cycleV2 and 0.4 or (tonumber(cfg.ScoreWeight) or 0.6))
+                  + health      * (cycleV2 and 0.6 or (tonumber(cfg.CareWeight)  or 0.4))
     quality = quality * (1 - Utils.Clamp(spoilage / 100, 0, 1))
 
     local waterDefect    = tonumber(current.waterStressAccumulated)   or 0
@@ -188,10 +198,12 @@ end
 
 local function thresholdsFor(record, key, enabled)
     if not enabled then return {} end
+    local cycleV2 = Sonar.CropClock.IsV2(record)
+    local cycleCfg = Config.Farming.AdvancedCare.Cycle or {}
     if key == 'water' then
         return {
-            { value = 30, label = 'Risk', tone = 'risk' },
-            { value = 60, label = 'Good', tone = 'good' },
+            { value = cycleV2 and (cycleCfg.Water.critical or 35) or 30, label = 'Risk', tone = 'risk' },
+            { value = cycleV2 and (cycleCfg.Water.green or 60) or 60, label = 'Good', tone = 'good' },
         }
     end
     if key == 'nutrients' then
@@ -202,19 +214,30 @@ local function thresholdsFor(record, key, enabled)
         }
     end
     return {
-        { value = 30, label = 'Watch', tone = 'watch' },
-        { value = 60, label = 'Risk', tone = 'risk' },
+        { value = cycleV2 and (cycleCfg.Pressure.green or 20) or 30, label = 'Watch', tone = 'watch' },
+        { value = cycleV2 and (cycleCfg.Pressure.critical or 50) or 60, label = 'Risk', tone = 'risk' },
     }
 end
 
 local function readyAt(record, now, current)
     if record.state == CROP_STATE.PLANTING or record.state == CROP_STATE.PLANTING_FAILED then return nil end
+    if current.state == CROP_STATE.DEAD then return nil end
     local plantedAt = tonumber(record.planted_at) or now
     if (current.progress or 0) >= 1 then
-        local penalty = (tonumber(current.growthPenaltyHours) or 0) * 3600
-        return math.floor(plantedAt + (tonumber(record.growth_time) or 0) + penalty)
+        if not Sonar.CropClock.IsV2(record) then
+            local penalty = (tonumber(current.growthPenaltyHours) or 0) * 3600
+            return math.floor(plantedAt + (tonumber(record.growth_time) or 0) + penalty)
+        end
+        local low, high = plantedAt, now
+        for _ = 1, 24 do
+            local middle = math.floor((low + high) * 0.5)
+            if Growth.Evaluate(record, middle).progress >= 1 then high = middle else low = middle + 1 end
+        end
+        return high
     end
-    local high = now + math.max(60, tonumber(config().MaxEtaSeconds) or 86400)
+    local maxEta = Sonar.CropClock.ScaledConfigSeconds(record,
+        config().MaxEtaSeconds or 86400, config().MaxEtaCycles or 4)
+    local high = now + math.max(60, maxEta)
     if (Growth.Evaluate(record, high).progress or 0) < 1 then return nil end
     local low = now
     for _ = 1, 24 do
@@ -224,7 +247,7 @@ local function readyAt(record, now, current)
     return high
 end
 
-local function diagnosis(record, now, current, future)
+local function diagnosis(record, now, current, future, horizonSeconds)
     if current.state == CROP_STATE.PLANTING_FAILED then
         return { cause = 'planting_failed', severity = 100, headline = 'PLANTING → INCOMPLETE', recommendation = 'RESUME OR CLEAR PLOT' }
     end
@@ -270,7 +293,7 @@ local function diagnosis(record, now, current, future)
         local without = shallowCopy(record)
         without.data = shallowCopy(record.data)
         without.data.weedCover = 0
-        local clean = Physiology.Evaluate(without, now + (tonumber(config().ForecastSeconds) or 600))
+        local clean = Physiology.Evaluate(without, now + horizonSeconds)
         local causalLoss = math.max(0, (clean.water or 0) - (future.water or 0))
             + math.max(0, (clean.nutrients or 0) - (future.nutrients or 0))
             + math.max(0, (future.pestPressure or 0) - (clean.pestPressure or 0))
@@ -279,8 +302,8 @@ local function diagnosis(record, now, current, future)
 
     local function crossingAt(key)
         local cropDefinition = definition(record)
-        local step = math.max(5, tonumber(config().SampleSeconds) or 30)
-        local forecastSeconds = math.max(0, tonumber(config().ForecastSeconds) or 600)
+        local step = math.max(1, math.min(tonumber(config().SampleSeconds) or 30,
+            math.max(1, math.floor(horizonSeconds / 20))))
         local function crossed(condition)
             if key == 'water' then return (condition.water or 0) <= waterThreshold end
             if key == 'nutrients' then
@@ -294,7 +317,7 @@ local function diagnosis(record, now, current, future)
             return (condition.pestPressure or 0) >= (tonumber(cfg.MinimumPestPressure) or 8)
         end
         if crossed(current) then return 0 end
-        for offset = step, forecastSeconds, step do
+        for offset = step, horizonSeconds, step do
             if crossed(Physiology.Evaluate(record, now + offset)) then return offset end
         end
         return math.huge
@@ -334,7 +357,8 @@ function Inspection.Build(record, now, options)
     now = now or Sonar.Time.Now()
     options = options or {}
     local current = Physiology.Evaluate(record, now)
-    local forecastSeconds = math.max(0, tonumber(config().ForecastSeconds) or 600)
+    local forecastSeconds = Sonar.CropClock.ScaledConfigSeconds(record,
+        config().ForecastSeconds or 600, config().DiagnosisCycleRatio or 0.10)
     local future = Physiology.Evaluate(record, now + forecastSeconds)
     local matureAt = readyAt(record, now, current)
     local metrics = {}
@@ -391,7 +415,7 @@ function Inspection.Build(record, now, options)
         health = Utils.Round(current.health or 0, 1),
         spoilage = Utils.Round(current.spoilage or 0, 1),
         metrics = metrics,
-        diagnosis = diagnosis(record, now, current, future),
+        diagnosis = diagnosis(record, now, current, future, forecastSeconds),
         outcome = projectOutcome(record, current),
     }
     if options.includeSeries ~= false then payload.series = seriesFor(record, now) end

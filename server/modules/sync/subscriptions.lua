@@ -112,10 +112,14 @@ function Sync.RenderPayload(record, identifier)
         water = data.water,
         health = data.health,
         lastCare = data.lastCare,
+        simulationVersion = Sonar.CropClock.Version(record),
+        growthAdjustmentRatio = data.growthAdjustmentRatio,
         isMine = (record.owner == nil) or (record.owner == identifier),
     }
     if Sonar.Conditions.IsAdvancedCareEnabled() then
-        payload.growthPenaltyHours = data.growthPenaltyHours
+        if not Sonar.CropClock.IsV2(record) then
+            payload.growthPenaltyHours = data.growthPenaltyHours
+        end
         payload.waterStressAccumulated = data.waterStressAccumulated
         payload.plantingQuality = data.plantingQuality or data.plantScore
         payload.waterProtectionStrength = data.waterProtectionStrength

@@ -92,7 +92,7 @@ return {
         weight = 800,
         stack = false,
         close = false,
-        description = "A compact watering can that restores +40% water (20 field uses).",
+        description = "Restores +40% water. Basic tools provide no residual protection (20 uses).",
         consume = 0,
     },
 
@@ -101,7 +101,7 @@ return {
         weight = 950,
         stack = false,
         close = false,
-        description = "Restores +70% water with 8 minutes of 40% soil moisture retention (50 uses).",
+        description = "Restores +70% water with 50% retention for 18% of the crop cycle (50 uses).",
         consume = 0,
     },
 
@@ -110,7 +110,7 @@ return {
         weight = 1100,
         stack = false,
         close = false,
-        description = "Restores +100% water with 15 minutes of 75% soil moisture retention (100 uses).",
+        description = "Restores +100% water with 85% retention for 40% of the crop cycle (100 uses).",
         consume = 0,
     },
 
@@ -119,7 +119,7 @@ return {
         weight = 900,
         stack = false,
         close = false,
-        description = "Basic hoe for 55% weed removal (20 uses).",
+        description = "Removes 55% weeds. Basic tools provide no residual resistance (20 uses).",
         consume = 0,
     },
 
@@ -128,7 +128,7 @@ return {
         weight = 1050,
         stack = false,
         close = false,
-        description = "Reinforced hoe for 80% weed removal with 5m of 40% weed resistance (50 uses).",
+        description = "Removes 80% weeds with 50% resistance for 18% of the crop cycle (50 uses).",
         consume = 0,
     },
 
@@ -137,7 +137,7 @@ return {
         weight = 1200,
         stack = false,
         close = false,
-        description = "Professional hoe for 100% weed removal with 12m of 80% weed resistance (100 uses).",
+        description = "Removes 100% weeds with 85% resistance for 40% of the crop cycle (100 uses).",
         consume = 0,
     },
 
@@ -146,7 +146,7 @@ return {
         weight = 350,
         stack = true,
         close = false,
-        description = "Gentle fertilizer (+25% nutrients) with 4 minutes of 20% retention.",
+        description = "Adds +25% nutrients with 20% retention for 6% of the crop cycle.",
     },
 
     ["fertilizer_balanced"] = {
@@ -154,7 +154,7 @@ return {
         weight = 400,
         stack = true,
         close = false,
-        description = "Balanced treatment (+40% nutrients) with 10 minutes of 45% retention.",
+        description = "Adds +40% nutrients with 50% retention for 18% of the crop cycle.",
     },
 
     ["fertilizer_chemical"] = {
@@ -162,7 +162,7 @@ return {
         weight = 250,
         stack = true,
         close = false,
-        description = "Concentrated treatment (+60% nutrients) with 18 minutes of 75% retention.",
+        description = "Adds +60% nutrients with 85% retention for 40% of the crop cycle.",
     },
 
     ["pest_spray_organic"] = {
@@ -170,7 +170,7 @@ return {
         weight = 300,
         stack = true,
         close = false,
-        description = "Crop-safe treatment (-40% pests) with 4 minutes of 30% pest suppression.",
+        description = "Reduces pest pressure by 40 with 20% suppression for 6% of the crop cycle.",
     },
 
     ["pest_spray_targeted"] = {
@@ -178,7 +178,7 @@ return {
         weight = 350,
         stack = true,
         close = false,
-        description = "Targeted treatment (-70% pests) with 10 minutes of 60% pest suppression.",
+        description = "Reduces pest pressure by 70 with 55% suppression for 18% of the crop cycle.",
     },
 
     ["pest_spray_chemical"] = {
@@ -186,7 +186,7 @@ return {
         weight = 400,
         stack = true,
         close = false,
-        description = "Professional treatment (-100% pests) with 18 minutes of 90% pest suppression.",
+        description = "Reduces pest pressure by 100 with 90% suppression for 40% of the crop cycle.",
     },
 
 }

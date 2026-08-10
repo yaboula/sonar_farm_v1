@@ -53,6 +53,8 @@ local function toRecord(payload)
             water = payload.water,
             health = payload.health,
             lastCare = payload.lastCare,
+            simulationVersion = payload.simulationVersion,
+            growthAdjustmentRatio = payload.growthAdjustmentRatio,
             nutrients = payload.nutrients,
             weedCover = payload.weedCover,
             pestPressure = payload.pestPressure,

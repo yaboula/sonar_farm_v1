@@ -223,29 +223,37 @@ local CARE_ICON = {
     treat_pest = 'bug',
 }
 
-local function protectionMinutes(effect)
-    return math.max(0, math.floor((tonumber(effect.protectionHours) or 0) * 60 + 0.5))
+local function protectionLabel(option)
+    local effect = option.effect or {}
+    local ratio = math.max(0, tonumber(option.protectionCycleRatio or effect.protectionCycleRatio) or 0)
+    local seconds = math.max(0, tonumber(option.protectionSeconds) or 0)
+    if ratio <= 0 and seconds <= 0 then return '' end
+    local minutes = math.max(1, math.floor(seconds / 60 + 0.5))
+    if ratio > 0 then
+        return (' | %d%% cycle (%dm here)'):format(math.floor(ratio * 100 + 0.5), minutes)
+    end
+    return (' | %dm retention'):format(minutes)
 end
 
 local function careDescription(action, option)
     local effect = option.effect or {}
-    local minutes = protectionMinutes(effect)
+    local protection = protectionLabel(option)
     if action == ACTIONS.WATER then
         return ('%s tier | +%d water%s | %d uses remaining'):format(option.tier,
-            effect.amount or 100, minutes > 0 and (' | %dm retention'):format(minutes) or '',
+            effect.amount or 100, protection,
             option.usesRemaining or 0)
     elseif action == ACTIONS.WEED then
         return ('%s tier | removes %d%%%s | %d uses remaining')
             :format(option.tier, effect.weedRemoval or 0,
-                minutes > 0 and (' | %dm resistance'):format(minutes) or '', option.usesRemaining or 0)
+                protection, option.usesRemaining or 0)
     elseif action == ACTIONS.FERTILIZE then
-        return ('%s tier | +%d nutrients | %d%% retention for %dm | %d available')
+        return ('%s tier | +%d nutrients | %d%% retention%s | %d available')
             :format(option.tier, effect.amount or 0, math.floor((effect.protectionStrength or 0) * 100),
-                minutes, option.count or 0)
+                protection, option.count or 0)
     end
-    return ('%s tier | -%d pressure | %d%% suppression for %dm | %d available')
+    return ('%s tier | -%d pressure | %d%% suppression%s | %d available')
         :format(option.tier, effect.reduction or 0, math.floor((effect.protectionStrength or 0) * 100),
-            minutes, option.count or 0)
+            protection, option.count or 0)
 end
 
 function Actions.OpenCareMenu(action, cropId)

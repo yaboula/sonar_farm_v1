@@ -41,28 +41,28 @@ local path = 'data/ox_inventory_items.lua'
 
 local function effect(item)
     if item.tool and item.tool.action == 'weed' then
-        local mins = math.floor((item.tool.protectionHours or 0) * 60 + 0.5)
-        if mins > 0 then
-            return ('Removes %d%% weeds · %dm resistance (%d uses)'):format(item.tool.weedRemoval, mins, item.tool.uses)
+        local coverage = math.floor((item.tool.protectionCycleRatio or 0) * 100 + 0.5)
+        if coverage > 0 then
+            return ('Removes %d%% weeds | %d%% of crop cycle (%d uses)'):format(item.tool.weedRemoval, coverage, item.tool.uses)
         end
-        return ('Removes %d%% weeds · %d uses'):format(item.tool.weedRemoval, item.tool.uses)
+        return ('Removes %d%% weeds | %d uses'):format(item.tool.weedRemoval, item.tool.uses)
     end
     if item.tool and item.tool.action == 'water' then
-        local mins = math.floor((item.tool.protectionHours or 0) * 60 + 0.5)
-        if mins > 0 then
-            return ('+%d%% water · %dm retention (%d uses)'):format(item.tool.amount or 100, mins, item.tool.uses)
+        local coverage = math.floor((item.tool.protectionCycleRatio or 0) * 100 + 0.5)
+        if coverage > 0 then
+            return ('+%d%% water | %d%% of crop cycle (%d uses)'):format(item.tool.amount or 100, coverage, item.tool.uses)
         end
-        return ('+%d%% water · %d uses'):format(item.tool.amount or 100, item.tool.uses)
+        return ('+%d%% water | %d uses'):format(item.tool.amount or 100, item.tool.uses)
     end
     if item.tool then return ('%d field uses'):format(item.tool.uses) end
     if not item.consumable then return item.description end
-    local mins = math.floor((item.consumable.protectionHours or 0) * 60 + 0.5)
+    local coverage = math.floor((item.consumable.protectionCycleRatio or 0) * 100 + 0.5)
     if item.consumable.action == 'fertilize' then
-        return ('+%d nutrients · %d%% retention for %dm'):format(item.consumable.amount,
-            math.floor(item.consumable.protectionStrength * 100 + 0.5), mins)
+        return ('+%d nutrients | %d%% retention for %d%% of crop cycle'):format(item.consumable.amount,
+            math.floor(item.consumable.protectionStrength * 100 + 0.5), coverage)
     end
-    return ('-%d pest pressure · %d%% suppression for %dm'):format(item.consumable.reduction,
-        math.floor(item.consumable.protectionStrength * 100 + 0.5), mins)
+    return ('-%d pest pressure | %d%% suppression for %d%% of crop cycle'):format(item.consumable.reduction,
+        math.floor(item.consumable.protectionStrength * 100 + 0.5), coverage)
 end
 
 local web = {

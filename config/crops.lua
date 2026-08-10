@@ -8,6 +8,7 @@
       seedItem      string  ox_inventory item consumed to plant.
       productItem   string  ox_inventory item yielded on harvest.
       growthTime    number  Seconds from planting to fully grown.
+      cycle         table   V2 rates expressed per complete growth cycle.
       stages        table   Visual stages picked by elapsed ratio (Stage 4 props).
                             Each: { model = 'prop_name', ratio = 0.0 .. 1.0 }.
                             Models come from the custom plant pack, which must be
@@ -47,6 +48,8 @@ Config.Crops = {
         nutrients = { decayPerHour = 100, optimalMin = 42, optimalMax = 82, overfertilizeCeiling = 100 },
         weeds = { growthPerHour = 180, resistance = 0.55 },
         pests = { onsetHours = 0.15, susceptibility = 0.35 },
+        cycle = { waterLoss = 280, nutrientLoss = 175, weedGrowth = 350,
+            pestOnset = 0.18, pestGrowth = 220, spoilage = 50, droughtTolerance = 0.85 },
         criticalWindow = { from = 0.35, to = 0.68 },
         yield = { min = 2, max = 5 },
         xpReward = 10,
@@ -70,6 +73,8 @@ Config.Crops = {
         nutrients = { decayPerHour = 80, optimalMin = 36, optimalMax = 85, overfertilizeCeiling = 100 },
         weeds = { growthPerHour = 150, resistance = 0.7 },
         pests = { onsetHours = 0.20, susceptibility = 0.2 },
+        cycle = { waterLoss = 240, nutrientLoss = 160, weedGrowth = 300,
+            pestOnset = 0.25, pestGrowth = 160, spoilage = 35, droughtTolerance = 0.9 },
         criticalWindow = { from = 0.25, to = 0.72 },
         yield = { min = 3, max = 7 },
         xpReward = 12,
@@ -93,6 +98,8 @@ Config.Crops = {
         nutrients = { decayPerHour = 220, optimalMin = 55, optimalMax = 82, overfertilizeCeiling = 100 },
         weeds = { growthPerHour = 280, resistance = 0.15 },
         pests = { onsetHours = 0.08, susceptibility = 0.8 },
+        cycle = { waterLoss = 320, nutrientLoss = 190, weedGrowth = 420,
+            pestOnset = 0.08, pestGrowth = 450, spoilage = 90 },
         criticalWindow = { from = 0.18, to = 0.62 },
         yield = { min = 2, max = 4 },
         xpReward = 8,
@@ -118,6 +125,8 @@ Config.Crops = {
         nutrients = { decayPerHour = 180, optimalMin = 52, optimalMax = 78, overfertilizeCeiling = 100 },
         weeds = { growthPerHour = 220, resistance = 0.3 },
         pests = { onsetHours = 0.15, susceptibility = 0.9 },
+        cycle = { waterLoss = 300, nutrientLoss = 180, weedGrowth = 400,
+            pestOnset = 0.12, pestGrowth = 380, spoilage = 65 },
         criticalWindow = { from = 0.38, to = 0.72 },
         conditionEffects = { weeds = true, pests = true },
         yield = { min = 3, max = 6 },

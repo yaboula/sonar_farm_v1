@@ -255,16 +255,20 @@ cuando la condición está habilitada globalmente y para el cultivo. Comparten e
 mismo pipeline autoritativo de distancia, permisos, rate limit, cooldown y lock
 que `water`.
 
+El cliente abre primero `sonar_farm:careOptions` con `cropId` y acción. Después
+envía únicamente `cropId` e `itemId`; el servidor vuelve a resolver slot,
+durabilidad, propiedad, efecto y duración proporcional.
+
 ```lua
-lib.callback.await('sonar_farm:fertilize', false, { cropId = cropId })
-lib.callback.await('sonar_farm:weed', false, { cropId = cropId })
-lib.callback.await('sonar_farm:treatPest', false, { cropId = cropId })
+lib.callback.await('sonar_farm:fertilize', false, { cropId = cropId, itemId = 'fertilizer_balanced' })
+lib.callback.await('sonar_farm:weed', false, { cropId = cropId, itemId = 'hand_hoe_reinforced' })
+lib.callback.await('sonar_farm:treatPest', false, { cropId = cropId, itemId = 'pest_spray_targeted' })
 ```
 
-`fertilize` consume primero fertilizante orgánico y después químico según lo
-disponible; permite superar el rango óptimo y registra quemadura acumulada, pero
-rechaza el techo de saturación. `weed` requiere `hand_hoe` sin consumirlo.
-`treatPest` consume primero tratamiento orgánico y después químico.
+El item elegido debe existir en el inventario y corresponder a la acción.
+Consumibles gastan una unidad; herramientas pierden durabilidad en el slot
+exacto y se eliminan al romperse. Fertilizar puede superar el rango óptimo y
+registra quemadura acumulada, pero rechaza el techo de saturación.
 
 **Respuestas:** nutrientes restantes, cobertura de malas hierbas o presión de
 plagas, respectivamente.
@@ -498,6 +502,7 @@ sigue interpolando desde calidad exactamente como antes.
 | `Config.Farming.AllowPublicCare`     | `true`  | Cualquiera puede regar cultivos ajenos          |
 | `Config.Farming.TheftQualityPenalty` | `0.3`   | Calidad perdida al cosechar ajeno               |
 | `Config.Farming.MaxCropsPerPlayer`   | `25`    | Cultivos activos simultáneos por jugador        |
+| `Config.Farming.NewCropSimulationVersion` | `2` | Modelo asignado solo a nuevas plantaciones    |
 | `Config.Farming.WaterRefillThreshold`| `95`    | Agua por encima de la cual no se puede regar    |
 | `Config.Features.AdvancedCare`       | `false` | Activa el modelo causal completo                 |
 | `Config.Farming.ConditionEffects`    | `true`  | Techo global por nutrientes/malas hierbas/plagas|

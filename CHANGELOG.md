@@ -6,6 +6,25 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
 
 ## [Unreleased]
 
+### Added — Simulación Agrícola Proporcional al Ciclo V2
+
+- Añadido `Sonar.CropClock` como autoridad del tiempo biológico normalizado.
+- Las nuevas plantaciones persisten `simulationVersion = 2` y
+  `growthAdjustmentRatio`; los registros V1 conservan exactamente su modelo.
+- Añadidas tasas por ciclo, bandas Green/Watch/Critical, protecciones relativas,
+  historial/diagnóstico proporcional y calibración determinista de muerte.
+- Añadidas regresiones para ciclos de 20 minutos, 40 minutos y 6 horas, ventanas
+  de abandono, madurez Green/Watch y catálogo generado.
+
+### Changed — Simulación Agrícola Proporcional al Ciclo V2
+
+- Cambiar `growthTime` escala toda la biología sin alterar cooldowns, minijuegos,
+  Supplies, Warehouse, delivery, restock ni refrescos UI.
+- Supplies muestra cobertura en porcentaje de ciclo y el menú de cuidado añade
+  la duración real resuelta para el cultivo seleccionado.
+- Las curvas de inspección conservan únicamente historial hasta `NOW`; el
+  horizonte diagnóstico equivale al 10 % del ciclo.
+
 ### Added — Crop Inspection Pulse Rail
 
 - Añadido un HUD agronómico transparente y sin foco que sustituye la

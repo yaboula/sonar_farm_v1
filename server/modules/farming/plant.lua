@@ -90,14 +90,14 @@ lib.callback.register(CALLBACKS.PLANT, function(source, payload)
             heading = slot.heading,
             planted_at = now,
             growth_time = def.growthTime,
-            data = {
+            data = Sonar.CropClock.NewData(cropType, {
                 water = 100,
                 health = initialHealth(score),
                 spoilage = 0,
                 lastCare = now,
                 careCount = 0,
                 plantScore = score,
-            },
+            }),
         })
 
         Sync.OnCropChanged(record)

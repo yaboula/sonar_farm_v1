@@ -62,7 +62,22 @@ function Growth.Evaluate(record, now)
 
     local elapsed = math.max(0, now - (record.planted_at or now))
     local effectiveElapsed = elapsed
-    if Sonar.Conditions and Sonar.Conditions.IsAdvancedCareEnabled() then
+    local cycleV2 = Sonar.CropClock and Sonar.CropClock.IsV2(record)
+    if cycleV2 then
+        local data = record.data or {}
+        local pending = Sonar.Conditions.Evaluate(record, now)
+        local nominalProgress = elapsed / Sonar.CropClock.GrowthSeconds(record)
+        local bonus = tonumber(Config.Farming and Config.Farming.AdvancedCare
+            and Config.Farming.AdvancedCare.Cycle
+            and Config.Farming.AdvancedCare.Cycle.GreenGrowthBonus) or 0.20
+        local adjustment = Sonar.Utils.Clamp(
+            (tonumber(data.growthAdjustmentRatio) or 0)
+                + (tonumber(pending.growthAdjustmentRatioDelta) or 0),
+            -nominalProgress * bonus,
+            nominalProgress
+        )
+        effectiveElapsed = math.max(0, (nominalProgress - adjustment) * Sonar.CropClock.GrowthSeconds(record))
+    elseif Sonar.Conditions and Sonar.Conditions.IsAdvancedCareEnabled() then
         local data = record.data or {}
         local pending = Sonar.Conditions.Evaluate(record, now)
         local elapsedHours = elapsed / 3600
@@ -100,7 +115,7 @@ function Growth.Evaluate(record, now)
         stageIndex = stageIndex,
         state = state,
     }
-    if Sonar.Conditions and Sonar.Conditions.IsAdvancedCareEnabled() then
+    if cycleV2 or (Sonar.Conditions and Sonar.Conditions.IsAdvancedCareEnabled()) then
         result.effectiveElapsed = effectiveElapsed
     end
     return result

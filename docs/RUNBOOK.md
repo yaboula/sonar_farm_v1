@@ -275,6 +275,21 @@ pero no lo dibujas (problema de modelo, radio, tope o interior).
 5. En consola deberia verse `State engine ready (1 crops loaded)`.
 6. `/farm_debug_grow <id>` -> el progreso aumenta con el tiempo.
 
+### Prueba de simulación proporcional V2
+
+`/farm_debug_plant` crea registros V2 por defecto. Para comparar ciclos sin
+alterar ninguna otra lógica, planta el mismo cultivo con dos duraciones:
+
+1. `/farm_debug_plant tomato 2400`
+2. `/farm_debug_plant tomato 21600`
+3. Aplica cuidados en los mismos porcentajes de ambos ciclos.
+4. Compara `/farm_debug_grow <id>` e Inspect.
+5. Reinicia durante una protección y verifica su porcentaje restante.
+
+La biología debe coincidir; cooldowns, minijuego, Warehouse, delivery y restock
+deben mantener sus segundos reales. La guía completa está en
+`docs/CROP_SIMULATION_V2.md`.
+
 ### Prueba del bucle completo (Etapa 3 / slots)
 
 Requiere estar junto a un surco vacio de `config/zones.lua` y tener los items.

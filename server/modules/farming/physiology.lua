@@ -22,9 +22,14 @@ function Physiology.Apply(record, now)
         spoilage = condition.spoilage,
         -- Advance the care clock so decay is not applied twice.
         lastCare = now,
+        simulationVersion = Sonar.CropClock.Version(record),
     }
-    if Sonar.Conditions.IsAdvancedCareEnabled() then
+    if Sonar.CropClock.IsV2(record) then
+        dataPatch.growthAdjustmentRatio = condition.growthAdjustmentRatio
+    elseif Sonar.Conditions.IsAdvancedCareEnabled() then
         dataPatch.growthPenaltyHours = condition.growthPenaltyHours
+    end
+    if Sonar.Conditions.IsAdvancedCareEnabled() or Sonar.CropClock.IsV2(record) then
         dataPatch.waterStressAccumulated = condition.waterStressAccumulated
         dataPatch.waterProtectionStrength = condition.waterProtectionStrength
         dataPatch.waterProtectionUntil = condition.waterProtectionUntil
@@ -87,7 +92,7 @@ function Physiology.Fertilize(record, effect, item)
     local oldUntil = tonumber(data.nutrientProtectionUntil) or 0
     local oldStrength = Utils.Clamp(tonumber(data.nutrientProtectionStrength) or 0, 0, 1)
     local oldScore = oldStrength * math.max(0, oldUntil - now)
-    local newUntil = now + math.max(0, tonumber(effect.protectionHours) or 0) * 3600
+    local newUntil = now + Sonar.CropClock.ProtectionSeconds(record, effect)
     local newStrength = Utils.Clamp(tonumber(effect.protectionStrength) or 0, 0, 1)
     local keepNew = newStrength * math.max(0, newUntil - now) >= oldScore
     State.Update(record.id, { data = {
@@ -109,10 +114,9 @@ end
 function Physiology.Weed(record, effect, item)
     local data = record.data or {}
     local removal = 55
-    local protectionHours, protectionStrength = 0, 0
+    local protectionStrength = 0
     if type(effect) == 'table' then
         removal = tonumber(effect.weedRemoval) or 55
-        protectionHours = tonumber(effect.protectionHours) or 0
         protectionStrength = tonumber(effect.protectionStrength) or 0
     elseif type(effect) == 'number' then
         removal = effect
@@ -124,7 +128,8 @@ function Physiology.Weed(record, effect, item)
     local oldUntil = tonumber(data.weedProtectionUntil) or 0
     local oldStrength = Utils.Clamp(tonumber(data.weedProtectionStrength) or 0, 0, 1)
     local oldScore = oldStrength * math.max(0, oldUntil - now)
-    local newUntil = now + math.max(0, protectionHours) * 3600
+    local newUntil = now + Sonar.CropClock.ProtectionSeconds(record,
+        type(effect) == 'table' and effect or {})
     local newStrength = Utils.Clamp(protectionStrength, 0, 1)
     local keepNew = newStrength * math.max(0, newUntil - now) >= oldScore
 
@@ -152,7 +157,7 @@ function Physiology.TreatPests(record, effect, item)
     local oldUntil = tonumber(data.pestProtectionUntil) or 0
     local oldStrength = Utils.Clamp(tonumber(data.pestProtectionStrength) or 0, 0, 1)
     local oldScore = oldStrength * math.max(0, oldUntil - now)
-    local newUntil = now + math.max(0, tonumber(effect.protectionHours) or 0) * 3600
+    local newUntil = now + Sonar.CropClock.ProtectionSeconds(record, effect)
     local newStrength = Utils.Clamp(tonumber(effect.protectionStrength) or 0, 0, 1)
     local keepNew = newStrength * math.max(0, newUntil - now) >= oldScore
     State.Update(record.id, { data = {
@@ -175,10 +180,9 @@ function Physiology.Water(record, effect, item, now)
     now = now or Sonar.Time.Now()
     local data = record.data or {}
     local amount = 100
-    local protectionHours, protectionStrength = 0, 0
+    local protectionStrength = 0
     if type(effect) == 'table' then
         amount = tonumber(effect.amount) or 100
-        protectionHours = tonumber(effect.protectionHours) or 0
         protectionStrength = tonumber(effect.protectionStrength) or 0
     elseif type(effect) == 'number' then
         amount = effect
@@ -189,7 +193,8 @@ function Physiology.Water(record, effect, item, now)
     local oldUntil = tonumber(data.waterProtectionUntil) or 0
     local oldStrength = Utils.Clamp(tonumber(data.waterProtectionStrength) or 0, 0, 1)
     local oldScore = oldStrength * math.max(0, oldUntil - now)
-    local newUntil = now + math.max(0, protectionHours) * 3600
+    local newUntil = now + Sonar.CropClock.ProtectionSeconds(record,
+        type(effect) == 'table' and effect or {})
     local newStrength = Utils.Clamp(protectionStrength, 0, 1)
     local keepNew = newStrength * math.max(0, newUntil - now) >= oldScore
 

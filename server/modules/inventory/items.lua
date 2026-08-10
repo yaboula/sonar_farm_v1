@@ -59,7 +59,7 @@ function Items.Resolve(source, action, itemId)
     }
 end
 
-function Items.ListForAction(source, action)
+function Items.ListForAction(source, action, record)
     local options = {}
     for _, item in ipairs(Sonar.ItemCatalog.items) do
         local effect = effectFor(item)
@@ -73,6 +73,8 @@ function Items.ListForAction(source, action)
                         totalUses = totalUses + math.ceil(durabilityOf(slot) / 100 * item.tool.uses - 0.0001)
                     end
                 end
+                local resolvedProtectionSeconds = record
+                    and Sonar.CropClock.ProtectionSeconds(record, effect) or 0
                 options[#options + 1] = {
                     id = item.id,
                     label = item.label,
@@ -80,6 +82,9 @@ function Items.ListForAction(source, action)
                     count = count,
                     usesRemaining = item.tool and totalUses or count,
                     effect = effect,
+                    protectionSeconds = resolvedProtectionSeconds,
+                    protectionCycleRatio = record and Sonar.CropClock.IsV2(record)
+                        and (tonumber(effect.protectionCycleRatio) or 0) or 0,
                     description = item.description,
                 }
             end

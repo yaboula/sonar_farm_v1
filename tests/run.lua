@@ -63,6 +63,7 @@ dofile('shared/item_catalog.lua')
 dofile('shared/constants.lua')
 dofile('shared/utils.lua')
 dofile('shared/time.lua')
+dofile('shared/crop_clock.lua')
 dofile('shared/conditions.lua')
 dofile('shared/growth.lua')
 dofile('shared/physiology.lua')
@@ -924,6 +925,158 @@ test('warehouse schema preserves tool durability and operation idempotency', fun
     assert(service:find("ORDER BY durability,id LIMIT 1", 1, true), 'lowest durability warehouse tool selected first')
     assert(service:find("row.status == 'prepared'", 1, true), 'prepared usage rows must be reconciled after a restart')
     assert(service:find("Lock.With('member-custody:' .. member.identifier", 1, true), 'withdrawal and member removal share a custody lock')
+end)
+
+local function v2Record(cropType, growthTime, plantedAt, values)
+    values = values or {}
+    values.water = values.water == nil and 100 or values.water
+    values.health = values.health == nil and 100 or values.health
+    values.spoilage = values.spoilage == nil and 0 or values.spoilage
+    values.lastCare = values.lastCare or plantedAt
+    return {
+        id = cropType .. '-' .. tostring(growthTime),
+        crop_type = cropType,
+        planted_at = plantedAt,
+        growth_time = growthTime,
+        state = Sonar.Constants.CROP_STATE.PLANTED,
+        data = Sonar.CropClock.NewData(cropType, values),
+    }
+end
+
+test('V2 crop clock initializes normalized state and preserves rollback to V1', function()
+    local original = Config.Farming.NewCropSimulationVersion
+    Config.Farming.NewCropSimulationVersion = 2
+    local data = Sonar.CropClock.NewData('tomato', {})
+    equal(data.simulationVersion, 2, 'new crops opt into V2')
+    equal(data.nutrients, 65, 'nutrients start at the crop optimal midpoint')
+    equal(data.growthAdjustmentRatio, 0, 'growth adjustment starts neutral')
+
+    Config.Farming.NewCropSimulationVersion = 1
+    local legacy = Sonar.CropClock.NewData('tomato', {})
+    equal(legacy.simulationVersion, 1, 'rollback creates legacy records without reinterpreting V2 crops')
+    equal(legacy.nutrients, nil, 'legacy initialization remains unchanged')
+    Config.Farming.NewCropSimulationVersion = original
+end)
+
+test('V2 biology is invariant across 20 minute 40 minute and 6 hour cycles', function()
+    local plantedAt = 100000
+    local durations = { 20 * 60, 40 * 60, 6 * 60 * 60 }
+    local keys = { 'water', 'health', 'nutrients', 'weedCover', 'pestPressure',
+        'growthAdjustmentRatio', 'waterStressAccumulated', 'nutrientStressAccumulated',
+        'pestDamageAccumulated', 'progress' }
+    local baseline
+    for _, duration in ipairs(durations) do
+        local condition = Physiology.Evaluate(v2Record('tomato', duration, plantedAt),
+            plantedAt + duration * 0.30)
+        if not baseline then baseline = condition else
+            for _, key in ipairs(keys) do
+                assert(math.abs((condition[key] or 0) - (baseline[key] or 0)) < 0.000001,
+                    ('%s changes with growthTime'):format(key))
+            end
+        end
+    end
+end)
+
+test('V2 protection duration and inspection windows scale with the selected crop', function()
+    local plantedAt = 100000
+    for _, duration in ipairs({ 1200, 2400, 21600 }) do
+        local record = v2Record('tomato', duration, plantedAt)
+        local effect = Sonar.ItemCatalog.byId.fertilizer_balanced.consumable
+        equal(Sonar.CropClock.ProtectionSeconds(record, effect), duration * 0.18,
+            'Plus protection covers 18 percent of the cycle')
+
+        local now = plantedAt + duration * 0.50
+        local payload = Sonar.Inspection.Build(record, now)
+        equal(payload.timing.forecastSeconds, duration * 0.10,
+            'diagnosis uses ten percent of the cycle')
+        equal(payload.series.historyStart, now - duration * 0.25,
+            'history uses twenty five percent of the cycle')
+        equal(payload.series.forecastEnd, now, 'inspection curve remains historical through NOW only')
+    end
+end)
+
+test('V2 unattended crops die inside their calibrated biological windows', function()
+    local windows = {
+        lettuce = { 0.25, 0.35 },
+        tomato = { 0.32, 0.40 },
+        carrot = { 0.50, 0.58 },
+        potato = { 0.58, 0.65 },
+    }
+    local plantedAt = 100000
+    for cropType, window in pairs(windows) do
+        local duration = Config.Crops[cropType].growthTime
+        local record = v2Record(cropType, duration, plantedAt)
+        local deathRatio
+        for index = 0, 1000 do
+            local ratio = index / 1000
+            local condition = Physiology.Evaluate(record, plantedAt + duration * ratio)
+            if condition.health <= 0 then deathRatio = ratio break end
+        end
+        assert(deathRatio and deathRatio >= window[1] and deathRatio <= window[2],
+            ('%s death ratio %.3f is outside %.2f..%.2f'):format(cropType, deathRatio or -1, window[1], window[2]))
+        assert(Physiology.Evaluate(record, plantedAt + duration * deathRatio).progress < 1,
+            cropType .. ' must die before maturity when abandoned')
+    end
+end)
+
+test('V2 Green and Watch outcomes match normalized maturity and harvest targets', function()
+    local plantedAt, duration = 100000, 2400
+    local green = v2Record('tomato', duration, plantedAt, {
+        plantScore = 100,
+        waterProtectionStrength = 1, waterProtectionUntil = plantedAt + duration * 4,
+        nutrientProtectionStrength = 1, nutrientProtectionUntil = plantedAt + duration * 4,
+        weedProtectionStrength = 1, weedProtectionUntil = plantedAt + duration * 4,
+        pestProtectionStrength = 1, pestProtectionUntil = plantedAt + duration * 4,
+    })
+    local greenCondition = Physiology.Evaluate(green, plantedAt + duration * (5 / 6))
+    assert(math.abs(greenCondition.progress - 1) < 0.001, 'always Green matures at about 83.3 percent')
+    local greenQuality = Quality.Resolve(Config.Quality.DefaultScore, greenCondition, { record = green })
+    assert(greenQuality >= 90, 'always Green quality is at least 90')
+    assert(Quality.ResolveProduction(green, greenCondition, greenQuality) >= 90,
+        'always Green production is at least 90')
+
+    local watch = v2Record('tomato', duration, plantedAt, {
+        water = 50, nutrients = 47,
+        waterProtectionStrength = 1, waterProtectionUntil = plantedAt + duration * 4,
+        nutrientProtectionStrength = 1, nutrientProtectionUntil = plantedAt + duration * 4,
+        weedProtectionStrength = 1, weedProtectionUntil = plantedAt + duration * 4,
+        pestProtectionStrength = 1, pestProtectionUntil = plantedAt + duration * 4,
+    })
+    local watchCondition = Physiology.Evaluate(watch, plantedAt + duration * 1.12)
+    assert(watchCondition.progress >= 1, 'managed Watch matures within 112 percent of the cycle')
+    local watchQuality = Quality.Resolve(Config.Quality.DefaultScore, watchCondition, { record = watch })
+    local watchProduction = Quality.ResolveProduction(watch, watchCondition, watchQuality)
+    assert(watchQuality >= 55 and watchQuality <= 75, 'Watch quality remains within 55..75')
+    assert(watchProduction >= 50 and watchProduction <= 75, 'Watch production remains within 50..75')
+end)
+
+test('V2 material tiers cover the tomato cycle within seven four and two rounds', function()
+    local def = Config.Crops.tomato
+    local matureRatio = 1 / (1 + Config.Farming.AdvancedCare.Cycle.GreenGrowthBonus)
+    local caps = { basic = 7, plus = 4, pro = 2 }
+    local rates = {
+        water = def.cycle.waterLoss,
+        fertilize = def.cycle.nutrientLoss,
+        weed = def.cycle.weedGrowth,
+        treat_pest = def.cycle.pestGrowth,
+    }
+    local baseDemand = {
+        water = rates.water * matureRatio,
+        fertilize = rates.fertilize * matureRatio,
+        weed = rates.weed * matureRatio,
+        treat_pest = rates.treat_pest * math.max(0, matureRatio - def.cycle.pestOnset),
+    }
+    for _, item in ipairs(Sonar.ItemCatalog.market) do
+        local effect = item.tool or item.consumable
+        if effect and rates[effect.action] then
+            local immediate = tonumber(effect.amount or effect.weedRemoval or effect.reduction) or 0
+            local prevented = rates[effect.action] * (tonumber(effect.protectionCycleRatio) or 0)
+                * (tonumber(effect.protectionStrength) or 0)
+            local applications = math.ceil(baseDemand[effect.action] / (immediate + prevented) - 0.000001)
+            assert(applications <= caps[item.tier],
+                ('%s needs %d applications, above the %s cap'):format(item.id, applications, item.tier))
+        end
+    end
 end)
 
 print(('All %d tests passed.'):format(passed))

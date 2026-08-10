@@ -31,6 +31,17 @@ local MAX_HEALTH_LOSS_PER_HOUR = 20
 -- Below this health the crop looks withered but is still recoverable.
 local WITHERED_HEALTH = 40
 
+local function matureAtFor(record, now)
+    local plantedAt = tonumber(record.planted_at) or now
+    if (Growth.Evaluate(record, now).progress or 0) < 1 then return nil end
+    local low, high = plantedAt, now
+    for _ = 1, 32 do
+        local middle = math.floor((low + high) * 0.5)
+        if Growth.Evaluate(record, middle).progress >= 1 then high = middle else low = middle + 1 end
+    end
+    return high
+end
+
 --- Resolve the physiology parameters for a record.
 ---@param record table
 ---@return table water
@@ -69,28 +80,41 @@ function Physiology.Evaluate(record, now)
     local lastCare = tonumber(data.lastCare) or record.planted_at or now
     local hours = math.max(0, now - lastCare) / 3600
     local advanced = Sonar.Conditions and Sonar.Conditions.IsAdvancedCareEnabled()
-    local trajectory = advanced and Sonar.Conditions.Evaluate(record, now) or nil
+    local cycleV2 = Sonar.CropClock and Sonar.CropClock.IsV2(record)
+    local trajectory = (advanced or cycleV2) and Sonar.Conditions.Evaluate(record, now) or nil
 
-    if hours > 0 then
-        local newWater = advanced and trajectory.water
+    if now > lastCare then
+        local newWater = (advanced or cycleV2) and trajectory.water
             or Utils.Clamp(water - (params.decayPerHour * hours), 0, 100)
 
-        -- Health only drops during the portion of time the crop spent dry.
-        local hoursUntilDry = (params.decayPerHour > 0) and (water / params.decayPerHour) or math.huge
-        local dryHours = advanced and trajectory.waterDryHours or math.max(0, hours - hoursUntilDry)
-        if dryHours > 0 then
-            local tolerance = Utils.Clamp(params.droughtTolerance or 0.5, 0, 0.95)
-            health = Utils.Clamp(health - (dryHours * MAX_HEALTH_LOSS_PER_HOUR * (1 - tolerance)), 0, 100)
+        if cycleV2 then
+            local cycleCfg = Config.Farming.AdvancedCare.Cycle or {}
+            local cropCycle = Config.Crops and Config.Crops[record.crop_type]
+                and Config.Crops[record.crop_type].cycle or {}
+            local tolerance = Utils.Clamp(tonumber(cropCycle.droughtTolerance)
+                or params.droughtTolerance or 0.5, 0, 0.95)
+            local dryLoss = (tonumber(trajectory.waterDryCycle) or 0)
+                * (tonumber(cycleCfg.DryHealthLossPerCycle) or 0) * (1 - tolerance)
+            local nutrientLoss = advanced and (tonumber(trajectory.nutrientCriticalCycle) or 0)
+                * (tonumber(cycleCfg.NutrientHealthLossPerCycle) or 0) or 0
+            local pestLoss = advanced and (tonumber(trajectory.pestDamageDelta) or 0) or 0
+            health = Utils.Clamp(health - dryLoss - nutrientLoss - pestLoss, 0, 100)
+        else
+            -- Health only drops during the portion of time the crop spent dry.
+            local hoursUntilDry = (params.decayPerHour > 0) and (water / params.decayPerHour) or math.huge
+            local dryHours = advanced and trajectory.waterDryHours or math.max(0, hours - hoursUntilDry)
+            if dryHours > 0 then
+                local tolerance = Utils.Clamp(params.droughtTolerance or 0.5, 0, 0.95)
+                health = Utils.Clamp(health - (dryHours * MAX_HEALTH_LOSS_PER_HOUR * (1 - tolerance)), 0, 100)
+            end
+            if advanced then
+                local cfg = Config.Farming.AdvancedCare or {}
+                local nutrientLoss = trajectory.nutrientDeficitHours
+                    * (tonumber(cfg.NutrientHealthLossPerHour) or 0)
+                health = Utils.Clamp(health - nutrientLoss - trajectory.pestDamageDelta, 0, 100)
+            end
         end
-
         water = newWater
-
-        if advanced then
-            local cfg = Config.Farming.AdvancedCare or {}
-            local nutrientLoss = trajectory.nutrientDeficitHours
-                * (tonumber(cfg.NutrientHealthLossPerHour) or 0)
-            health = Utils.Clamp(health - nutrientLoss - trajectory.pestDamageDelta, 0, 100)
-        end
     end
 
     -- Advanced Care subtracts persisted and pending stress penalties. With the
@@ -99,12 +123,20 @@ function Physiology.Evaluate(record, now)
 
     -- Spoilage accrues only after maturity.
     if growth.progress >= 1 then
-        local penaltySeconds = advanced
-            and ((tonumber(data.growthPenaltyHours) or 0) + trajectory.growthPenaltyHoursDelta) * 3600
-            or 0
-        local matureAt = (record.planted_at or now) + (record.growth_time or 0) + penaltySeconds
-        local matureHours = math.max(0, now - matureAt) / 3600
-        spoilage = Utils.Clamp(matureHours * spoilagePerHour, 0, 100)
+        if cycleV2 then
+            local matureAt = matureAtFor(record, now) or now
+            local cycleDef = Config.Crops and Config.Crops[record.crop_type]
+                and Config.Crops[record.crop_type].cycle or {}
+            spoilage = Utils.Clamp(Sonar.CropClock.Between(record, matureAt, now)
+                * (tonumber(cycleDef.spoilage) or 0), 0, 100)
+        else
+            local penaltySeconds = advanced
+                and ((tonumber(data.growthPenaltyHours) or 0) + trajectory.growthPenaltyHoursDelta) * 3600
+                or 0
+            local matureAt = (record.planted_at or now) + (record.growth_time or 0) + penaltySeconds
+            local matureHours = math.max(0, now - matureAt) / 3600
+            spoilage = Utils.Clamp(matureHours * spoilagePerHour, 0, 100)
+        end
     end
 
     local state
@@ -116,37 +148,53 @@ function Physiology.Evaluate(record, now)
         state = growth.state
     end
 
+    -- V2 keeps full precision in the authoritative JSON baseline so settling a
+    -- long interval once or in many lazy evaluations produces the same state.
+    -- Presentation layers already round their own values.
+    local function stored(value, places)
+        return cycleV2 and value or Utils.Round(value, places)
+    end
     local result = {
-        water = Utils.Round(water, 1),
-        health = Utils.Round(health, 1),
-        spoilage = Utils.Round(spoilage, 1),
+        water = stored(water, 1),
+        health = stored(health, 1),
+        spoilage = stored(spoilage, 1),
         state = state,
         progress = growth.progress,
         stageIndex = growth.stageIndex,
     }
     if advanced then
-        result.nutrients = trajectory.nutrients and Utils.Round(trajectory.nutrients, 1) or nil
-        result.weedCover = trajectory.weedCover and Utils.Round(trajectory.weedCover, 1) or nil
-        result.pestPressure = trajectory.pestPressure and Utils.Round(trajectory.pestPressure, 1) or nil
-        result.growthPenaltyHours = Utils.Round(
-            Utils.Clamp(
-                (tonumber(data.growthPenaltyHours) or 0) + trajectory.growthPenaltyHoursDelta,
-                -hours * 0.15,
-                hours
-            ),
-            4
-        )
-        result.waterStressAccumulated = Utils.Round(Utils.Clamp(
+        result.nutrients = trajectory.nutrients and stored(trajectory.nutrients, 1) or nil
+        result.weedCover = trajectory.weedCover and stored(trajectory.weedCover, 1) or nil
+        result.pestPressure = trajectory.pestPressure and stored(trajectory.pestPressure, 1) or nil
+        if cycleV2 then
+            local nominal = Sonar.CropClock.Between(record, tonumber(record.planted_at) or now, now)
+            local bonus = tonumber(Config.Farming.AdvancedCare.Cycle.GreenGrowthBonus) or 0.20
+            result.growthAdjustmentRatio = Utils.Clamp(
+                (tonumber(data.growthAdjustmentRatio) or 0)
+                    + (tonumber(trajectory.growthAdjustmentRatioDelta) or 0),
+                -nominal * bonus, nominal
+            )
+        else
+            result.growthPenaltyHours = Utils.Round(
+                Utils.Clamp(
+                    (tonumber(data.growthPenaltyHours) or 0) + trajectory.growthPenaltyHoursDelta,
+                    -hours * 0.15,
+                    hours
+                ),
+                4
+            )
+        end
+        result.waterStressAccumulated = stored(Utils.Clamp(
             (tonumber(data.waterStressAccumulated) or 0) + trajectory.waterStressDelta,
             0,
             100
         ), 2)
-        result.nutrientStressAccumulated = trajectory.enabled.nutrients and Utils.Round(Utils.Clamp(
+        result.nutrientStressAccumulated = trajectory.enabled.nutrients and stored(Utils.Clamp(
             (tonumber(data.nutrientStressAccumulated) or 0) + trajectory.nutrientStressDelta,
             0,
             100
         ), 2) or nil
-        result.pestDamageAccumulated = trajectory.enabled.pests and Utils.Round(Utils.Clamp(
+        result.pestDamageAccumulated = trajectory.enabled.pests and stored(Utils.Clamp(
             (tonumber(data.pestDamageAccumulated) or 0) + trajectory.pestDamageDelta,
             0,
             100
@@ -170,6 +218,15 @@ function Physiology.Evaluate(record, now)
         result.pestProtectionUntil = trajectory.pestProtectionUntil
         result.pestProtectionTier = trajectory.pestProtectionTier
         result.pestProtectionItem = trajectory.pestProtectionItem
+        result.bandExposure = trajectory.bandExposure
+    elseif cycleV2 then
+        result.growthAdjustmentRatio = (
+            (tonumber(data.growthAdjustmentRatio) or 0)
+                + (tonumber(trajectory.growthAdjustmentRatioDelta) or 0))
+        result.waterProtectionStrength = trajectory.waterProtectionStrength
+        result.waterProtectionUntil = trajectory.waterProtectionUntil
+        result.waterProtectionTier = trajectory.waterProtectionTier
+        result.waterProtectionItem = trajectory.waterProtectionItem
     end
     return result
 end

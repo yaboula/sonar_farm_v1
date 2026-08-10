@@ -68,6 +68,7 @@ lib.callback.register(CALLBACKS.HARVEST, function(source, payload)
         local quality = Quality.Resolve(score, condition, {
             theft = permission.theft,
             plantingQuality = plantingQuality,
+            record = record,
         })
         local productionScore = Quality.ResolveProduction(record, condition, quality)
         local defect = Quality.DominantDefect(record, condition)

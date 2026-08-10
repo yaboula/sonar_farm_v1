@@ -86,6 +86,18 @@ local function validateCrops(errors)
 
             positive(errors, path .. '.growthTime', crop.growthTime, false)
 
+            if type(crop.cycle) ~= 'table' then
+                errors[#errors + 1] = path .. '.cycle must be a table for simulation V2.'
+            else
+                for _, key in ipairs({ 'waterLoss', 'nutrientLoss', 'weedGrowth', 'pestGrowth', 'spoilage' }) do
+                    positive(errors, ('%s.cycle.%s'):format(path, key), crop.cycle[key], true)
+                end
+                range(errors, path .. '.cycle.pestOnset', crop.cycle.pestOnset, 0, 1)
+                if crop.cycle.droughtTolerance ~= nil then
+                    range(errors, path .. '.cycle.droughtTolerance', crop.cycle.droughtTolerance, 0, 0.95)
+                end
+            end
+
             if type(crop.stages) ~= 'table' or #crop.stages == 0 then
                 errors[#errors + 1] = path .. '.stages must contain at least one stage.'
             else
@@ -297,6 +309,11 @@ local function validateAdvancedCare(errors)
         errors[#errors + 1] = 'Config.Farming must be a table.'
         return
     end
+    if not finite(farming.NewCropSimulationVersion)
+        or farming.NewCropSimulationVersion < 1
+        or farming.NewCropSimulationVersion % 1 ~= 0 then
+        errors[#errors + 1] = 'Config.Farming.NewCropSimulationVersion must be a positive integer.'
+    end
 
     if type(farming.ConditionEffects) ~= 'table' then
         errors[#errors + 1] = 'Config.Farming.ConditionEffects must be a table.'
@@ -351,6 +368,29 @@ local function validateAdvancedCare(errors)
         positive(errors, 'Config.Farming.AdvancedCare.StressPerDeficitHour.nutrients', stress.nutrients, true)
     end
 
+    local cycle = advanced.Cycle
+    if type(cycle) ~= 'table' then
+        errors[#errors + 1] = 'Config.Farming.AdvancedCare.Cycle must be a table.'
+    else
+        for _, key in ipairs({ 'GreenGrowthBonus', 'WatchGrowthPenalty', 'CriticalGrowthPenalty',
+            'WatchStressMultiplier', 'WeedWaterCompetition', 'WeedNutrientCompetition',
+            'PestWeedAcceleration' }) do
+            range(errors, ('Config.Farming.AdvancedCare.Cycle.%s'):format(key), cycle[key], 0, 1)
+        end
+        for _, key in ipairs({ 'DryHealthLossPerCycle', 'NutrientHealthLossPerCycle', 'PestDamagePerCycle' }) do
+            positive(errors, ('Config.Farming.AdvancedCare.Cycle.%s'):format(key), cycle[key], true)
+        end
+        positive(errors, 'Config.Farming.AdvancedCare.Cycle.StressPerCycle.water',
+            cycle.StressPerCycle and cycle.StressPerCycle.water, true)
+        positive(errors, 'Config.Farming.AdvancedCare.Cycle.StressPerCycle.nutrients',
+            cycle.StressPerCycle and cycle.StressPerCycle.nutrients, true)
+        range(errors, 'Config.Farming.AdvancedCare.Cycle.Water.green', cycle.Water and cycle.Water.green, 0, 100)
+        range(errors, 'Config.Farming.AdvancedCare.Cycle.Water.critical', cycle.Water and cycle.Water.critical, 0, 100)
+        range(errors, 'Config.Farming.AdvancedCare.Cycle.Pressure.green', cycle.Pressure and cycle.Pressure.green, 0, 100)
+        range(errors, 'Config.Farming.AdvancedCare.Cycle.Pressure.critical', cycle.Pressure and cycle.Pressure.critical, 0, 100)
+        positive(errors, 'Config.Farming.AdvancedCare.Cycle.NutrientWatchMargin', cycle.NutrientWatchMargin, true)
+    end
+
     local catalog = Sonar.ItemCatalog
     if type(catalog) ~= 'table' or type(catalog.items) ~= 'table' or #catalog.items ~= 21 then
         errors[#errors + 1] = 'Sonar.ItemCatalog must contain exactly 21 canonical items.'
@@ -378,6 +418,7 @@ local function validateAdvancedCare(errors)
                     range(errors, path .. '.consumable.reduction', effect.reduction, 0.01, 100)
                 end
             end
+            range(errors, path .. '.protectionCycleRatio', effect.protectionCycleRatio, 0, 1)
         end
     end
     for action, count in pairs(counts) do
@@ -395,6 +436,9 @@ local function validateInspection(errors)
         'ValueRefreshSeconds', 'MaxEtaSeconds', 'CloseDistance', 'MinimapGapPixels', 'RightInsetPixels' }) do
         positive(errors, ('Config.Inspection.%s'):format(key), cfg[key], key == 'MinimapGapPixels' or key == 'RightInsetPixels')
     end
+    range(errors, 'Config.Inspection.HistoryCycleRatio', cfg.HistoryCycleRatio, 0.01, 1)
+    range(errors, 'Config.Inspection.DiagnosisCycleRatio', cfg.DiagnosisCycleRatio, 0.01, 1)
+    positive(errors, 'Config.Inspection.MaxEtaCycles', cfg.MaxEtaCycles, false)
     range(errors, 'Config.Inspection.MinimapWidthRatio', cfg.MinimapWidthRatio, 0.05, 0.4)
     range(errors, 'Config.Inspection.SevereConditionPercent', cfg.SevereConditionPercent, 1, 100)
     if finite(cfg.CloseDistance) and finite(Config.Security and Config.Security.MaxInteractDistance)

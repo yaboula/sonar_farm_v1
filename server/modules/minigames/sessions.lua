@@ -159,12 +159,12 @@ local function createReservation(source, runtime, cropType, zoneKey, slotIndex, 
             planted_at = Sonar.Time.Now(),
             growth_time = def.growthTime,
             state = CROP_STATE.PLANTING,
-            data = {
+            data = Sonar.CropClock.NewData(cropType, {
                 water = 0,
                 health = 100,
                 spoilage = 0,
                 lastCare = Sonar.Time.Now(),
-            },
+            }),
         })
         if not cropId then return { reason = REJECT.INTERNAL_ERROR } end
         return { record = record }

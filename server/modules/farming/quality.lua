@@ -74,7 +74,7 @@ end)
 --- Care state (health) and spoilage are what make attentive farming pay off.
 ---@param score number 0..100 from the provider
 ---@param condition table from Physiology.Evaluate
----@param opts? table { theft = boolean, mechanized = boolean, plantingQuality = number }
+---@param opts? table { theft = boolean, mechanized = boolean, plantingQuality = number, record = table }
 ---@return number quality 0..100
 function Quality.Resolve(score, condition, opts)
     opts = opts or {}
@@ -87,7 +87,10 @@ function Quality.Resolve(score, condition, opts)
         skillScore = score * (1 - influence) + Utils.Clamp(opts.plantingQuality, 0, 100) * influence
     end
 
-    local quality = (skillScore * cfg.ScoreWeight) + (careScore * cfg.CareWeight)
+    local cycleV2 = opts.record and Sonar.CropClock.IsV2(opts.record)
+    local scoreWeight = cycleV2 and 0.4 or cfg.ScoreWeight
+    local careWeight = cycleV2 and 0.6 or cfg.CareWeight
+    local quality = (skillScore * scoreWeight) + (careScore * careWeight)
 
     -- Spoilage is a direct multiplier: produce left rotting loses value.
     quality = quality * (1 - Utils.Clamp((condition.spoilage or 0) / 100, 0, 1))

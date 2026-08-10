@@ -77,12 +77,15 @@ Config.Features = {
 
 Config.Inspection = {
     HistorySeconds = 10 * 60,
+    HistoryCycleRatio = 0.25,
     -- Diagnostic comparison horizon only. It never produces chart samples.
     ForecastSeconds = 10 * 60,
+    DiagnosisCycleRatio = 0.10,
     SampleSeconds = 30,
     CurveRefreshSeconds = 5,
     ValueRefreshSeconds = 1,
     MaxEtaSeconds = 24 * 60 * 60,
+    MaxEtaCycles = 4,
     CloseDistance = 4.0,
     -- Standard GTA radar width plus a small breathing gap. Servers using a
     -- custom HUD can tune these values without changing the inspection UI.
@@ -144,6 +147,9 @@ Config.Cooldowns = {
 -- Farming rules (Stage 3)
 -- ---------------------------------------------------------------------------
 Config.Farming = {
+    -- New crops use the normalized biological clock. Existing records without
+    -- simulationVersion remain on the immutable V1 evaluator.
+    NewCropSimulationVersion = 2,
     -- Only the player who planted a crop may harvest it. When false, anyone
     -- can harvest but stolen produce loses quality (TheftQualityPenalty).
     OwnerOnlyHarvest = true,
@@ -188,6 +194,22 @@ Config.Farming = {
         },
         MinimumWeedCover = 8,
         MinimumPestPressure = 8,
+        Cycle = {
+            GreenGrowthBonus = 0.20,
+            WatchGrowthPenalty = 0.10,
+            CriticalGrowthPenalty = 0.55,
+            WatchStressMultiplier = 0.35,
+            DryHealthLossPerCycle = 1200,
+            NutrientHealthLossPerCycle = 160,
+            PestDamagePerCycle = 200,
+            StressPerCycle = { water = 100, nutrients = 110 },
+            WeedWaterCompetition = 0.35,
+            WeedNutrientCompetition = 0.45,
+            PestWeedAcceleration = 0.60,
+            Water = { green = 60, critical = 35 },
+            Pressure = { green = 20, critical = 50 },
+            NutrientWatchMargin = 20,
+        },
     },
     -- A minigame is cancelled when the ped loses at least this much health
     -- during one active interaction. Death always cancels regardless.

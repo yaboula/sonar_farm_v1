@@ -44,7 +44,7 @@ lib.callback.register(CALLBACKS.CARE_OPTIONS, function(source, payload)
             return reject(REJECT.CONDITION_DISABLED)
         end
     end
-    return { ok = true, data = { options = Items.ListForAction(source, action) } }
+    return { ok = true, data = { options = Items.ListForAction(source, action, record) } }
 end)
 
 lib.callback.register(CALLBACKS.WATER, function(source, payload)
@@ -94,6 +94,7 @@ lib.callback.register(CALLBACKS.WATER, function(source, payload)
         local waterEff = {
             amount = (selected.effect.amount or 100) * (waterAmount(score) / 100),
             protectionHours = selected.effect.protectionHours or 0,
+            protectionCycleRatio = selected.effect.protectionCycleRatio or 0,
             protectionStrength = selected.effect.protectionStrength or 0,
         }
         Physiology.Water(record, waterEff, selected.definition)

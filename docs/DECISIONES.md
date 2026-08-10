@@ -314,8 +314,8 @@ El plantado libre dentro de un radio se sustituyó por surcos configurados:
   acciones de `ox_target`.
 - `Sonar.Inspection.Build` es el único evaluador de presentación y reutiliza
   Growth, Physiology y Conditions; la NUI no inventa valores ni trayectorias.
-- Cada curva combina hasta diez minutos de historial real desde la última
-  atención con diez minutos discontinuos de previsión **sin cuidado**.
+- Cada curva contiene solo historial real hasta `NOW`; en V2 cubre hasta el 25 %
+  del ciclo. El horizonte sin cuidado se usa para diagnóstico, nunca se dibuja.
 - El servidor autoriza una única snapshot inicial. Mientras el HUD está abierto,
   reloj, valores, ETA y curvas se evalúan localmente; cerrado no existe ningún
   loop ni tráfico adicional.
@@ -326,6 +326,24 @@ El plantado libre dentro de un radio se sustituyó por surcos configurados:
   horizontal, compacto, oscuro, amarillo cálido y curvas temporales legibles.
 - `inspection-ui/` es la tercera superficie del shell NUI único. Es transparente
   y no interactiva; Hub y minijuego la cierran antes de adquirir foco.
+
+---
+
+## Decisiones de Simulación Agrícola Proporcional V2
+
+- `Sonar.CropClock` es la única autoridad del reloj biológico. El dominio
+  operativo sigue usando segundos reales.
+- `growthTime` almacenado por cultivo escala tasas, daño, protecciones,
+  inspección, ETA y spoilage. No hay constantes agrícolas por hora en V2.
+- La compatibilidad se decide por `record.data.simulationVersion`: nunca se
+  migra ni reinterpreta automáticamente un cultivo ya plantado.
+- Nutrientes nuevos parten del centro óptimo. El progreso acumula
+  `growthAdjustmentRatio`: Green acelera 20 %, Watch ralentiza 10 % y Critical
+  ralentiza 55 %.
+- La inspección dibuja solo historia hasta `NOW`; su evaluación futura existe
+  exclusivamente para diagnóstico y equivale al 10 % del ciclo.
+- Supplies comunica cobertura relativa. Solo el menú vinculado a un cultivo
+  convierte esa cobertura a minutos reales.
 
 ---
 

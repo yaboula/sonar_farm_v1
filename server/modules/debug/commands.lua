@@ -64,7 +64,8 @@ RegisterCommand('farm_debug_plant', function(src, args)
         pos_x = x, pos_y = y, pos_z = z, heading = h,
         planted_at = Sonar.Time.Now(),
         growth_time = growthTime,
-        data = { water = 100, health = 100, lastCare = Sonar.Time.Now() },
+        data = Sonar.CropClock.NewData(cropType,
+            { water = 100, health = 100, lastCare = Sonar.Time.Now() }),
     })
 
     -- Keep subscribed clients in sync, or the debug crop renders for nobody

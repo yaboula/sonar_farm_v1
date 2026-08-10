@@ -28,6 +28,7 @@ shared_scripts {
     'shared/constants.lua',
     'shared/utils.lua',
     'shared/time.lua',
+    'shared/crop_clock.lua',
     'shared/conditions.lua',
     -- Growth and physiology are shared so the client can predict what it renders
     -- with the exact same formula the server validates with.
