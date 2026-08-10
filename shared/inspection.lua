@@ -1,5 +1,5 @@
 --[[
-    sonar_farm - Pure crop inspection projection
+    sonar_farm - Pure crop inspection snapshot
 
     Produces the versioned domain payload consumed by the focus-free inspection
     NUI. Every value comes from the same shared Growth/Physiology/Conditions
@@ -86,20 +86,16 @@ local function sample(record, at)
     return result, condition
 end
 
-local MIN_WINDOW_SECONDS = 300  -- minimum graph width (5 min) so the chart is never empty after care
-
 local function seriesFor(record, now)
     local cfg = config()
     local data = record.data or {}
     local plantedAt = tonumber(record.planted_at) or now
-    -- The reliable simulation window starts at lastCare: Physiology.Evaluate only
-    -- produces accurate values from that point forward. Sampling before lastCare
-    -- always returns the same flat value (hours clamped to 0), so we never go
-    -- further back than lastCare.
-    local lastCare = tonumber(data.lastCare) or plantedAt
-    local windowStart = math.min(lastCare, now - MIN_WINDOW_SECONDS)
-    -- Never go before planting
-    windowStart = math.max(windowStart, plantedAt)
+    local historySeconds = math.max(0, tonumber(cfg.HistorySeconds) or 600)
+    -- Records persist a condition baseline at lastCare. Values before that
+    -- baseline cannot be reconstructed truthfully, so the historical chart
+    -- starts at the newest reliable boundary and ends at the current sample.
+    local lastCare = math.min(now, tonumber(data.lastCare) or plantedAt)
+    local windowStart = math.max(plantedAt, lastCare, now - historySeconds)
     local windowLen = math.max(1, now - windowStart)
 
     -- Adaptive step: ~50 samples across the window, clamped 5-120 s.
@@ -132,10 +128,10 @@ end
 
 
 -- ---------------------------------------------------------------------------
--- Projected quality and production (shared, mirrors Quality.Resolve / Quality.ResolveProduction)
+-- Estimated quality and production (shared, mirrors Quality.Resolve / Quality.ResolveProduction)
 -- These are estimates visible to the player NOW, not the authoritative harvest values.
 -- ---------------------------------------------------------------------------
-local function projectOutcome(current)
+local function projectOutcome(record, current)
     if not Sonar.Conditions.IsAdvancedCareEnabled() then
         return nil
     end
@@ -143,9 +139,18 @@ local function projectOutcome(current)
     local health     = tonumber(current.health) or 100
     local spoilage   = tonumber(current.spoilage) or 0
     local defaultScore = tonumber(cfg.DefaultScore) or 75
+    local skillScore = defaultScore
+    local data = record.data or {}
+    local plantingQuality = tonumber(data.plantingQuality)
+        or tonumber(data.plantScore)
+    if plantingQuality then
+        local influence = Utils.Clamp(tonumber(cfg.PlantingInfluence) or 0, 0, 1)
+        skillScore = defaultScore * (1 - influence) + Utils.Clamp(plantingQuality, 0, 100) * influence
+    end
 
-    -- Mirror Quality.Resolve using the default score (real score replaces this at harvest)
-    local quality = defaultScore * (tonumber(cfg.ScoreWeight) or 0.6)
+    -- Mirror Quality.Resolve using the default future harvest score plus the
+    -- already-authoritative planting score when one exists.
+    local quality = skillScore  * (tonumber(cfg.ScoreWeight) or 0.6)
                   + health      * (tonumber(cfg.CareWeight)  or 0.4)
     quality = quality * (1 - Utils.Clamp(spoilage / 100, 0, 1))
 
@@ -181,11 +186,32 @@ local function projectOutcome(current)
     }
 end
 
+local function thresholdsFor(record, key, enabled)
+    if not enabled then return {} end
+    if key == 'water' then
+        return {
+            { value = 30, label = 'Risk', tone = 'risk' },
+            { value = 60, label = 'Good', tone = 'good' },
+        }
+    end
+    if key == 'nutrients' then
+        local params = definition(record).nutrients or {}
+        return {
+            { value = tonumber(params.optimalMin) or 30, label = 'Minimum', tone = 'good' },
+            { value = tonumber(params.optimalMax) or 75, label = 'Maximum', tone = 'risk' },
+        }
+    end
+    return {
+        { value = 30, label = 'Watch', tone = 'watch' },
+        { value = 60, label = 'Risk', tone = 'risk' },
+    }
+end
+
 local function readyAt(record, now, current)
     if record.state == CROP_STATE.PLANTING or record.state == CROP_STATE.PLANTING_FAILED then return nil end
     local plantedAt = tonumber(record.planted_at) or now
     if (current.progress or 0) >= 1 then
-        local penalty = math.max(0, tonumber(current.growthPenaltyHours) or 0) * 3600
+        local penalty = (tonumber(current.growthPenaltyHours) or 0) * 3600
         return math.floor(plantedAt + (tonumber(record.growth_time) or 0) + penalty)
     end
     local high = now + math.max(60, tonumber(config().MaxEtaSeconds) or 86400)
@@ -323,6 +349,7 @@ function Inspection.Build(record, now, options)
             value = Utils.Round(currentValue, 1),
             enabled = enabled,
             status = statusFor(record, key, currentValue, enabled),
+            thresholds = thresholdsFor(record, key, enabled),
         }
         if key == 'water' then
             metric.protectionTier = current.waterProtectionTier
@@ -365,7 +392,7 @@ function Inspection.Build(record, now, options)
         spoilage = Utils.Round(current.spoilage or 0, 1),
         metrics = metrics,
         diagnosis = diagnosis(record, now, current, future),
-        outcome = projectOutcome(current),
+        outcome = projectOutcome(record, current),
     }
     if options.includeSeries ~= false then payload.series = seriesFor(record, now) end
     return payload

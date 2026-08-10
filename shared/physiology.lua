@@ -129,7 +129,11 @@ function Physiology.Evaluate(record, now)
         result.weedCover = trajectory.weedCover and Utils.Round(trajectory.weedCover, 1) or nil
         result.pestPressure = trajectory.pestPressure and Utils.Round(trajectory.pestPressure, 1) or nil
         result.growthPenaltyHours = Utils.Round(
-            math.max(0, tonumber(data.growthPenaltyHours) or 0) + trajectory.growthPenaltyHoursDelta,
+            Utils.Clamp(
+                (tonumber(data.growthPenaltyHours) or 0) + trajectory.growthPenaltyHoursDelta,
+                -hours * 0.15,
+                hours
+            ),
             4
         )
         result.waterStressAccumulated = Utils.Round(Utils.Clamp(
@@ -150,10 +154,18 @@ function Physiology.Evaluate(record, now)
         result.overfertilizeExcess = trajectory.enabled.nutrients
             and Utils.Round(Utils.Clamp(tonumber(data.overfertilizeExcess) or 0, 0, 100), 2)
             or nil
+        result.waterProtectionStrength = trajectory.waterProtectionStrength
+        result.waterProtectionUntil = trajectory.waterProtectionUntil
+        result.waterProtectionTier = trajectory.waterProtectionTier
+        result.waterProtectionItem = trajectory.waterProtectionItem
         result.nutrientProtectionStrength = trajectory.nutrientProtectionStrength
         result.nutrientProtectionUntil = trajectory.nutrientProtectionUntil
         result.nutrientProtectionTier = trajectory.nutrientProtectionTier
         result.nutrientProtectionItem = trajectory.nutrientProtectionItem
+        result.weedProtectionStrength = trajectory.weedProtectionStrength
+        result.weedProtectionUntil = trajectory.weedProtectionUntil
+        result.weedProtectionTier = trajectory.weedProtectionTier
+        result.weedProtectionItem = trajectory.weedProtectionItem
         result.pestProtectionStrength = trajectory.pestProtectionStrength
         result.pestProtectionUntil = trajectory.pestProtectionUntil
         result.pestProtectionTier = trajectory.pestProtectionTier

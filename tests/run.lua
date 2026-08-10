@@ -204,7 +204,7 @@ test('advanced condition gating respects global and per-crop ceilings', function
     Config.Features.AdvancedCare = enabled
 end)
 
-test('inspection builds real history forecast timing and disabled conditions', function()
+test('inspection builds authoritative history and disabled conditions', function()
     local enabled = Config.Features.AdvancedCare
     local pests = Config.Farming.ConditionEffects.Pests
     Config.Features.AdvancedCare = true
@@ -213,17 +213,29 @@ test('inspection builds real history forecast timing and disabled conditions', f
         planted_at = 1000, growth_time = 900, state = Sonar.Constants.CROP_STATE.GROWING,
         isMine = true,
         data = { lastCare = 1000, water = 44, health = 92, nutrients = 62, weedCover = 38,
-            pestPressure = 12, nutrientProtectionTier = 'plus', nutrientProtectionUntil = 1900 },
+            pestPressure = 12, plantingQuality = 20,
+            waterProtectionTier = 'basic', waterProtectionUntil = 1700,
+            nutrientProtectionTier = 'plus', nutrientProtectionUntil = 1900,
+            weedProtectionTier = 'pro', weedProtectionUntil = 1800 },
     }
     local payload = Sonar.Inspection.Build(record, 1600)
     equal(payload.version, 1, 'inspection contract version')
     equal(payload.series.historyStart, 1000, 'history starts at last care')
     equal(payload.series.now, 1600, 'series marks server now')
-    equal(payload.series.forecastEnd, 2200, 'forecast uses configured horizon')
-    equal(#payload.series.samples, 41, 'thirty-second history and forecast samples')
+    equal(payload.series.forecastEnd, 1600, 'compatibility boundary ends at current time')
+    equal(#payload.series.samples, 51, 'adaptive samples cover only reliable history and now')
+    for _, point in ipairs(payload.series.samples) do
+        assert(point.phase == 'history' or point.phase == 'now', 'inspection must not invent forecast samples')
+        assert(point.at <= payload.series.now, 'inspection samples cannot be in the future')
+    end
     equal(payload.subject.stage, 'Root development', 'data-driven stage label')
     assert(payload.timing.readyAt and payload.timing.readyAt > 1600, 'stress-aware ETA resolved')
+    equal(payload.metrics[1].protectionTier, 'basic', 'water protection tier exposed')
     equal(payload.metrics[2].protectionTier, 'plus', 'protection tier exposed')
+    equal(payload.metrics[3].protectionTier, 'pro', 'weed protection tier exposed')
+    equal(payload.metrics[2].thresholds[1].value, 42, 'nutrient minimum comes from crop config')
+    equal(payload.metrics[2].thresholds[2].value, 82, 'nutrient maximum comes from crop config')
+    assert(payload.outcome.quality < 80, 'estimated quality includes poor authoritative planting score')
 
     Config.Farming.ConditionEffects.Pests = false
     local withoutPests = Sonar.Inspection.Build(record, 1600, { includeSeries = false })
@@ -231,6 +243,67 @@ test('inspection builds real history forecast timing and disabled conditions', f
     equal(withoutPests.metrics[4].status, 'unaffected', 'disabled condition is labelled unaffected')
     equal(withoutPests.series, nil, 'lightweight refresh omits series')
     Config.Farming.ConditionEffects.Pests = pests
+    Config.Features.AdvancedCare = enabled
+end)
+
+test('optimal green zone accelerates growth by fifteen percent', function()
+    local enabled = Config.Features.AdvancedCare
+    local crop = Config.Crops.carrot
+    local waterRate = crop.water.decayPerHour
+    local nutrientRate = crop.nutrients.decayPerHour
+    local weedRate = crop.weeds.growthPerHour
+    local pestRate = Config.Farming.AdvancedCare.PestGrowthPerHour
+    Config.Features.AdvancedCare = true
+    crop.water.decayPerHour = 0
+    crop.nutrients.decayPerHour = 0
+    crop.weeds.growthPerHour = 0
+    Config.Farming.AdvancedCare.PestGrowthPerHour = 0
+
+    local record = {
+        crop_type = 'carrot', planted_at = 1000, growth_time = 3600,
+        data = { water = 100, health = 100, nutrients = 62, weedCover = 0,
+            pestPressure = 0, growthPenaltyHours = 0, lastCare = 1000 },
+    }
+    local condition = Physiology.Evaluate(record, 2800)
+    assert(math.abs(condition.growthPenaltyHours - (-0.075)) < 0.0001,
+        'green-zone bonus must persist as a signed growth adjustment')
+    assert(math.abs(condition.progress - 0.575) < 0.0001,
+        'thirty minutes in green zone must advance 34.5 biological minutes')
+
+    crop.water.decayPerHour = waterRate
+    crop.nutrients.decayPerHour = nutrientRate
+    crop.weeds.growthPerHour = weedRate
+    Config.Farming.AdvancedCare.PestGrowthPerHour = pestRate
+    Config.Features.AdvancedCare = enabled
+end)
+
+test('water protection delays drought and health loss across its expiry', function()
+    local enabled = Config.Features.AdvancedCare
+    local effects = Config.Crops.lettuce.conditionEffects
+    Config.Features.AdvancedCare = true
+    Config.Crops.lettuce.conditionEffects = { nutrients = false, weeds = false, pests = false }
+    local base = {
+        crop_type = 'lettuce', planted_at = 1000, growth_time = 7200,
+        data = { water = 100, health = 100, nutrients = 70, weedCover = 0,
+            pestPressure = 0, lastCare = 1000 },
+    }
+    local protected = {
+        crop_type = base.crop_type, planted_at = base.planted_at, growth_time = base.growth_time,
+        data = {
+            water = 100, health = 100, nutrients = 70, weedCover = 0, pestPressure = 0,
+            lastCare = 1000, waterProtectionStrength = 0.75,
+            waterProtectionUntil = 1900, waterProtectionTier = 'pro',
+        },
+    }
+    local ordinaryResult = Physiology.Evaluate(base, 2800)
+    local protectedResult = Physiology.Evaluate(protected, 2800)
+    assert(protectedResult.water > ordinaryResult.water,
+        'water protection must reduce decay during its active segment')
+    assert(protectedResult.health > ordinaryResult.health,
+        'protected time must delay drought health damage after protection expires')
+    equal(protectedResult.waterProtectionTier, 'pro', 'protection metadata survives evaluation')
+    equal(protectedResult.waterProtectionUntil, 1900, 'protection expiry survives evaluation')
+    Config.Crops.lettuce.conditionEffects = effects
     Config.Features.AdvancedCare = enabled
 end)
 
@@ -263,6 +336,16 @@ test('inspection callback accepts only crop identity and revalidates authority',
     assert(source:find('Validation.Distance(source', 1, true), 'server distance validation')
     assert(source:find('Sync.RenderPayload(record, runtime.identifier)', 1, true), 'minimal synchronized snapshot')
     assert(not source:find('request.coords', 1, true), 'client coordinates are never trusted')
+
+    local syncFile = assert(io.open('server/modules/sync/subscriptions.lua', 'rb'))
+    local syncSource = syncFile:read('*a')
+    syncFile:close()
+    assert(syncSource:find('payload.plantingQuality = data.plantingQuality or data.plantScore', 1, true),
+        'authoritative planting quality reaches inspection prediction')
+    assert(syncSource:find('payload.waterProtectionUntil = data.waterProtectionUntil', 1, true),
+        'water protection reaches client evaluator')
+    assert(syncSource:find('payload.weedProtectionUntil = data.weedProtectionUntil', 1, true),
+        'weed protection reaches client evaluator')
 end)
 
 test('advanced trajectories are causal and old records stay compatible', function()
@@ -284,8 +367,8 @@ test('advanced trajectories are causal and old records stay compatible', functio
         crop_type = 'carrot', planted_at = 1000, growth_time = 7200,
         data = { water = 100, nutrients = 100, weedCover = 70, pestPressure = 0, lastCare = 1000 },
     }
-    local cleanResult = Sonar.Conditions.Evaluate(clean, 4600)
-    local weedyResult = Sonar.Conditions.Evaluate(weedy, 4600)
+    local cleanResult = Sonar.Conditions.Evaluate(clean, 1600)
+    local weedyResult = Sonar.Conditions.Evaluate(weedy, 1600)
     assert(weedyResult.water < cleanResult.water, 'weeds accelerate water loss')
     assert(weedyResult.nutrients < cleanResult.nutrients, 'weeds accelerate nutrient loss')
     assert(weedyResult.pestPressure > cleanResult.pestPressure, 'weeds accelerate pest pressure')

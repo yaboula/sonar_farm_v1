@@ -117,6 +117,11 @@ function Sync.RenderPayload(record, identifier)
     if Sonar.Conditions.IsAdvancedCareEnabled() then
         payload.growthPenaltyHours = data.growthPenaltyHours
         payload.waterStressAccumulated = data.waterStressAccumulated
+        payload.plantingQuality = data.plantingQuality or data.plantScore
+        payload.waterProtectionStrength = data.waterProtectionStrength
+        payload.waterProtectionUntil = data.waterProtectionUntil
+        payload.waterProtectionTier = data.waterProtectionTier
+        payload.waterProtectionItem = data.waterProtectionItem
         if Sonar.Conditions.IsEnabled(record, 'nutrients') then
             payload.nutrients = data.nutrients
             payload.nutrientStressAccumulated = data.nutrientStressAccumulated
@@ -128,6 +133,10 @@ function Sync.RenderPayload(record, identifier)
         end
         if Sonar.Conditions.IsEnabled(record, 'weeds') then
             payload.weedCover = data.weedCover
+            payload.weedProtectionStrength = data.weedProtectionStrength
+            payload.weedProtectionUntil = data.weedProtectionUntil
+            payload.weedProtectionTier = data.weedProtectionTier
+            payload.weedProtectionItem = data.weedProtectionItem
         end
         if Sonar.Conditions.IsEnabled(record, 'pests') then
             payload.pestPressure = data.pestPressure

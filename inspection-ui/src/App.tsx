@@ -1,7 +1,7 @@
 import { Bug, ChartBar, Clock, Drop, Leaf, Plant, ShieldCheck, Star } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { cropImages } from "./cropImages";
-import { MetricChart } from "./MetricChart";
+import { curveTone, MetricChart } from "./MetricChart";
 import type { InspectionMessage, InspectionMetric, InspectionPayloadV1, MetricKey } from "./types";
 
 const ICONS: Record<MetricKey, typeof Drop> = { water: Drop, nutrients: Leaf, weeds: Plant, pests: Bug };
@@ -11,7 +11,8 @@ const FIELD_GUIDES = [
   { key: "nutrients", headline: "KEEP NUTRIENTS BALANCED", detail: "Below optimal minimum is risk. Above maximum causes overfertilize damage." },
   { key: "weeds", headline: "WEEDS DRAIN WATER AND NUTRIENTS", detail: "Below 30% is safe. Above 60% demands immediate action." },
   { key: "pests", headline: "PESTS REDUCE FINAL PRODUCTION", detail: "Below 30% is safe. Above 60% will cause significant harvest loss." },
-  { key: "protection", headline: "PROTECTION ENDS AT ITS MARKER", detail: "Residual care only works while its timer is active." },
+  { key: "protection", headline: "PROTECTION ENDS WITH ITS TIMER", detail: "Residual care only works while the metric timer is active." },
+  { key: "history", headline: "CURVES SHOW RECORDED CROP HISTORY", detail: "Each line ends at NOW and contains no invented future projection." },
 ] as const;
 
 // Quality tier → CSS variable name for colour
@@ -48,16 +49,17 @@ function Stat({ label, value, tone }: { label: string; value: number; tone: "gro
 
 function Metric({ metric, payload }: { metric: InspectionMetric; payload: InspectionPayloadV1 }) {
   const Icon = ICONS[metric.key];
+  const tone = curveTone(metric);
   const series = payload.series;
-  // MetricChart uses the reliable window start (lastCare) not plantedAt
+  // History begins at the newest reliable persisted baseline.
   const windowStart = series?.windowStart ?? series?.historyStart ?? payload.timing.lastCareAt;
   const protection = metric.protectionUntil && metric.protectionUntil > payload.timing.serverNow
     ? `${metric.protectionTier?.toUpperCase() ?? "ACTIVE"} · ${duration(metric.protectionUntil - payload.timing.serverNow)}`
     : undefined;
-  return <section className={`metric metric--${metric.key}`} data-status={metric.status}>
+  return <section className={`metric metric--${metric.key}`} data-status={metric.status} data-tone={tone}>
     <header><Icon size={18} weight="regular" /><span>{metric.label}</span></header>
     <div className="metric-reading"><strong>{Math.round(metric.value)}%</strong><em>{metric.status}</em></div>
-    {series ? <MetricChart metric={metric} samples={series.samples} plantedAt={windowStart} now={series.now} lastCareAt={payload.timing.lastCareAt} /> : null}
+    {series ? <MetricChart metric={metric} samples={series.samples} historyStart={windowStart} now={series.now} lastCareAt={payload.timing.lastCareAt} /> : null}
     {protection ? <small><ShieldCheck size={12} />{protection}</small> : <small>{metric.enabled ? "LIVE CONDITION" : "NO CROP EFFECT"}</small>}
   </section>;
 }

@@ -28,7 +28,7 @@ Config.Features.AdvancedCare = true
 Config.Inspection.CloseDistance = 4.0
 ```
 
-No cambies los 10 minutos de historial/forecast para la aceptación final. Para
+No cambies la ventana máxima de 10 minutos de historial para la aceptación final. Para
 probar una expiración rápidamente sí puedes reducir temporalmente la duración de
 una protección en el catálogo de un entorno de pruebas.
 
@@ -53,10 +53,9 @@ En un tomate en crecimiento confirma:
 - Crop, fase data-driven y slot correctos.
 - Growth y Health coinciden con la inspección/estado autoritativo.
 - Water, Nutrients, Weeds y Pests tienen valor, estado y curva.
-- Línea sólida antes de NOW y discontinua después de NOW.
-- `LAST CARE`, hora del servidor, ETA/hora de maduración y
-  `NO CARE FORECAST` visibles.
-- Diagnóstico causal y recomendación informativa sin botón ni chevron.
+- Línea histórica sólida que termina exactamente en NOW, sin proyección futura.
+- `LAST CARE`, hora del servidor y ETA/hora de maduración visibles.
+- Field Guide rotativa, informativa y sin botón ni chevron.
 - La barra empieza después del minimapa y termina dentro del safe-zone.
 
 Repite con Carrot, Potato y Lettuce. Si desactivas Weeds o Pests para uno en
@@ -81,9 +80,8 @@ mayor `strength × horas restantes`.
 
 1. Aplica una protección corta en el entorno de prueba.
 2. Mantén el HUD abierto antes, durante y después del vencimiento.
-3. El marcador de expiración debe quedar en la curva cuando esté dentro de la
-   ventana.
-4. Al cruzarlo, desaparece el tiempo restante y solo el tramo posterior usa la
+3. El tiempo restante debe mostrarse debajo de la métrica correspondiente.
+4. Al cruzarlo, desaparece el tiempo restante y el historial posterior refleja la
    trayectoria sin protección.
 5. Confirma que estrés o daño histórico no se reduce al expirar/reaplicar.
 

@@ -223,21 +223,29 @@ local CARE_ICON = {
     treat_pest = 'bug',
 }
 
+local function protectionMinutes(effect)
+    return math.max(0, math.floor((tonumber(effect.protectionHours) or 0) * 60 + 0.5))
+end
+
 local function careDescription(action, option)
     local effect = option.effect or {}
+    local minutes = protectionMinutes(effect)
     if action == ACTIONS.WATER then
-        return ('%s tier | %d uses remaining'):format(option.tier, option.usesRemaining or 0)
+        return ('%s tier | +%d water%s | %d uses remaining'):format(option.tier,
+            effect.amount or 100, minutes > 0 and (' | %dm retention'):format(minutes) or '',
+            option.usesRemaining or 0)
     elseif action == ACTIONS.WEED then
-        return ('%s tier | removes %d%% | %d uses remaining')
-            :format(option.tier, effect.weedRemoval or 0, option.usesRemaining or 0)
+        return ('%s tier | removes %d%%%s | %d uses remaining')
+            :format(option.tier, effect.weedRemoval or 0,
+                minutes > 0 and (' | %dm resistance'):format(minutes) or '', option.usesRemaining or 0)
     elseif action == ACTIONS.FERTILIZE then
-        return ('%s tier | +%d nutrients | %d%% retention for %dh | %d available')
+        return ('%s tier | +%d nutrients | %d%% retention for %dm | %d available')
             :format(option.tier, effect.amount or 0, math.floor((effect.protectionStrength or 0) * 100),
-                effect.protectionHours or 0, option.count or 0)
+                minutes, option.count or 0)
     end
-    return ('%s tier | -%d pressure | %d%% suppression for %dh | %d available')
+    return ('%s tier | -%d pressure | %d%% suppression for %dm | %d available')
         :format(option.tier, effect.reduction or 0, math.floor((effect.protectionStrength or 0) * 100),
-            effect.protectionHours or 0, option.count or 0)
+            minutes, option.count or 0)
 end
 
 function Actions.OpenCareMenu(action, cropId)

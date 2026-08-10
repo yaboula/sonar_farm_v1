@@ -65,9 +65,13 @@ function Growth.Evaluate(record, now)
     if Sonar.Conditions and Sonar.Conditions.IsAdvancedCareEnabled() then
         local data = record.data or {}
         local pending = Sonar.Conditions.Evaluate(record, now)
-        local penaltyHours = math.max(0, tonumber(data.growthPenaltyHours) or 0)
-            + math.max(0, tonumber(pending.growthPenaltyHoursDelta) or 0)
-        effectiveElapsed = math.max(0, elapsed - penaltyHours * 3600)
+        local elapsedHours = elapsed / 3600
+        local adjustmentHours = Sonar.Utils.Clamp(
+            (tonumber(data.growthPenaltyHours) or 0) + (tonumber(pending.growthPenaltyHoursDelta) or 0),
+            -elapsedHours * 0.15,
+            elapsedHours
+        )
+        effectiveElapsed = math.max(0, elapsed - adjustmentHours * 3600)
     end
     local growthTime = record.growth_time or 0
 

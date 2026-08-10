@@ -31,6 +31,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y e
   Field Guide pasiva de seis lecciones agronómicas que rota sin tráfico adicional.
 - Las curvas ahora comunican el estado autoritativo mediante tonos semánticos:
   riesgo, vigilancia, correcto y un gris neutro para condiciones no afectadas.
+- El chart de inspección queda definido como historial autoritativo hasta NOW,
+  sin proyección visual; conserva la evaluación futura únicamente para diagnóstico.
+- Corregidos el bonus Green Zone, la retención hídrica, los timers de protección,
+  los umbrales por cultivo y la estimación de calidad con planting score real.
 
 ## [0.3.0] - 2026-08-09
 

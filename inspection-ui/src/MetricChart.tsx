@@ -7,13 +7,11 @@ const COLORS = {
   unaffected: "#74796f",
 } as const;
 
-export function curveTone(status: InspectionMetric["status"]) {
+export function curveTone(metric: Pick<InspectionMetric, "key" | "status">) {
+  const { key, status } = metric;
   if (status === "unaffected") return "unaffected" as const;
-  // good states — stable (water/nutrients in range) or low (weeds/pests low)
-  if (status === "stable" || status === "low") return "good" as const;
-  // watch states — elevated means weeds/pests 31-60%
-  if (status === "elevated") return "watch" as const;
-  // risk states: critical, high (overfertilize), severe
+  if (status === "stable" || (status === "low" && (key === "weeds" || key === "pests"))) return "good" as const;
+  if (status === "low" || status === "elevated") return "watch" as const;
   return "risk" as const;
 }
 
@@ -59,11 +57,10 @@ function minuteLabel(seconds: number) {
   return m === 0 ? "0m" : `${m}m`;
 }
 
-export function MetricChart({ metric, samples, plantedAt, now, lastCareAt }: {
+export function MetricChart({ metric, samples, historyStart, now, lastCareAt }: {
   metric: InspectionMetric;
   samples: InspectionSample[];
-  /** Unix seconds when the crop was planted — left edge of graph */
-  plantedAt: number;
+  historyStart: number;
   now: number;
   lastCareAt: number;
 }) {
@@ -73,9 +70,8 @@ export function MetricChart({ metric, samples, plantedAt, now, lastCareAt }: {
   const labelH = 10;
   const totalH = H + labelH;
 
-  // X axis spans full lifetime: plantedAt → now
-  const lifespan = Math.max(1, now - plantedAt);
-  const xFor = (unix: number) => ((unix - plantedAt) / lifespan) * W;
+  const historySeconds = Math.max(1, now - historyStart);
+  const xFor = (unix: number) => ((unix - historyStart) / historySeconds) * W;
 
   // Y axis is always fixed 0-100% so all metrics are comparable
   const yFor = (value: number) => H - (Math.max(0, Math.min(100, value)) / 100) * (H - 6) - 3;
@@ -90,43 +86,21 @@ export function MetricChart({ metric, samples, plantedAt, now, lastCareAt }: {
   const nowX = xFor(now);
   const currentY = current ? yFor(Math.max(0, Math.min(100, current[metric.key]))) : H / 2;
 
-  // Care marker — only if after planted and before now
-  const careX = lastCareAt > plantedAt && lastCareAt <= now ? xFor(lastCareAt) : undefined;
-  // Protection marker
-  const protectionX = metric.protectionUntil && metric.protectionUntil > now && metric.protectionUntil < now + 3600
-    ? xFor(metric.protectionUntil)
-    : undefined;
+  const careX = lastCareAt > historyStart && lastCareAt <= now ? xFor(lastCareAt) : undefined;
 
   const historyPath = historyPoints.length > 1 ? monotonePath(historyPoints) : "";
   const historyArea = historyPath && historyPoints.length > 1
     ? `${historyPath} L ${historyPoints[historyPoints.length - 1].x.toFixed(2)} ${H} L ${historyPoints[0].x.toFixed(2)} ${H} Z`
     : "";
 
-  const tone = curveTone(metric.status);
+  const tone = curveTone(metric);
   const color = COLORS[tone];
 
-  // Threshold reference lines: varies per metric
-  const thresholds: { y: number; label: string; color: string }[] = [];
-  if (metric.enabled) {
-    if (metric.key === "water") {
-      // risk < 30, watch 30-60
-      thresholds.push({ y: yFor(30), label: "30%", color: COLORS.risk });
-      thresholds.push({ y: yFor(60), label: "60%", color: COLORS.watch });
-    } else if (metric.key === "nutrients") {
-      // warn zones at optMin/optMax — we use generic 30/75 to match config
-      thresholds.push({ y: yFor(30), label: "30%", color: COLORS.risk });
-      thresholds.push({ y: yFor(75), label: "75%", color: COLORS.risk });
-    } else {
-      // weeds / pests: 30 watch threshold, 60 risk threshold
-      thresholds.push({ y: yFor(30), label: "30%", color: COLORS.watch });
-      thresholds.push({ y: yFor(60), label: "60%", color: COLORS.risk });
-    }
-  }
+  const thresholds = metric.enabled ? (metric.thresholds ?? []) : [];
 
-  // Time labels on X axis: 0m (planted), halfway, now
-  const halfX = xFor(plantedAt + lifespan * 0.5);
-  const halfLabel = minuteLabel(lifespan * 0.5);
-  const nowLabel = minuteLabel(lifespan);
+  const halfX = xFor(historyStart + historySeconds * 0.5);
+  const halfLabel = minuteLabel(historySeconds * 0.5);
+  const startLabel = minuteLabel(historySeconds);
 
   return (
     <svg
@@ -134,16 +108,16 @@ export function MetricChart({ metric, samples, plantedAt, now, lastCareAt }: {
       data-tone={tone}
       viewBox={`0 0 ${W} ${totalH}`}
       role="img"
-      aria-label={`${metric.label} full lifespan trend`}
+      aria-label={`${metric.label} historical trend`}
     >
-      <title>{`${metric.label}: 0% to 100% Y-axis, planted-to-now X-axis`}</title>
+      <title>{`${metric.label}: authoritative history ending at the current value`}</title>
 
       {/* Threshold guide lines */}
       {thresholds.map((t, i) => (
         <line
           key={i}
-          x1="0" y1={t.y} x2={W} y2={t.y}
-          stroke={t.color}
+          x1="0" y1={yFor(t.value)} x2={W} y2={yFor(t.value)}
+          stroke={COLORS[t.tone]}
           strokeWidth="0.6"
           strokeDasharray="3 3"
           opacity="0.45"
@@ -161,11 +135,6 @@ export function MetricChart({ metric, samples, plantedAt, now, lastCareAt }: {
       {/* Now / current time */}
       <line className="chart-now" x1={nowX} y1="0" x2={nowX} y2={H} />
 
-      {/* Protection ends marker */}
-      {protectionX !== undefined && (
-        <line className="chart-protection" x1={protectionX} y1="0" x2={protectionX} y2={H} />
-      )}
-
       {/* History area fill + curve */}
       {historyArea && <path className="chart-area" d={historyArea} fill={color} />}
       {historyPath && <path className="chart-glow" d={historyPath} fill="none" stroke={color} />}
@@ -176,9 +145,9 @@ export function MetricChart({ metric, samples, plantedAt, now, lastCareAt }: {
       <circle cx={nowX} cy={currentY} r="4" fill="#11140f" stroke={color} strokeWidth="2.2" />
 
       {/* X-axis time labels */}
-      <text x="2" y={totalH - 1} fontSize="6" fill="#8a9280" opacity="0.7">0m</text>
-      <text x={halfX} y={totalH - 1} fontSize="6" fill="#8a9280" opacity="0.7" textAnchor="middle">{halfLabel}</text>
-      <text x={W - 2} y={totalH - 1} fontSize="6" fill="#8a9280" opacity="0.7" textAnchor="end">{nowLabel}</text>
+      <text x="2" y={totalH - 1} fontSize="6" fill="#8a9280" opacity="0.7">-{startLabel}</text>
+      <text x={halfX} y={totalH - 1} fontSize="6" fill="#8a9280" opacity="0.7" textAnchor="middle">-{halfLabel}</text>
+      <text x={W - 2} y={totalH - 1} fontSize="6" fill="#8a9280" opacity="0.7" textAnchor="end">NOW</text>
     </svg>
   );
 }

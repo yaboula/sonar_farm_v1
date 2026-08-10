@@ -14,13 +14,22 @@ end
 
 local function lineEffect(item)
     local effect = item.tool or item.consumable or {}
-    if item.tool and effect.action == 'weed' then return ('Removes %d%% weeds · %d uses'):format(effect.weedRemoval, effect.uses) end
+    local minutes = math.max(0, math.floor((tonumber(effect.protectionHours) or 0) * 60 + 0.5))
+    local strength = math.floor((tonumber(effect.protectionStrength) or 0) * 100 + 0.5)
+    if item.tool and effect.action == 'weed' then
+        return ('Removes %d%% weeds%s · %d uses'):format(effect.weedRemoval,
+            minutes > 0 and (' · %dm resistance'):format(minutes) or '', effect.uses)
+    end
+    if item.tool and effect.action == 'water' then
+        return ('+%d water%s · %d uses'):format(effect.amount or 100,
+            minutes > 0 and (' · %dm retention'):format(minutes) or '', effect.uses)
+    end
     if item.tool then return ('%d field uses'):format(effect.uses) end
     if effect.action == 'fertilize' then
-        return ('+%d nutrients · %d%% retention for %dh'):format(effect.amount, effect.protectionStrength * 100, effect.protectionHours)
+        return ('+%d nutrients · %d%% retention for %dm'):format(effect.amount, strength, minutes)
     end
     if effect.action == 'treat_pest' then
-        return ('-%d pest pressure · %d%% suppression for %dh'):format(effect.reduction, effect.protectionStrength * 100, effect.protectionHours)
+        return ('-%d pest pressure · %d%% suppression for %dm'):format(effect.reduction, strength, minutes)
     end
     return item.description
 end

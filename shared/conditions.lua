@@ -86,10 +86,15 @@ local function criticalFactor(record, fromTime, toTime, pendingPenaltyHours)
     -- clock time. Persisted and pending slowdown therefore shift the window
     -- together with the crop instead of letting stress amplification expire
     -- before a delayed crop actually reaches that stage.
-    local persistedPenalty = math.max(0, tonumber(record.data and record.data.growthPenaltyHours) or 0) * 3600
-    local pendingPenalty = math.max(0, tonumber(pendingPenaltyHours) or 0) * 3600
-    local effectiveFrom = math.max(0, fromTime - plantedAt - persistedPenalty)
-    local effectiveTo = math.max(effectiveFrom, toTime - plantedAt - persistedPenalty - pendingPenalty)
+    local elapsedFrom = math.max(0, fromTime - plantedAt)
+    local persistedAdjustment = Utils.Clamp(
+        tonumber(record.data and record.data.growthPenaltyHours) or 0,
+        -(elapsedFrom / 3600) * 0.15,
+        elapsedFrom / 3600
+    ) * 3600
+    local pendingAdjustment = tonumber(pendingPenaltyHours) or 0
+    local effectiveFrom = math.max(0, fromTime - plantedAt - persistedAdjustment)
+    local effectiveTo = math.max(effectiveFrom, toTime - plantedAt - persistedAdjustment - pendingAdjustment * 3600)
     local criticalFrom = growthTime * window.from
     local criticalTo = growthTime * window.to
     local effectiveDistance = effectiveTo - effectiveFrom
@@ -166,8 +171,7 @@ function Conditions.Evaluate(record, now)
         waterSegments,
         tonumber(cfg.WaterDeficitThreshold) or 35
     )
-    local hoursUntilDry = waterDecay > 0 and waterStart / waterDecay or math.huge
-    local waterDryHours = math.max(0, hours - hoursUntilDry)
+    local _, waterDryHours = evaluateDecay(waterStart, waterDecay, waterSegments, 0)
 
     local nutrientStart = nutrientsEnabled and Utils.Clamp(tonumber(data.nutrients) or 100, 0, 100) or nil
     local nutrientParams = def.nutrients or {}
@@ -228,7 +232,7 @@ function Conditions.Evaluate(record, now)
     -- Subtract optimal growth bonus from raw penalty (can speed up growth)
     local netGrowthPenaltyDelta = rawGrowthPenalty - optimalBonusHoursDelta
     local growthPenalty = Utils.Clamp(netGrowthPenaltyDelta, -hours * 0.15, hours)
-    local stressFactor = criticalFactor(record, lastCare, now, math.max(0, growthPenalty))
+    local stressFactor = criticalFactor(record, lastCare, now, growthPenalty)
     local weightedWaterDeficit = waterDeficitHours * stressFactor
     local weightedNutrientDeficit = nutrientDeficitHours * stressFactor
     local pestDamageDelta = pestsEnabled
@@ -247,10 +251,18 @@ function Conditions.Evaluate(record, now)
         nutrientDeficitHours = nutrientDeficitHours,
         weedCover = weedCover,
         pestPressure = pestPressure,
+        waterProtectionStrength = waterProtectionStrength,
+        waterProtectionUntil = waterProtectionUntil,
+        waterProtectionTier = data.waterProtectionTier,
+        waterProtectionItem = data.waterProtectionItem,
         nutrientProtectionStrength = nutrientProtectionStrength,
         nutrientProtectionUntil = nutrientProtectionUntil,
         nutrientProtectionTier = data.nutrientProtectionTier,
         nutrientProtectionItem = data.nutrientProtectionItem,
+        weedProtectionStrength = weedProtectionStrength,
+        weedProtectionUntil = weedProtectionUntil,
+        weedProtectionTier = data.weedProtectionTier,
+        weedProtectionItem = data.weedProtectionItem,
         pestProtectionStrength = pestProtectionStrength,
         pestProtectionUntil = pestProtectionUntil,
         pestProtectionTier = data.pestProtectionTier,

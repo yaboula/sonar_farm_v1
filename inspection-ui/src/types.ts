@@ -8,6 +8,7 @@ export type InspectionMetric = {
   status: "unaffected" | "stable" | "low" | "elevated" | "severe" | "critical" | "high";
   protectionTier?: string;
   protectionUntil?: number;
+  thresholds?: Array<{ value: number; label: string; tone: "risk" | "watch" | "good" }>;
 };
 
 export type InspectionSample = {

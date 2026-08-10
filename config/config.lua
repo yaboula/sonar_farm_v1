@@ -77,6 +77,7 @@ Config.Features = {
 
 Config.Inspection = {
     HistorySeconds = 10 * 60,
+    -- Diagnostic comparison horizon only. It never produces chart samples.
     ForecastSeconds = 10 * 60,
     SampleSeconds = 30,
     CurveRefreshSeconds = 5,

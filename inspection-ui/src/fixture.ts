@@ -6,7 +6,7 @@ export function inspectionFixture(now = Math.floor(Date.now() / 1000)): Inspecti
   const addSample = (offset: number) => {
     samples.push({
       at: now + offset,
-      phase: offset < 0 ? "history" : offset === 0 ? "now" : "forecast",
+      phase: offset < 0 ? "history" : "now",
       progress: 68 + offset / 600 * 5,
       health: 84 - Math.max(0, offset) / 600 * 2,
       water: 42 - offset / 600 * 7,
@@ -16,7 +16,7 @@ export function inspectionFixture(now = Math.floor(Date.now() / 1000)): Inspecti
     });
   };
   addSample(-historySeconds);
-  for (let offset = -240; offset <= 600; offset += 30) {
+  for (let offset = -240; offset <= 0; offset += 30) {
     addSample(offset);
   }
   return {
@@ -27,10 +27,10 @@ export function inspectionFixture(now = Math.floor(Date.now() / 1000)): Inspecti
     health: 84,
     spoilage: 0,
     metrics: [
-      { key: "water", label: "Water", value: 42, enabled: true, status: "low" },
-      { key: "nutrients", label: "Nutrients", value: 61, enabled: true, status: "stable", protectionTier: "plus", protectionUntil: now + 343 },
-      { key: "weeds", label: "Weeds", value: 38, enabled: true, status: "elevated" },
-      { key: "pests", label: "Pests", value: 12, enabled: true, status: "low" },
+      { key: "water", label: "Water", value: 42, enabled: true, status: "low", thresholds: [{ value: 30, label: "Risk", tone: "risk" }, { value: 60, label: "Good", tone: "good" }] },
+      { key: "nutrients", label: "Nutrients", value: 61, enabled: true, status: "stable", protectionTier: "plus", protectionUntil: now + 343, thresholds: [{ value: 52, label: "Minimum", tone: "good" }, { value: 78, label: "Maximum", tone: "risk" }] },
+      { key: "weeds", label: "Weeds", value: 38, enabled: true, status: "elevated", thresholds: [{ value: 30, label: "Watch", tone: "watch" }, { value: 60, label: "Risk", tone: "risk" }] },
+      { key: "pests", label: "Pests", value: 12, enabled: true, status: "low", thresholds: [{ value: 30, label: "Watch", tone: "watch" }, { value: 60, label: "Risk", tone: "risk" }] },
     ],
     series: { plantedAt: now - 1440, lastCare: now - 252, windowStart: now - 252, windowLen: 252, historyStart: now - 252, now, forecastEnd: now, samples },
     diagnosis: { cause: "weeds", severity: 38, headline: "WEEDS → FASTER WATER LOSS", recommendation: "REMOVE WEEDS" },

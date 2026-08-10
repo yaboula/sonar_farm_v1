@@ -26,6 +26,10 @@ function Physiology.Apply(record, now)
     if Sonar.Conditions.IsAdvancedCareEnabled() then
         dataPatch.growthPenaltyHours = condition.growthPenaltyHours
         dataPatch.waterStressAccumulated = condition.waterStressAccumulated
+        dataPatch.waterProtectionStrength = condition.waterProtectionStrength
+        dataPatch.waterProtectionUntil = condition.waterProtectionUntil
+        dataPatch.waterProtectionTier = condition.waterProtectionTier
+        dataPatch.waterProtectionItem = condition.waterProtectionItem
         if Sonar.Conditions.IsEnabled(record, 'nutrients') then
             dataPatch.nutrients = condition.nutrients
             dataPatch.nutrientStressAccumulated = condition.nutrientStressAccumulated
@@ -37,6 +41,10 @@ function Physiology.Apply(record, now)
         end
         if Sonar.Conditions.IsEnabled(record, 'weeds') then
             dataPatch.weedCover = condition.weedCover
+            dataPatch.weedProtectionStrength = condition.weedProtectionStrength
+            dataPatch.weedProtectionUntil = condition.weedProtectionUntil
+            dataPatch.weedProtectionTier = condition.weedProtectionTier
+            dataPatch.weedProtectionItem = condition.weedProtectionItem
         end
         if Sonar.Conditions.IsEnabled(record, 'pests') then
             dataPatch.pestPressure = condition.pestPressure
