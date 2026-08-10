@@ -12,6 +12,10 @@
   --risk: #e46f3f;
   --watch: #efb72c;
   --good: #79a84d;
+  /* Aliased for JS access via style vars */
+  --c-risk: #e46f3f;
+  --c-watch: #efb72c;
+  --c-good: #79a84d;
 }
 
 * { box-sizing: border-box; }
@@ -171,6 +175,43 @@ body { user-select: none; }
 .curve-legend span[data-tone="watch"] { color: var(--watch); }
 .curve-legend span[data-tone="good"] { color: var(--good); }
 
+/* ------------------------------------------------------------------ outcome in footer */
+.footer-outcomes {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  pointer-events: none;
+}
+.footer-outcome {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+}
+.footer-outcome small {
+  color: #b0b4aa !important;
+  font: 700 10px/1 "Barlow Condensed", sans-serif !important;
+  letter-spacing: .08em !important;
+}
+.footer-outcome strong {
+  color: inherit !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+}
+.footer-outcome em {
+  font: 700 10px/1 "Barlow Condensed", sans-serif;
+  margin-left: 2px;
+  letter-spacing: 0.06em;
+  opacity: 0.95;
+  color: inherit;
+}
+
 .inspection-rail footer {
   position: absolute;
   left: 0;
@@ -194,7 +235,7 @@ body { user-select: none; }
 .inspection-rail footer { height: 34px; gap: 16px; padding: 0 12px; }
 .inspection-rail footer .footer-time { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
 .inspection-rail footer .footer-time--care { margin-right: auto; align-items: center; }
-.inspection-rail footer .footer-time small { color: #858980; font: 600 10px/1 "Barlow Condensed", sans-serif; letter-spacing: .07em; }
+.inspection-rail footer .footer-time small { color: #858980 !important; font: 600 10px/1 "Barlow Condensed", sans-serif; letter-spacing: .07em; }
 .inspection-rail footer .footer-time strong { color: #d5d2c8; font: 700 13px/1 "Barlow Condensed", sans-serif; letter-spacing: .035em; }
 .inspection-rail footer .footer-time--ready strong { color: #f0ede3; }
 .inspection-rail footer .footer-time--forecast strong { color: #aeb1a7; }

@@ -26,6 +26,7 @@ export type InspectionPayloadV1 = {
   subject: { id: string; crop: string; label: string; stage: string; slot: string; state: string; isMine: boolean };
   timing: {
     serverNow: number;
+    plantedAt: number;
     lastCareAt: number;
     readyAt?: number;
     readyInSeconds?: number;
@@ -36,7 +37,26 @@ export type InspectionPayloadV1 = {
   health: number;
   spoilage: number;
   metrics: InspectionMetric[];
-  series?: { historyStart: number; now: number; forecastEnd: number; samples: InspectionSample[] };
+  series?: {
+    plantedAt: number;
+    lastCare: number;
+    windowStart: number;
+    windowLen: number;
+    historyStart: number;
+    now: number;
+    forecastEnd: number;
+    samples: InspectionSample[];
+  };
+  outcome?: {
+    quality: number;
+    qualityTier: string;
+    qualityLabel: string;
+    production: number;
+    dominantDefect?: string;
+    waterStress: number;
+    nutrientStress: number;
+    pestDamage: number;
+  };
   diagnosis: { cause: string; severity: number; headline: string; recommendation: string };
   layout?: { leftInset: number; rightInset: number };
 };

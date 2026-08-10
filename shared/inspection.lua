@@ -50,30 +50,26 @@ local function stageLabel(record, condition)
     return stage and stage.label or (condition.progress >= 1 and 'Harvest ready' or 'Growing')
 end
 
-local function statusFor(record, key, current, future, enabled)
+local function statusFor(record, key, current, enabled)
     if not enabled then return 'unaffected' end
-    local advanced = Config.Farming.AdvancedCare or {}
-    local severe = tonumber(config().SevereConditionPercent) or 50
     if key == 'water' then
-        local threshold = tonumber(advanced.WaterDeficitThreshold) or 35
-        if current <= threshold then return 'critical' end
-        if future <= threshold then return 'low' end
+        -- 0-30 risk, 31-60 watch, 61-100 good
+        if current <= 30 then return 'critical' end
+        if current <= 60 then return 'low' end
         return 'stable'
     end
     if key == 'nutrients' then
+        -- 0-30 risk, 31-75 good, 76-100 risk (overfertilize)
         local params = definition(record).nutrients or {}
-        local minimum = tonumber(params.optimalMin) or 40
-        local maximum = tonumber(params.optimalMax) or 85
+        local minimum = tonumber(params.optimalMin) or 30
+        local maximum = tonumber(params.optimalMax) or 75
         if current > maximum then return 'high' end
         if current < minimum then return 'critical' end
-        if future < minimum then return 'low' end
         return 'stable'
     end
-    local minimum = key == 'weeds'
-        and (tonumber(advanced.MinimumWeedCover) or 8)
-        or (tonumber(advanced.MinimumPestPressure) or 8)
-    if current >= severe then return 'severe' end
-    if current >= minimum then return 'elevated' end
+    -- weeds and pests: 0-30 good, 31-60 watch, 61-100 risk
+    if current >= 61 then return 'severe' end
+    if current >= 31 then return 'elevated' end
     return 'low'
 end
 
@@ -90,21 +86,28 @@ local function sample(record, at)
     return result, condition
 end
 
+local MIN_WINDOW_SECONDS = 300  -- minimum graph width (5 min) so the chart is never empty after care
+
 local function seriesFor(record, now)
     local cfg = config()
-    local historySeconds = math.max(0, tonumber(cfg.HistorySeconds) or 600)
-    local forecastSeconds = math.max(0, tonumber(cfg.ForecastSeconds) or 600)
-    local step = math.max(5, tonumber(cfg.SampleSeconds) or 30)
     local data = record.data or {}
-    local historyStart = math.max(
-        tonumber(record.planted_at) or now,
-        tonumber(data.lastCare) or tonumber(record.planted_at) or now,
-        now - historySeconds
-    )
-    local forecastEnd = now + forecastSeconds
-    local samples = {}
+    local plantedAt = tonumber(record.planted_at) or now
+    -- The reliable simulation window starts at lastCare: Physiology.Evaluate only
+    -- produces accurate values from that point forward. Sampling before lastCare
+    -- always returns the same flat value (hours clamped to 0), so we never go
+    -- further back than lastCare.
+    local lastCare = tonumber(data.lastCare) or plantedAt
+    local windowStart = math.min(lastCare, now - MIN_WINDOW_SECONDS)
+    -- Never go before planting
+    windowStart = math.max(windowStart, plantedAt)
+    local windowLen = math.max(1, now - windowStart)
 
-    local at = historyStart
+    -- Adaptive step: ~50 samples across the window, clamped 5-120 s.
+    local targetSamples = tonumber(cfg.TargetSamples) or 50
+    local step = math.max(5, math.min(120, math.floor(windowLen / targetSamples)))
+
+    local samples = {}
+    local at = windowStart
     while at < now do
         local point = sample(record, at)
         point.phase = 'history'
@@ -114,24 +117,67 @@ local function seriesFor(record, now)
     local current = sample(record, now)
     current.phase = 'now'
     samples[#samples + 1] = current
-    at = now + step
-    while at < forecastEnd do
-        local point = sample(record, at)
-        point.phase = 'forecast'
-        samples[#samples + 1] = point
-        at = at + step
-    end
-    if forecastEnd > now then
-        local final = sample(record, forecastEnd)
-        final.phase = 'forecast'
-        samples[#samples + 1] = final
-    end
 
     return {
-        historyStart = historyStart,
-        now = now,
-        forecastEnd = forecastEnd,
-        samples = samples,
+        plantedAt    = plantedAt,
+        lastCare     = lastCare,
+        windowStart  = windowStart,
+        windowLen    = windowLen,
+        historyStart = windowStart,
+        now          = now,
+        forecastEnd  = now,
+        samples      = samples,
+    }
+end
+
+
+-- ---------------------------------------------------------------------------
+-- Projected quality and production (shared, mirrors Quality.Resolve / Quality.ResolveProduction)
+-- These are estimates visible to the player NOW, not the authoritative harvest values.
+-- ---------------------------------------------------------------------------
+local function projectOutcome(current)
+    if not Sonar.Conditions.IsAdvancedCareEnabled() then
+        return nil
+    end
+    local cfg = Config.Quality or {}
+    local health     = tonumber(current.health) or 100
+    local spoilage   = tonumber(current.spoilage) or 0
+    local defaultScore = tonumber(cfg.DefaultScore) or 75
+
+    -- Mirror Quality.Resolve using the default score (real score replaces this at harvest)
+    local quality = defaultScore * (tonumber(cfg.ScoreWeight) or 0.6)
+                  + health      * (tonumber(cfg.CareWeight)  or 0.4)
+    quality = quality * (1 - Utils.Clamp(spoilage / 100, 0, 1))
+
+    local waterDefect    = tonumber(current.waterStressAccumulated)   or 0
+    local nutrientDefect = (tonumber(current.nutrientStressAccumulated) or 0)
+                         + (tonumber(current.overfertilizeExcess)       or 0)
+    local pestDefect     = tonumber(current.pestDamageAccumulated)     or 0
+    local defectScore    = Utils.Clamp(math.max(waterDefect, nutrientDefect, pestDefect), 0, 100)
+    quality = quality * (1 - defectScore / 100 * Utils.Clamp(tonumber(cfg.DefectWeight) or 0, 0, 1))
+    quality = Utils.Round(Utils.Clamp(quality, 0, 100), 1)
+
+    -- Mirror Quality.ResolveProduction
+    local weights       = cfg.ProductionWeights or {}
+    local nutrientStress = tonumber(current.nutrientStressAccumulated) or 0
+    local pestDamage    = tonumber(current.pestDamageAccumulated)     or 0
+    local production    = 100
+                        - nutrientStress * (tonumber(weights.nutrientStress) or 0)
+                        - pestDamage     * (tonumber(weights.pestDamage)     or 0)
+    production = Utils.Round(Utils.Clamp(production, 0, 100), 1)
+
+    local tier = Utils.QualityTier(quality)
+    local dominant = Sonar.Conditions.DominantDefect(current)
+
+    return {
+        quality         = quality,
+        qualityTier     = tier.key,
+        qualityLabel    = tier.label,
+        production      = production,
+        dominantDefect  = dominant ~= 'none' and dominant or nil,
+        waterStress     = Utils.Round(waterDefect,    1),
+        nutrientStress  = Utils.Round(nutrientDefect, 1),
+        pestDamage      = Utils.Round(pestDefect,     1),
     }
 end
 
@@ -276,7 +322,7 @@ function Inspection.Build(record, now, options)
                 or key:sub(1, 1):upper() .. key:sub(2),
             value = Utils.Round(currentValue, 1),
             enabled = enabled,
-            status = statusFor(record, key, currentValue, futureValue, enabled),
+            status = statusFor(record, key, currentValue, enabled),
         }
         if key == 'nutrients' then
             metric.protectionTier = current.nutrientProtectionTier
@@ -301,6 +347,7 @@ function Inspection.Build(record, now, options)
         },
         timing = {
             serverNow = now,
+            plantedAt = tonumber(record.planted_at) or now,
             lastCareAt = tonumber(record.data and record.data.lastCare) or tonumber(record.planted_at) or now,
             readyAt = matureAt,
             readyInSeconds = matureAt and math.max(0, matureAt - now) or nil,
@@ -312,6 +359,7 @@ function Inspection.Build(record, now, options)
         spoilage = Utils.Round(current.spoilage or 0, 1),
         metrics = metrics,
         diagnosis = diagnosis(record, now, current, future),
+        outcome = projectOutcome(current),
     }
     if options.includeSeries ~= false then payload.series = seriesFor(record, now) end
     return payload

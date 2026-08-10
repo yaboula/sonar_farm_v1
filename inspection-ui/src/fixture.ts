@@ -22,7 +22,7 @@ export function inspectionFixture(now = Math.floor(Date.now() / 1000)): Inspecti
   return {
     version: 1,
     subject: { id: "fixture-07-b", crop: "tomato", label: "Tomato", stage: "Flowering", slot: "east_field · 7", state: "growing", isMine: true },
-    timing: { serverNow: now, lastCareAt: now - 252, readyAt: now + 504, readyInSeconds: 504, forecastSeconds: 600 },
+    timing: { serverNow: now, plantedAt: now - 1440, lastCareAt: now - 252, readyAt: now + 504, readyInSeconds: 504, forecastSeconds: 600 },
     growth: 68,
     health: 84,
     spoilage: 0,
@@ -32,8 +32,9 @@ export function inspectionFixture(now = Math.floor(Date.now() / 1000)): Inspecti
       { key: "weeds", label: "Weeds", value: 38, enabled: true, status: "elevated" },
       { key: "pests", label: "Pests", value: 12, enabled: true, status: "low" },
     ],
-    series: { historyStart: now - historySeconds, now, forecastEnd: now + 600, samples },
+    series: { plantedAt: now - 1440, lastCare: now - 252, windowStart: now - 252, windowLen: 252, historyStart: now - 252, now, forecastEnd: now, samples },
     diagnosis: { cause: "weeds", severity: 38, headline: "WEEDS → FASTER WATER LOSS", recommendation: "REMOVE WEEDS" },
+    outcome: { quality: 71, qualityTier: "fine", qualityLabel: "Fine", production: 85, dominantDefect: undefined, waterStress: 8, nutrientStress: 14, pestDamage: 2 },
     layout: { leftInset: 335, rightInset: 18 },
   };
 }

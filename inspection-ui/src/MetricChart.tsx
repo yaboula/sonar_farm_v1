@@ -9,8 +9,11 @@ const COLORS = {
 
 export function curveTone(status: InspectionMetric["status"]) {
   if (status === "unaffected") return "unaffected" as const;
-  if (status === "stable") return "good" as const;
-  if (status === "low" || status === "elevated") return "watch" as const;
+  // good states — stable (water/nutrients in range) or low (weeds/pests low)
+  if (status === "stable" || status === "low") return "good" as const;
+  // watch states — elevated means weeds/pests 31-60%
+  if (status === "elevated") return "watch" as const;
+  // risk states: critical, high (overfertilize), severe
   return "risk" as const;
 }
 
@@ -29,11 +32,7 @@ function monotonePath(points: Point[]) {
     return (slopes[index - 1] + slopes[index]) / 2;
   });
   slopes.forEach((slope, index) => {
-    if (slope === 0) {
-      tangents[index] = 0;
-      tangents[index + 1] = 0;
-      return;
-    }
+    if (slope === 0) { tangents[index] = 0; tangents[index + 1] = 0; return; }
     const a = tangents[index] / slope;
     const b = tangents[index + 1] / slope;
     const magnitude = Math.hypot(a, b);
@@ -55,64 +54,131 @@ function monotonePath(points: Point[]) {
   return path;
 }
 
-export function MetricChart({ metric, samples, start, now, end, lastCareAt }: {
+function minuteLabel(seconds: number) {
+  const m = Math.round(seconds / 60);
+  return m === 0 ? "0m" : `${m}m`;
+}
+
+export function MetricChart({ metric, samples, plantedAt, now, lastCareAt }: {
   metric: InspectionMetric;
   samples: InspectionSample[];
-  start: number;
+  /** Unix seconds when the crop was planted — left edge of graph */
+  plantedAt: number;
   now: number;
-  end: number;
   lastCareAt: number;
 }) {
-  const width = 180;
-  const height = 40;
-  const duration = Math.max(1, end - start);
-  const values = samples.map((sample) => Math.max(0, Math.min(100, sample[metric.key])));
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
-  const center = (rawMin + rawMax) * 0.5;
-  const desiredSpan = Math.min(100, Math.max(18, rawMax - rawMin + 8));
-  let domainMin = metric.enabled ? center - desiredSpan * 0.5 : 0;
-  let domainMax = metric.enabled ? center + desiredSpan * 0.5 : 100;
-  if (domainMin < 0) { domainMax -= domainMin; domainMin = 0; }
-  if (domainMax > 100) { domainMin -= domainMax - 100; domainMax = 100; }
-  domainMin = Math.max(0, domainMin);
-  const domainSpan = Math.max(1, domainMax - domainMin);
-  const yFor = (value: number) => height - ((value - domainMin) / domainSpan) * (height - 8) - 4;
-  const points = (items: InspectionSample[]) => items.map((sample) => ({
-    x: ((sample.at - start) / duration) * width,
-    y: yFor(Math.max(0, Math.min(100, sample[metric.key]))),
+  const W = 180;
+  const H = 44;
+  // Extra bottom margin for time labels
+  const labelH = 10;
+  const totalH = H + labelH;
+
+  // X axis spans full lifetime: plantedAt → now
+  const lifespan = Math.max(1, now - plantedAt);
+  const xFor = (unix: number) => ((unix - plantedAt) / lifespan) * W;
+
+  // Y axis is always fixed 0-100% so all metrics are comparable
+  const yFor = (value: number) => H - (Math.max(0, Math.min(100, value)) / 100) * (H - 6) - 3;
+
+  const historySamples = samples.filter((s) => s.phase !== "forecast");
+  const historyPoints: Point[] = historySamples.map((s) => ({
+    x: xFor(s.at),
+    y: yFor(Math.max(0, Math.min(100, s[metric.key]))),
   }));
-  const current = samples.find((sample) => sample.phase === "now") ?? samples[0];
-  const history = points(samples.filter((sample) => sample.phase !== "forecast"));
-  const forecast = points(current ? [current, ...samples.filter((sample) => sample.phase === "forecast")] : []);
-  const nowX = ((now - start) / duration) * width;
-  const currentY = current ? yFor(Math.max(0, Math.min(100, current[metric.key]))) : height / 2;
-  const protectionX = metric.protectionUntil && metric.protectionUntil > now && metric.protectionUntil < end
-    ? ((metric.protectionUntil - start) / duration) * width
+
+  const current = samples.find((s) => s.phase === "now") ?? samples[samples.length - 1];
+  const nowX = xFor(now);
+  const currentY = current ? yFor(Math.max(0, Math.min(100, current[metric.key]))) : H / 2;
+
+  // Care marker — only if after planted and before now
+  const careX = lastCareAt > plantedAt && lastCareAt <= now ? xFor(lastCareAt) : undefined;
+  // Protection marker
+  const protectionX = metric.protectionUntil && metric.protectionUntil > now && metric.protectionUntil < now + 3600
+    ? xFor(metric.protectionUntil)
     : undefined;
-  const tone = curveTone(metric.status);
-  const color = COLORS[tone];
-  const careX = lastCareAt >= start && lastCareAt <= now
-    ? ((lastCareAt - start) / duration) * width
-    : undefined;
-  const historyPath = history.length > 1 ? monotonePath(history) : "";
-  const forecastPath = forecast.length > 1 ? monotonePath(forecast) : "";
-  const historyArea = historyPath
-    ? `${historyPath} L ${history[history.length - 1].x.toFixed(2)} ${height} L ${history[0].x.toFixed(2)} ${height} Z`
+
+  const historyPath = historyPoints.length > 1 ? monotonePath(historyPoints) : "";
+  const historyArea = historyPath && historyPoints.length > 1
+    ? `${historyPath} L ${historyPoints[historyPoints.length - 1].x.toFixed(2)} ${H} L ${historyPoints[0].x.toFixed(2)} ${H} Z`
     : "";
 
-  return <svg className="metric-chart" data-tone={tone} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${metric.label} trend`}>
-    <title>{`${metric.label}: solid history, current marker, dashed no-care forecast`}</title>
-    <line className="chart-baseline" x1="0" y1={height - 1} x2={width} y2={height - 1} />
-    {careX !== undefined ? <line className="chart-care" x1={careX} y1="0" x2={careX} y2={height} /> : null}
-    <line className="chart-now" x1={nowX} y1="0" x2={nowX} y2={height} />
-    {protectionX !== undefined ? <line className="chart-protection" x1={protectionX} y1="0" x2={protectionX} y2={height} /> : null}
-    {historyArea ? <path className="chart-area" d={historyArea} fill={color} /> : null}
-    {historyPath ? <path className="chart-glow" d={historyPath} fill="none" stroke={color} /> : null}
-    {historyPath ? <path className="chart-history" d={historyPath} fill="none" stroke={color} /> : null}
-    {forecastPath ? <path className="chart-glow chart-glow--forecast" d={forecastPath} fill="none" stroke={color} /> : null}
-    {forecastPath ? <path className="chart-forecast" d={forecastPath} fill="none" stroke={color} /> : null}
-    <circle className="chart-marker-glow" cx={nowX} cy={currentY} r="6" fill={color} />
-    <circle cx={nowX} cy={currentY} r="4" fill="#11140f" stroke={color} strokeWidth="2.2" />
-  </svg>;
+  const tone = curveTone(metric.status);
+  const color = COLORS[tone];
+
+  // Threshold reference lines: varies per metric
+  const thresholds: { y: number; label: string; color: string }[] = [];
+  if (metric.enabled) {
+    if (metric.key === "water") {
+      // risk < 30, watch 30-60
+      thresholds.push({ y: yFor(30), label: "30%", color: COLORS.risk });
+      thresholds.push({ y: yFor(60), label: "60%", color: COLORS.watch });
+    } else if (metric.key === "nutrients") {
+      // warn zones at optMin/optMax — we use generic 30/75 to match config
+      thresholds.push({ y: yFor(30), label: "30%", color: COLORS.risk });
+      thresholds.push({ y: yFor(75), label: "75%", color: COLORS.risk });
+    } else {
+      // weeds / pests: 30 watch threshold, 60 risk threshold
+      thresholds.push({ y: yFor(30), label: "30%", color: COLORS.watch });
+      thresholds.push({ y: yFor(60), label: "60%", color: COLORS.risk });
+    }
+  }
+
+  // Time labels on X axis: 0m (planted), halfway, now
+  const halfX = xFor(plantedAt + lifespan * 0.5);
+  const halfLabel = minuteLabel(lifespan * 0.5);
+  const nowLabel = minuteLabel(lifespan);
+
+  return (
+    <svg
+      className="metric-chart"
+      data-tone={tone}
+      viewBox={`0 0 ${W} ${totalH}`}
+      role="img"
+      aria-label={`${metric.label} full lifespan trend`}
+    >
+      <title>{`${metric.label}: 0% to 100% Y-axis, planted-to-now X-axis`}</title>
+
+      {/* Threshold guide lines */}
+      {thresholds.map((t, i) => (
+        <line
+          key={i}
+          x1="0" y1={t.y} x2={W} y2={t.y}
+          stroke={t.color}
+          strokeWidth="0.6"
+          strokeDasharray="3 3"
+          opacity="0.45"
+        />
+      ))}
+
+      {/* Baseline */}
+      <line className="chart-baseline" x1="0" y1={H - 1} x2={W} y2={H - 1} />
+
+      {/* Care event marker */}
+      {careX !== undefined && (
+        <line className="chart-care" x1={careX} y1="0" x2={careX} y2={H} />
+      )}
+
+      {/* Now / current time */}
+      <line className="chart-now" x1={nowX} y1="0" x2={nowX} y2={H} />
+
+      {/* Protection ends marker */}
+      {protectionX !== undefined && (
+        <line className="chart-protection" x1={protectionX} y1="0" x2={protectionX} y2={H} />
+      )}
+
+      {/* History area fill + curve */}
+      {historyArea && <path className="chart-area" d={historyArea} fill={color} />}
+      {historyPath && <path className="chart-glow" d={historyPath} fill="none" stroke={color} />}
+      {historyPath && <path className="chart-history" d={historyPath} fill="none" stroke={color} />}
+
+      {/* Current value dot */}
+      <circle className="chart-marker-glow" cx={nowX} cy={currentY} r="6" fill={color} />
+      <circle cx={nowX} cy={currentY} r="4" fill="#11140f" stroke={color} strokeWidth="2.2" />
+
+      {/* X-axis time labels */}
+      <text x="2" y={totalH - 1} fontSize="6" fill="#8a9280" opacity="0.7">0m</text>
+      <text x={halfX} y={totalH - 1} fontSize="6" fill="#8a9280" opacity="0.7" textAnchor="middle">{halfLabel}</text>
+      <text x={W - 2} y={totalH - 1} fontSize="6" fill="#8a9280" opacity="0.7" textAnchor="end">{nowLabel}</text>
+    </svg>
+  );
 }

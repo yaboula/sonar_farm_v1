@@ -55,7 +55,15 @@ function Bridge.Inventory.GetSlot(source, slot)
 end
 
 function Bridge.Inventory.SetDurability(source, slot, durability)
-    return ox:SetDurability(source, slot, durability) and true or false
+    if ox:SetDurability(source, slot, durability) then return true end
+    local current = ox:GetSlot(source, slot)
+    if current then
+        local meta = current.metadata or {}
+        meta.durability = durability
+        ox:SetMetadata(source, slot, meta)
+        return true
+    end
+    return false
 end
 
 --- Count how many of `item` a player holds (optionally matching metadata).

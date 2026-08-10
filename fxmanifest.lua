@@ -18,6 +18,7 @@ dependencies {
 
 shared_scripts {
     '@ox_lib/init.lua',
+    '@prism_uipack/lib_override.lua',
     -- Configuration must load first: everything else reads from `Config`.
     'config/config.lua',
     'config/crops.lua',

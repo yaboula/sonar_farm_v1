@@ -1,4 +1,4 @@
-import { Bug, Clock, Drop, Leaf, Plant, ShieldCheck } from "@phosphor-icons/react";
+import { Bug, ChartBar, Clock, Drop, Leaf, Plant, ShieldCheck, Star } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { cropImages } from "./cropImages";
 import { MetricChart } from "./MetricChart";
@@ -7,13 +7,20 @@ import type { InspectionMessage, InspectionMetric, InspectionPayloadV1, MetricKe
 const ICONS: Record<MetricKey, typeof Drop> = { water: Drop, nutrients: Leaf, weeds: Plant, pests: Bug };
 
 const FIELD_GUIDES = [
-  { key: "water", headline: "LOW WATER SLOWS GROWTH", detail: "Water stress delays maturity and weakens the crop." },
-  { key: "nutrients", headline: "KEEP NUTRIENTS BALANCED", detail: "Deficit and excess both create avoidable stress." },
-  { key: "weeds", headline: "WEEDS DRAIN WATER AND NUTRIENTS", detail: "Competition increases resource loss around the crop." },
-  { key: "pests", headline: "PESTS REDUCE FINAL PRODUCTION", detail: "Untreated pressure lowers the eventual harvest." },
+  { key: "water", headline: "LOW WATER SLOWS GROWTH", detail: "0–30% is risk. Keep above 60% for healthy development." },
+  { key: "nutrients", headline: "KEEP NUTRIENTS BALANCED", detail: "Below optimal minimum is risk. Above maximum causes overfertilize damage." },
+  { key: "weeds", headline: "WEEDS DRAIN WATER AND NUTRIENTS", detail: "Below 30% is safe. Above 60% demands immediate action." },
+  { key: "pests", headline: "PESTS REDUCE FINAL PRODUCTION", detail: "Below 30% is safe. Above 60% will cause significant harvest loss." },
   { key: "protection", headline: "PROTECTION ENDS AT ITS MARKER", detail: "Residual care only works while its timer is active." },
-  { key: "forecast", headline: "DASHED CURVES ASSUME NO CARE", detail: "They project the next ten minutes without intervention." },
 ] as const;
+
+// Quality tier → CSS variable name for colour
+const TIER_TONE: Record<string, string> = {
+  poor: "var(--c-risk)",
+  standard: "var(--c-watch)",
+  fine: "var(--c-good)",
+  premium: "#9de8b0",
+};
 
 function orderedGuides(cause: string) {
   const normalized = cause.toLowerCase();
@@ -42,13 +49,15 @@ function Stat({ label, value, tone }: { label: string; value: number; tone: "gro
 function Metric({ metric, payload }: { metric: InspectionMetric; payload: InspectionPayloadV1 }) {
   const Icon = ICONS[metric.key];
   const series = payload.series;
+  // MetricChart uses the reliable window start (lastCare) not plantedAt
+  const windowStart = series?.windowStart ?? series?.historyStart ?? payload.timing.lastCareAt;
   const protection = metric.protectionUntil && metric.protectionUntil > payload.timing.serverNow
     ? `${metric.protectionTier?.toUpperCase() ?? "ACTIVE"} · ${duration(metric.protectionUntil - payload.timing.serverNow)}`
     : undefined;
   return <section className={`metric metric--${metric.key}`} data-status={metric.status}>
     <header><Icon size={18} weight="regular" /><span>{metric.label}</span></header>
     <div className="metric-reading"><strong>{Math.round(metric.value)}%</strong><em>{metric.status}</em></div>
-    {series ? <MetricChart metric={metric} samples={series.samples} start={series.historyStart} now={series.now} end={series.forecastEnd} lastCareAt={payload.timing.lastCareAt} /> : null}
+    {series ? <MetricChart metric={metric} samples={series.samples} plantedAt={windowStart} now={series.now} lastCareAt={payload.timing.lastCareAt} /> : null}
     {protection ? <small><ShieldCheck size={12} />{protection}</small> : <small>{metric.enabled ? "LIVE CONDITION" : "NO CROP EFFECT"}</small>}
   </section>;
 }
@@ -111,9 +120,23 @@ export function App() {
 
       <footer>
         <span className="footer-time footer-time--care"><Clock size={15} /><small>LAST CARE</small><strong>{duration(historySeconds)} AGO</strong></span>
+        {payload.outcome && (
+          <div className="footer-outcomes">
+            <span className="footer-time footer-outcome" style={{ color: TIER_TONE[payload.outcome.qualityTier] ?? "var(--c-watch)" }}>
+              <Star size={13} weight="fill" />
+              <small>EST. QUALITY</small>
+              <strong>{Math.round(payload.outcome.quality)}%</strong>
+              <em>{payload.outcome.qualityLabel.toUpperCase()}</em>
+            </span>
+            <span className="footer-time footer-outcome" style={{ color: payload.outcome.production >= 80 ? "var(--c-good)" : payload.outcome.production >= 50 ? "var(--c-watch)" : "var(--c-risk)" }}>
+              <ChartBar size={13} weight="fill" />
+              <small>EST. YIELD</small>
+              <strong>{Math.round(payload.outcome.production)}%</strong>
+            </span>
+          </div>
+        )}
         <span className="footer-time"><small>NOW</small><strong>{clock(payload.timing.serverNow)}</strong></span>
         <span className="footer-time footer-time--ready"><small>MATURITY</small><strong>{timeCopy}</strong></span>
-        <span className="footer-time footer-time--forecast"><small>WINDOW</small><strong>+{duration(payload.timing.forecastSeconds)} · NO CARE FORECAST</strong></span>
         <kbd>BACKSPACE</kbd><span>CLOSE</span>
       </footer>
     </article>

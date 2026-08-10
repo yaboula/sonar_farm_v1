@@ -132,6 +132,7 @@ end
 ---@param zoneKey string
 ---@param slotIndex number
 function Actions.Plant(cropType, zoneKey, slotIndex)
+    if Inspection and Inspection.IsActive() then Inspection.Close('action') end
     local def = Config.Crops and Config.Crops[cropType]
     if not def then
         return Bridge.Notify(MESSAGES[REJECT.UNKNOWN_CROP], NOTIFY.ERROR)
@@ -240,6 +241,7 @@ local function careDescription(action, option)
 end
 
 function Actions.OpenCareMenu(action, cropId)
+    if Inspection and Inspection.IsActive() then Inspection.Close('action') end
     local execute = CARE_ACTION[action]
     if not execute or not cropId then return end
     local response = lib.callback.await(CALLBACKS.CARE_OPTIONS, false, { cropId = cropId, action = action })
@@ -265,6 +267,7 @@ end
 --- Harvest a crop.
 ---@param cropId string
 function Actions.Harvest(cropId)
+    if Inspection and Inspection.IsActive() then Inspection.Close('action') end
     if not cropId then return end
 
     if not placeholderProgress('Harvesting...', 'harvest') then
@@ -294,6 +297,7 @@ end
 ---@param zoneKey string
 ---@param slotIndex number
 function Actions.OpenPlantMenu(zoneKey, slotIndex)
+    if Inspection and Inspection.IsActive() then Inspection.Close('action') end
     if Crops.IsSlotOccupied(zoneKey, slotIndex) then
         return Bridge.Notify(MESSAGES[REJECT.SLOT_OCCUPIED], NOTIFY.ERROR)
     end

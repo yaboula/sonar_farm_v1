@@ -64,10 +64,10 @@ Config.Locale = 'en'
 -- Toggle whole subsystems without touching code. Useful for staged rollout.
 -- ---------------------------------------------------------------------------
 Config.Features = {
-    Minigames = true,      -- Stage 5: authoritative tomato planting enabled
-    AdvancedCare = false,  -- Causal nutrients/weeds/pests model; opt-in rollout
+    Minigames = false,      -- Stage 5: authoritative tomato planting enabled
+    AdvancedCare = true,  -- Causal nutrients/weeds/pests model; opt-in rollout
     InspectionHud = true,  -- Focus-free authoritative crop inspection rail
-    Supplies = false,      -- Authoritative Company procurement and Warehouse
+    Supplies = true,      -- Authoritative Company procurement and Warehouse
     Machinery = false,     -- Stage 9+: not implemented
     Progression = false,   -- Stage 7: not implemented
     Economy = false,       -- Stage 8: not implemented
@@ -174,7 +174,7 @@ Config.Farming = {
         WeedWaterCompetition = 0.65,
         WeedNutrientCompetition = 0.8,
         PestWeedAcceleration = 1.0,
-        PestGrowthPerHour = 18,
+        PestGrowthPerHour = 200,
         PestDamagePerHour = 16,
         NutrientHealthLossPerHour = 8,
         GrowthPenaltyPerDeficitHour = {
