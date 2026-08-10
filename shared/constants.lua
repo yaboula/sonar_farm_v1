@@ -91,8 +91,6 @@ Constants.EVENTS = {
     CROP_REMOVE = 'sonar_farm:cropRemove',
     SYNC_RESET = 'sonar_farm:syncReset',
     RUNTIME_READY = 'sonar_farm:runtimeReady',
-    -- Presentation-only: nearby clients play action PTFX/sounds. Not authoritative.
-    ACTION_FX = 'sonar_farm:actionFx',
 }
 
 -- Public server events other resources can listen to (platform API).

@@ -78,8 +78,6 @@ server_scripts {
     'server/modules/farming/care.lua',
     'server/modules/farming/cultivation.lua',
     'server/modules/farming/harvest.lua',
-    -- Presentation relay: listens to public crop events after handlers load.
-    'server/modules/farming/action_fx.lua',
     'server/modules/debug/commands.lua',
     'server/main.lua',
 }
@@ -91,7 +89,6 @@ client_scripts {
     'client/modules/render/crops.lua',
     'client/modules/render/target.lua',
     -- Actions before sync/slots: those bind to Actions on select.
-    'client/modules/interaction/action_fx.lua',
     'client/modules/interaction/actions.lua',
     'client/modules/minigames/controller.lua',
     'client/modules/hub/controller.lua',
