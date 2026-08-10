@@ -134,8 +134,12 @@ local function createReservation(source, runtime, cropType, zoneKey, slotIndex, 
     local slot = Validation.Slot(source, zoneKey, slotIndex, cropType)
     if not slot.ok then return nil, slot.reason end
 
-    local limit = Validation.CropLimit(source)
-    if not limit.ok then return nil, limit.reason end
+    local fieldAccess = Fields.ResolvePlantAccess(source, cropType, zoneKey, slotIndex)
+    if not fieldAccess.ok then return nil, fieldAccess.reason end
+    if fieldAccess.legacy then
+        local limit = Validation.CropLimit(source)
+        if not limit.ok then return nil, limit.reason end
+    end
 
     local def = Config.Crops and Config.Crops[cropType]
     if not def then return nil, REJECT.UNKNOWN_CROP end
@@ -147,9 +151,18 @@ local function createReservation(source, runtime, cropType, zoneKey, slotIndex, 
         local recheck = Validation.Slot(source, zoneKey, slotIndex, cropType)
         if not recheck.ok then return { reason = recheck.reason } end
 
+        local cropData = Sonar.CropClock.NewData(cropType, {
+            water = 0, health = 100, spoilage = 0, lastCare = Sonar.Time.Now(),
+        })
+        if not fieldAccess.legacy then
+            cropData.fieldId, cropData.topologyRevision = fieldAccess.field.id, fieldAccess.field.revisionId
+            cropData.rowId, cropData.slotId = fieldAccess.slot.rowId, fieldAccess.slot.id
+            cropData.companyId, cropData.planId = fieldAccess.companyId, fieldAccess.planId
+            cropData.workType, cropData.workId, cropData.plantedBy = fieldAccess.work.kind, fieldAccess.work.id, runtime.identifier
+        end
         local cropId, record = State.Add({
             crop_type = cropType,
-            owner = runtime.identifier,
+            owner = fieldAccess.legacy and runtime.identifier or fieldAccess.companyId,
             zone = zoneKey,
             slot = slotIndex,
             pos_x = recheck.slot.x,
@@ -159,12 +172,7 @@ local function createReservation(source, runtime, cropType, zoneKey, slotIndex, 
             planted_at = Sonar.Time.Now(),
             growth_time = def.growthTime,
             state = CROP_STATE.PLANTING,
-            data = Sonar.CropClock.NewData(cropType, {
-                water = 0,
-                health = 100,
-                spoilage = 0,
-                lastCare = Sonar.Time.Now(),
-            }),
+            data = cropData,
         })
         if not cropId then return { reason = REJECT.INTERNAL_ERROR } end
         return { record = record }
@@ -196,7 +204,8 @@ local function createReservation(source, runtime, cropType, zoneKey, slotIndex, 
 end
 
 local function restoreSession(source, runtime, record, cfg)
-    if record.owner ~= runtime.identifier then return nil, REJECT.NOT_OWNER end
+    local data = record.data or {}
+    if record.owner ~= runtime.identifier and data.plantedBy ~= runtime.identifier then return nil, REJECT.NOT_OWNER end
     if record.state ~= CROP_STATE.PLANTING and record.state ~= CROP_STATE.PLANTING_FAILED then
         return nil, REJECT.PLANTING_NOT_FAILED
     end
@@ -236,6 +245,8 @@ local function commit(session)
     local seedCheck = Validation.GetSeedItem(session.source, def)
     if not seedCheck.ok then return nil, seedCheck.reason end
     local seedItem = seedCheck.item
+    local fieldAccess = Fields.ResolveCropAccess(session.source, record, Sonar.Constants.ACTIONS.PLANT)
+    if not fieldAccess.ok then return nil, fieldAccess.reason end
 
     local penalty = math.min(
         session.interruptions * (session.config.interruptionPenalty or 0),
@@ -284,6 +295,10 @@ local function commit(session)
         return nil, REJECT.INTERNAL_ERROR
     end
     local updated = State.Get(record.id)
+    if not Fields.RecordOperation(session.source, updated, Sonar.Constants.ACTIONS.PLANT, fieldAccess,
+        { itemId = seedItem, score = final.score, minigame = true }) then
+        return nil, REJECT.INTERNAL_ERROR
+    end
     Sync.OnCropChanged(updated)
 
     TriggerEvent(PUBLIC.CROP_PLANTED, {
@@ -458,7 +473,10 @@ lib.callback.register(CALLBACKS.MINIGAME_CLEAR_INCOMPLETE, function(source, payl
     local cropId = type(payload.cropId) == 'string' and payload.cropId or ''
     local record = State.Get(cropId)
     if not record then return { ok = true } end
-    if record.owner ~= runtime.identifier then return reject(REJECT.NOT_OWNER) end
+    local data = record.data or {}
+    if record.owner ~= runtime.identifier and data.plantedBy ~= runtime.identifier then
+        return reject(REJECT.NOT_OWNER)
+    end
     if record.state ~= CROP_STATE.PLANTING_FAILED then return reject(REJECT.PLANTING_NOT_FAILED) end
     local distance = Validation.Distance(source, vec3(record.pos_x, record.pos_y, record.pos_z))
     if not distance.ok then return reject(distance.reason) end

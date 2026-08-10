@@ -5,7 +5,7 @@ lua54 'yes'
 name 'sonar_farm'
 author 'Sonar'
 description 'Scalable, server-authoritative farming platform for FiveM (QB-Core + ox).'
-version '0.3.0'
+version '0.4.0'
 repository 'https://github.com/yaboula/sonar_farm_v1.git'
 
 -- Hard dependencies. The Bridge auto-detects the framework at runtime.
@@ -24,6 +24,7 @@ shared_scripts {
     'config/crops.lua',
     'config/zones.lua',
     'config/minigames.lua',
+    'data/fields.lua',
     'shared/item_catalog.lua',
     'shared/constants.lua',
     'shared/utils.lua',
@@ -37,6 +38,7 @@ shared_scripts {
     'shared/inspection.lua',
     -- Zone/slot resolver: same list on client (targets) and server (validation).
     'shared/zones.lua',
+    'shared/fields.lua',
     'shared/config_validation.lua',
     -- Bridge Layer (framework abstraction). Order matters:
     -- core first, then adapters register themselves into the registry.
@@ -55,7 +57,9 @@ server_scripts {
     'server/modules/admin/permissions.lua',
     'server/modules/database/database.lua',
     'server/modules/company/database.lua',
+    'server/modules/fields/database.lua',
     'server/modules/company/company.lua',
+    'server/modules/fields/service.lua',
     'server/modules/supplies/service.lua',
     'server/modules/hub/runtime.lua',
     'server/modules/inventory/company_hooks.lua',

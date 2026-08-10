@@ -14,8 +14,9 @@ function CompanyInventoryHooks.Init()
         local playerMove = payload.fromType == 'player' and payload.toType == 'player' and sameInventory
         if playerMove then return true end
 
-        Logger.Warn(('Blocked Company material transfer (%s -> %s, issue %s)')
-            :format(tostring(payload.fromType), tostring(payload.toType), tostring(metadata.issueId)), 'inventory')
+        Logger.Warn(('Blocked Company custody transfer (%s -> %s, reference %s)')
+            :format(tostring(payload.fromType), tostring(payload.toType),
+                tostring(metadata.issueId or metadata.cargoId or 'unknown')), 'inventory')
         return false
     end, { print = false })
     return hookId ~= nil

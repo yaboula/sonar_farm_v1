@@ -207,6 +207,11 @@ end
 local function access(source, permission)
     if not Supplies.IsEnabled() then return nil, 'unavailable' end
     local allowed, member = Company.HasPermission(source, permission, true)
+    if not allowed and Fields and Fields.ActorContext
+        and (permission == 'warehouse.view' or permission == 'warehouse.withdraw' or permission == 'warehouse.return') then
+        local actor = Fields.ActorContext(source)
+        if actor and actor.temporary_scope and actor.permissionMap[permission] then return actor end
+    end
     if not allowed then return nil, 'permission_denied' end
     return member
 end
@@ -264,7 +269,7 @@ function Supplies.Confirm(source, draftId)
     if not member then return reject(reason, 'Ordering permission is required.') end
     -- Supplier stock is shared by every company, so confirmations serialize on
     -- one resource-wide key rather than only per company.
-    local acquired, result = Lock.With('supplier-order', function()
+    local acquired, result = Lock.With('company-finance', function()
         local existing = MySQL.single.await('SELECT id,receipt_id,status FROM sf_supply_orders WHERE draft_id=? AND company_id=? LIMIT 1',
             { draftId, member.company_id })
         if existing then return { ok = true, changed = false, entityId = existing.id, receiptId = existing.receipt_id, status = existing.status, message = 'This order was already confirmed.' } end
@@ -422,12 +427,40 @@ function Supplies.LoadWarehouse(source)
             available = quantity, reserved = 0, quality = {{ label = ('%s · next %d%%'):format(item and item.tier or 'standard', math.floor(tonumber(row.min_durability) or 0)), quantity = quantity }}, incoming = 0,
             status = quantity <= 2 and 'low' or 'stocked', location = 'Company Warehouse' }
     end
+    if Config.Features.CompanyCargo then
+        local produce = {}
+        for _, row in ipairs(MySQL.query.await([[SELECT item_id,quality_tier,SUM(quantity) quantity,
+            SUM(reserved_quantity) reserved FROM sf_warehouse_produce_lots WHERE company_id=?
+            GROUP BY item_id,quality_tier ORDER BY item_id,quality_tier]], { member.company_id }) or {}) do
+            local entry = produce[row.item_id]
+            if not entry then
+                entry = { id = row.item_id, name = row.item_id, category = 'produce', unit = 'unit', total = 0,
+                    available = 0, reserved = 0, quality = {}, incoming = 0, status = 'stocked', location = 'Produce Warehouse' }
+                produce[row.item_id], items[#items + 1] = entry, entry
+            end
+            local quantity, reserved = tonumber(row.quantity) or 0, tonumber(row.reserved) or 0
+            entry.total, entry.available, entry.reserved = entry.total + quantity, entry.available + quantity - reserved, entry.reserved + reserved
+            entry.quality[#entry.quality + 1] = { label = row.quality_tier, quantity = quantity }
+            used = used + quantity
+        end
+    end
     local incoming = {}
     for _, row in ipairs(MySQL.query.await([[SELECT o.id,o.receipt_id,o.due_at,l.item_id,l.quantity FROM sf_supply_orders o
         JOIN sf_supply_order_lines l ON l.order_id=o.id WHERE o.company_id=? AND o.status='in_transit' ORDER BY o.due_at]], { member.company_id }) or {}) do
         local item = Sonar.ItemCatalog.byId[row.item_id]
         incoming[#incoming + 1] = { id = row.id .. ':' .. row.item_id, product = item and item.label or row.item_id, reference = row.receipt_id,
             custodian = 'Supplier delivery', quantity = row.quantity, unit = 'unit', status = 'in_transit', dueAt = row.due_at }
+    end
+    if Config.Features.CompanyCargo then
+        for _, row in ipairs(MySQL.query.await([[SELECT id,reference,item_id,quantity,deposited_quantity,
+            custodian_identifier,status FROM sf_company_cargo WHERE company_id=?
+            AND status IN ('prepared','carrying','partial_deposit') ORDER BY created_at]], { member.company_id }) or {}) do
+            incoming[#incoming + 1] = { id = row.id, reference = row.reference, product = row.item_id,
+                custodianId = row.custodian_identifier, custodian = row.custodian_identifier,
+                quantity = tonumber(row.quantity) - tonumber(row.deposited_quantity), unit = 'unit',
+                status = row.status, ownership = 'Company', linkedKind = 'assignment', linkedId = '',
+                destination = 'Company Warehouse', restriction = 'Physical deposit required', availableActions = {} }
+        end
     end
     return { items = items, reservations = {}, incomingCargo = incoming, capacity = { used = used, total = 1000 }, atWarehouse = true,
         canManage = member.permissionMap['warehouse.withdraw'] == true, canSellWholesale = false }
@@ -439,9 +472,14 @@ local function ledgerRows(member, limit)
         { member.company_id }) or {}
     local entries = {}
     for _, row in ipairs(rows) do
+        local entryType = row.entry_type == 'purchase' and 'purchase'
+            or row.entry_type == 'field_purchase' and 'field_purchase'
+            or row.entry_type and row.entry_type:find('assignment', 1, true) and 'assignment_pay'
+            or row.entry_type and row.entry_type:find('contract', 1, true) and 'contract_escrow'
+            or row.entry_type == 'buyer_order' and 'buyer_order' or 'owner_contribution'
         entries[#entries + 1] = {
             id = row.id, idempotencyKey = row.idempotency_key,
-            type = row.entry_type == 'purchase' and 'purchase' or 'owner_contribution',
+            type = entryType,
             amount = dollars(row.amount_cents), direction = row.direction,
             actorId = row.actor_identifier, actor = row.actor_identifier,
             at = tostring(row.created_at), source = row.direction == 'credit' and 'Owner' or 'Company Treasury',
@@ -466,6 +504,19 @@ function Supplies.LoadCompanyHome(source)
     local modules = {
         { id = 'warehouse', area = 'operations', title = 'Warehouse', detail = 'Supply lots, incoming deliveries and issued custody', value = tostring(total) .. ' items', path = '/company/warehouse', priority = 'normal' },
     }
+    if Config.Features.Fields and member.permissionMap['fields.view_portfolio'] then
+        local owned = tonumber(MySQL.scalar.await('SELECT COUNT(*) FROM sf_company_fields WHERE company_id=?', { member.company_id })) or 0
+        modules[#modules + 1] = { id = 'leases', area = 'ownership', title = 'Land & Fields',
+            detail = 'Permanent property, topology and available acquisitions', value = tostring(owned) .. ' owned',
+            path = '/company/leases', priority = 'normal' }
+    end
+    if Config.Features.CompanyCargo and member.permissionMap['cargo.view_own'] then
+        local cargo = tonumber(MySQL.scalar.await([[SELECT COUNT(*) FROM sf_company_cargo WHERE company_id=?
+            AND status IN ('prepared','carrying','partial_deposit','mismatch')]], { member.company_id })) or 0
+        modules[#modules + 1] = { id = 'cargo', area = 'operations', title = 'Company Cargo',
+            detail = 'Harvest custody awaiting Warehouse deposit', value = tostring(cargo) .. ' active',
+            path = '/company/cargo', priority = cargo > 0 and 'attention' or 'normal' }
+    end
     if member.permissionMap['supplies.view_ledger'] then
         modules[#modules + 1] = { id = 'treasury', area = 'finance', title = 'Treasury', detail = 'Available Company funds and procurement budget', value = ('$%s'):format(dollars(company.treasury_cents)), path = '/company/treasury', priority = 'normal' }
         modules[#modules + 1] = { id = 'ledger', area = 'finance', title = 'Transaction Ledger', detail = 'Immutable procurement movements', value = tostring(#ledgerRows(member, 100)) .. ' entries', path = '/company/ledger', priority = 'normal' }
@@ -474,7 +525,7 @@ function Supplies.LoadCompanyHome(source)
         company = { id = company.id, name = company.name, originalName = company.name, brandName = 'Sonar Farm', status = 'operating',
             ownerId = company.owner_identifier, ownerName = company.owner_identifier, description = 'Authoritative farming company',
             officeLocation = 'Grapeseed Farm Office', foundedAt = tostring(company.created_at), capabilitiesRevision = 1 },
-        headline = pending > 0 and (tostring(pending) .. ' procurement request(s) require approval') or 'Company supplies and custody are synchronized',
+        headline = pending > 0 and (tostring(pending) .. ' procurement request(s) require approval') or 'Company land, funds and custody are synchronized',
         modules = modules, procurementLink = { remaining = remaining, pending = pending, path = '/supplies?area=procurement' },
     }
 end
@@ -486,8 +537,17 @@ function Supplies.LoadTreasury(source)
     local incoming = tonumber(MySQL.scalar.await("SELECT COALESCE(SUM(total_cents),0) FROM sf_supply_orders WHERE company_id=? AND status='in_transit'", { member.company_id })) or 0
     local valuation = tonumber(MySQL.scalar.await([[SELECT COALESCE(SUM(l.quantity * 100),0) FROM sf_warehouse_lots l WHERE l.company_id=?]], { member.company_id })) or 0
     valuation = valuation + (tonumber(MySQL.scalar.await("SELECT COUNT(*) * 100 FROM sf_warehouse_tool_units WHERE company_id=? AND status='available'", { member.company_id })) or 0)
-    return { available = dollars(company.treasury_cents), escrowReserved = 0, assignmentPayReserved = 0, leaseObligations = 0,
-        pendingBuyerIncome = 0, warehouseValuation = dollars(valuation), recentEntries = ledgerRows(member, 5), availableActions = { 'ledger' },
+    valuation = valuation + (tonumber(MySQL.scalar.await([[SELECT COALESCE(SUM(quantity * quality),0)
+        FROM sf_warehouse_produce_lots WHERE company_id=?]], { member.company_id })) or 0)
+    local contractEscrow = tonumber(MySQL.scalar.await([[SELECT COALESCE(SUM(payout_cents),0) FROM sf_work
+        WHERE company_id=? AND kind='contract' AND escrow_status='reserved' AND status NOT IN ('cancelled','completed')]], { member.company_id })) or 0
+    local assignmentPay = tonumber(MySQL.scalar.await([[SELECT COALESCE(SUM(payout_cents),0) FROM sf_work
+        WHERE company_id=? AND kind='assignment' AND escrow_status='reserved' AND status NOT IN ('cancelled','completed')]], { member.company_id })) or 0
+    local pendingBuyer = tonumber(MySQL.scalar.await([[SELECT COALESCE(SUM(payout_cents),0) FROM sf_buyer_orders
+        WHERE company_id=? AND status IN ('accepted','planned','reserved','ready')]], { member.company_id })) or 0
+    return { available = dollars(company.treasury_cents), escrowReserved = dollars(contractEscrow),
+        assignmentPayReserved = dollars(assignmentPay), leaseObligations = 0,
+        pendingBuyerIncome = dollars(pendingBuyer), warehouseValuation = dollars(valuation), recentEntries = ledgerRows(member, 5), availableActions = { 'ledger' },
         supplierCommitments = dollars(incoming) }
 end
 
@@ -507,9 +567,20 @@ function Supplies.Withdraw(source, itemId, quantity, operationId)
         or #operationId < 8 or #operationId > 100 or not operationId:match('^[%w_:%-]+$') then
         return reject('invalid_item', 'Invalid Warehouse request.')
     end
+    if member.temporary_scope then
+        local permitted, allowance = Fields.CanUseCompanyMaterial(source, member.company_id, itemId)
+        if not permitted or quantity > allowance then
+            return reject('permission_denied', 'This quantity is outside the remaining active Work requirements.')
+        end
+    end
     local memberAcquired, memberResult = Lock.With('member-custody:' .. member.identifier, function()
-        local stillAllowed, liveMember = Company.HasPermission(source, 'warehouse.withdraw', true)
-        if not stillAllowed or not liveMember or liveMember.company_id ~= member.company_id then
+        local liveMember = access(source, 'warehouse.withdraw')
+        local temporaryAllowed, temporaryAllowance = true, quantity
+        if liveMember and liveMember.temporary_scope then
+            temporaryAllowed, temporaryAllowance = Fields.CanUseCompanyMaterial(source, member.company_id, itemId)
+        end
+        if not liveMember or liveMember.company_id ~= member.company_id
+            or not temporaryAllowed or quantity > temporaryAllowance then
             return reject('permission_denied', 'Company membership changed before the withdrawal.')
         end
         member = liveMember
@@ -587,8 +658,8 @@ function Supplies.Return(source, issueId, operationId)
         return reject('invalid_operation', 'Invalid Warehouse return request.')
     end
     local memberAcquired, memberResult = Lock.With('member-custody:' .. member.identifier, function()
-        local stillAllowed, liveMember = Company.HasPermission(source, 'warehouse.return', true)
-        if not stillAllowed or not liveMember or liveMember.company_id ~= member.company_id then
+        local liveMember = access(source, 'warehouse.return')
+        if not liveMember or liveMember.company_id ~= member.company_id then
             return reject('permission_denied', 'Company membership changed before the return.')
         end
         member = liveMember

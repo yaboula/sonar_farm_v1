@@ -199,6 +199,12 @@ function Bridge.GetPlayerName(source)
     return callAdapter('GetPlayerName', source)
 end
 
+--- [Server] Credit a framework account. `operationId` is forwarded for
+--- provider audit; the caller owns durable at-most-once recovery.
+function Bridge.CreditMoney(identifier, account, amount, reason, operationId)
+    return callAdapter('CreditMoney', identifier, account, amount, reason, operationId)
+end
+
 --- [Client] Get the local player's framework data table.
 function Bridge.GetPlayerData()
     return callAdapter('GetPlayerData')

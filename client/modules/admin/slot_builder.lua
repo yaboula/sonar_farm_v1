@@ -128,7 +128,7 @@ end
 
 -- ─── Export ──────────────────────────────────────────────────────────────────
 
-local function SB_ExportToClipboard(zoneKey, label, allowedCrops)
+local function SB_SaveDraft(zoneKey, label, allowedCrops, rowSizes, purchasePrice, starterEligible)
     if #sbSlots == 0 then
         Bridge.Notify("No slots to export.", "error")
         return
@@ -168,7 +168,24 @@ local function SB_ExportToClipboard(zoneKey, label, allowedCrops)
     lib.setClipboard(output)
     print("\n^2[SONAR FARM] GENERATED SLOT ZONE CONFIGURATION:^0")
     print(output)
-    Bridge.Notify(string.format("Zone '%s' (%d slots) copied to clipboard!", zoneKey, #sbSlots), "success")
+    local rows, cursor = {}, 1
+    for _, size in ipairs(rowSizes) do
+        local row = { slots = {} }
+        for _ = 1, size do row.slots[#row.slots + 1] = sbSlots[cursor]; cursor = cursor + 1 end
+        rows[#rows + 1] = row
+    end
+    local response = lib.callback.await(Sonar.Constants.CALLBACKS.FIELD_DRAFT_SAVE, false, {
+        id = zoneKey, legacyZone = zoneKey, name = label, location = label,
+        orientation = sbSlots[1].heading or 0, starterEligible = starterEligible == true,
+        starterPriority = 100, purchasePrice = tonumber(purchasePrice) or 0, catalogVisible = true,
+        allowedCrops = allowedCrops or {}, access = { x = cx, y = cy, z = cz }, rows = rows,
+        blip = { enabled = true, sprite = 496, color = 25, scale = 0.8 },
+    })
+    if response and response.ok then
+        Bridge.Notify(('Field draft saved. Revision: %s'):format(response.revisionId), 'success')
+    else
+        Bridge.Notify(('Field draft rejected: %s. Recovery config copied to clipboard.'):format(response and response.reason or 'no_response'), 'error')
+    end
 end
 
 -- ─── Finalize ────────────────────────────────────────────────────────────────
@@ -192,6 +209,9 @@ local function SB_Finalize()
         { type = 'input',        label = 'Zone Key',     placeholder = 'e.g. vineyard_west',  required = true },
         { type = 'input',        label = 'Display Label', placeholder = 'e.g. West Vineyard', required = true },
         { type = 'multi-select', label = 'Allowed Crops (Empty = All)', options = cropOptions },
+        { type = 'input', label = 'Row sizes (comma-separated)', placeholder = '8,8,8', required = true },
+        { type = 'number', label = 'Permanent Purchase Price', default = 40000, min = 0, required = true },
+        { type = 'checkbox', label = 'Eligible as Starter Field', checked = false },
     })
 
     if not input or not input[1] or not input[2] then
@@ -199,7 +219,18 @@ local function SB_Finalize()
         return
     end
 
-    SB_ExportToClipboard(input[1], input[2], input[3])
+    local rowSizes, total = {}, 0
+    for token in tostring(input[4] or ''):gmatch('[^,%s]+') do
+        local size = tonumber(token)
+        if not size or size % 1 ~= 0 or size < 2 or size > 20 then
+            return Bridge.Notify('Every Row size must be an integer from 2 to 20.', 'error')
+        end
+        rowSizes[#rowSizes + 1], total = size, total + size
+    end
+    if #rowSizes < 1 or #rowSizes > 20 or total ~= #sbSlots then
+        return Bridge.Notify(('Row sizes must describe all %d placed Slots.'):format(#sbSlots), 'error')
+    end
+    SB_SaveDraft(input[1], input[2], input[3], rowSizes, input[5], input[6])
 end
 
 -- ─── DrawText3D (native; no tick overhead when builder is idle) ───────────────

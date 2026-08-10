@@ -72,6 +72,7 @@ Constants.CALLBACKS = {
     HUB_OPEN = 'sonar_farm:hub:open',
     HUB_LOAD = 'sonar_farm:hub:load',
     HUB_DISPATCH = 'sonar_farm:hub:dispatch',
+    HUB_SUBSCRIBE_FIELD = 'sonar_farm:hub:subscribeField',
     HUB_CLOSE = 'sonar_farm:hub:close',
     MINIGAME_BEGIN = 'sonar_farm:minigame:begin',
     MINIGAME_CHECKPOINT = 'sonar_farm:minigame:checkpoint',
@@ -80,6 +81,7 @@ Constants.CALLBACKS = {
     MINIGAME_CLEAR_INCOMPLETE = 'sonar_farm:minigame:clearIncomplete',
     SUBSCRIBE = 'sonar_farm:subscribe',
     ADMIN_AUTHORIZED = 'sonar_farm:adminAuthorized',
+    FIELD_DRAFT_SAVE = 'sonar_farm:fieldDraftSave',
 }
 
 -- Networked event names. Prefixed to avoid collisions with other resources.
@@ -91,6 +93,7 @@ Constants.EVENTS = {
     CROP_REMOVE = 'sonar_farm:cropRemove',
     SYNC_RESET = 'sonar_farm:syncReset',
     RUNTIME_READY = 'sonar_farm:runtimeReady',
+    FIELD_DELTA = 'sonar_farm:fieldDelta',
 }
 
 -- Public server events other resources can listen to (platform API).

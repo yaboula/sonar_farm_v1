@@ -68,6 +68,12 @@ Config.Features = {
     AdvancedCare = true,  -- Causal nutrients/weeds/pests model; opt-in rollout
     InspectionHud = true,  -- Focus-free authoritative crop inspection rail
     Supplies = true,      -- Authoritative Company procurement and Warehouse
+    Fields = true,         -- Authoritative Field catalogue, ownership and Hub maps
+    CompanyFieldAuthority = false, -- Atomic cutover to Company-only farming
+    Work = false,          -- Assignments and structured Crop Plan execution
+    PublicContracts = false,
+    CompanyCargo = false,
+    BuyerOrders = false,
     Machinery = false,     -- Stage 9+: not implemented
     Progression = false,   -- Stage 7: not implemented
     Economy = false,       -- Stage 8: not implemented
@@ -319,6 +325,22 @@ Config.Render = {
     -- Each crop gets deterministic jitter to avoid a periodic all-field spike.
     VisualStageCacheMs = 5000,
     VisualStageJitterMs = 1500,
+}
+
+Config.Fields = {
+    Ace = 'sonar_farm.fields_admin',
+    InteractionDistance = 3.0,
+    DetailRefreshSeconds = 5,
+    MaxEventsPerDetail = 100,
+    MinimumSlotSpacing = 0.75,
+    PurchaseDraftTtlSeconds = 10 * 60,
+    BuyerOrderWorkerSeconds = 60,
+    BuyerOrderTemplates = {
+        { id = 'local_carrots', buyer = 'Grapeseed Grocers', product = 'carrot',
+          quantity = 40, minimumQuality = 70, intervalSeconds = 60 * 60,
+          deadlineSeconds = 45 * 60, payout = 2200,
+          destination = { label = 'Grapeseed Produce Depot', coords = vec3(1688.4, 4929.2, 42.1) } },
+    },
 }
 
 -- ---------------------------------------------------------------------------

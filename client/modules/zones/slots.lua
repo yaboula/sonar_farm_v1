@@ -1,6 +1,7 @@
 --[[
     sonar_farm - Planting slots & target interactions (client)
-    One permanent ox_target sphere zone per configured plot. Handles the FULL
+    One ox_target sphere per nearby authoritative plot (or permanent configured
+    plot while Company Field authority is disabled). Handles the full
     interaction lifecycle for a slot:
       - Empty slot    → Shows "Plant seeds"
       - Occupied slot → Shows "Inspect", "Water" (if thirsty), "Harvest" (if ready/dead)
@@ -236,7 +237,11 @@ function Slots.NearestEmpty(coords, radius)
     radius = radius or Config.Security.MaxInteractDistance
 
     local best, bestDist
-    for _, slot in ipairs(Sonar.Zones.AllSlots()) do
+    local source = {}
+    if Config.Features.CompanyFieldAuthority then
+        for _, entry in pairs(registered) do if entry.slot then source[#source + 1] = entry.slot end end
+    else source = Sonar.Zones.AllSlots() end
+    for _, slot in ipairs(source) do
         if not Crops.IsSlotOccupied(slot.zone, slot.index) then
             local dist = Sonar.Utils.Distance(coords, slot)
             if dist <= radius and (not bestDist or dist < bestDist) then
@@ -254,25 +259,55 @@ function Slots.RefreshProps()
         return
     end
 
-    for _, slot in ipairs(Sonar.Zones.AllSlots()) do
-        refreshProp(slot)
-    end
+    if Config.Features.CompanyFieldAuthority then
+        for _, entry in pairs(registered) do if entry.slot then refreshProp(entry.slot) end end
+    else for _, slot in ipairs(Sonar.Zones.AllSlots()) do refreshProp(slot) end end
 end
 
 --- Register one ox_target sphere per slot at resource start.
 function Slots.Register()
+    if Config.Features.CompanyFieldAuthority then return end
     for _, slot in ipairs(Sonar.Zones.AllSlots()) do
         local key     = keyOf(slot.zone, slot.index)
         local propKey = propKeyOf(slot.zone, slot.index)
         local zoneId  = createSphereZone(slot, key)
 
-        registered[key] = { zoneId = zoneId, propKey = propKey }
+        registered[key] = { zoneId = zoneId, propKey = propKey, slot = slot }
         refreshProp(slot)
     end
 
     if Config.Debug then
         Bridge.Log('info', ('Registered %d planting slots with unified target options.'):format(Sonar.Zones.TotalSlots()))
     end
+end
+
+
+--- Reconcile only the authoritative slots in the player's subscribed cells.
+function Slots.ReplaceFields(fields)
+    if not Config.Features.CompanyFieldAuthority then return end
+    local wanted = {}
+    for _, field in ipairs(fields or {}) do
+        for _, slot in ipairs(field.slots or {}) do
+            local key = keyOf(slot.zone, slot.index)
+            wanted[key] = true
+            if not registered[key] then
+                registered[key] = { zoneId = createSphereZone(slot, key), propKey = propKeyOf(slot.zone, slot.index), slot = slot }
+                refreshProp(slot)
+            else registered[key].slot = slot end
+        end
+    end
+    for key, entry in pairs(registered) do
+        if not wanted[key] then
+            if entry.zoneId then Bridge.Target.RemoveZone(entry.zoneId) end
+            if entry.propKey then Pool.Destroy(entry.propKey) end
+            registered[key] = nil
+        end
+    end
+end
+
+function Slots.ClearDynamic()
+    if not Config.Features.CompanyFieldAuthority then return end
+    Slots.ReplaceFields({})
 end
 
 AddEventHandler('onResourceStop', function(resource)

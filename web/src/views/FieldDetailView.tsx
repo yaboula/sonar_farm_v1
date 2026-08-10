@@ -79,9 +79,17 @@ export function FieldDetailView() {
     return () => { active = false; };
   }, [context, fieldId, hub.adapter]);
 
+  const hasFieldData = Boolean(model?.data);
+  useEffect(() => {
+    if (!hasFieldData) return undefined;
+    const timer = window.setInterval(() => void reload(), 5000);
+    return () => window.clearInterval(timer);
+  }, [hasFieldData, reload]);
+
   useEffect(() => {
     if (!model?.data) return undefined;
     return hub.adapter.subscribeField(fieldId, model.data.sequence, context, (delta) => {
+      if (delta.fieldId !== fieldId) return;
       const currentSync = syncRef.current;
       if (!currentSync) { void reload(); return; }
       const nextSync = applyFieldDelta(currentSync, delta);
@@ -182,7 +190,7 @@ export function FieldDetailView() {
         <div className="field-layer-tabs" role="tablist" aria-label="Operating layer">
           {LAYERS.map((item) => <button type="button" role="tab" aria-selected={layer === item.id} className={layer === item.id ? "is-selected" : ""} key={item.id} onClick={() => setQuery({ layer: item.id })}>{item.label}</button>)}
         </div>
-        <div className={`field-sync-status field-sync-status--${syncStatus}`} role="status"><i />{syncStatus === "live" ? `Live fixture · seq ${field.sequence}` : "Resyncing authoritative snapshot"}<span>{field.serverTime.slice(11, 16)}</span></div>
+        <div className={`field-sync-status field-sync-status--${syncStatus}`} role="status"><i />{syncStatus === "live" ? `Authoritative live · seq ${field.sequence}` : "Resyncing authoritative snapshot"}<span>{field.serverTime.slice(11, 16)}</span></div>
       </div>
       <div className="field-operating-layout">
         <div className="field-map-column">
@@ -203,7 +211,7 @@ export function FieldDetailView() {
           {selectedSlot ? <SlotInspector slot={selectedSlot} diagnostics={diagnostics.length} /> : selectedRow ? <RowInspector row={selectedRow} /> : <FieldInspector field={field} />}
         </aside>
       </div>
-      {handoff ? <div className="field-handoff"><MapPin size={38} /><span>World handoff prepared</span><h2>{scopeLabel}</h2><p>The future NUI bridge will close the Hub and set the authoritative route. Fixture data has not changed.</p><button type="button" onClick={() => setHandoff(false)}>Return to Field Map</button></div> : null}
+      {handoff ? <div className="field-handoff"><MapPin size={38} /><span>Authoritative route set</span><h2>{scopeLabel}</h2><p>The Hub will close in FiveM and the server-validated Field access will be marked on the map.</p><button type="button" onClick={() => setHandoff(false)}>Return to Field Map</button></div> : null}
       {planEditor ? <CropPlanDialog field={field} initialRowId={selectedRow?.id} existingPlan={planEditor === "new" ? undefined : planEditor} pending={planPending} onClose={() => setPlanEditor(undefined)} onConfirm={(input) => void savePlan(input)} /> : null}
       {cancelPlan ? <ConfirmDialog eyebrow="Crop Plan control" title={`Cancel ${cancelPlan.reference}?`} confirmLabel="Cancel Crop Plan" tone="danger-confirm" pending={planPending} onClose={() => setCancelPlan(undefined)} onConfirm={() => void resolvePlanCancellation()}><p>{cancelPlan.rowIds.length} reserved Row{cancelPlan.rowIds.length === 1 ? "" : "s"} will be released. Occupied plants and Work history are not changed.</p></ConfirmDialog> : null}
     </DeepViewShell>

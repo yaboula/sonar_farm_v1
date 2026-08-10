@@ -1,6 +1,7 @@
 import { Plant } from "@phosphor-icons/react";
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { ROLE_LABELS } from "../data/fixtures";
+import { ROLE_LABELS } from "../hubPresentation";
 import { useHub } from "../store/HubContext";
 import type { HubRoute } from "../types";
 
@@ -13,8 +14,20 @@ const NAVIGATION: Array<{ id: HubRoute; label: string; path: string }> = [
 ];
 
 export function AppHeader() {
-  const { role, surface, capabilities } = useHub();
+  const { role, surface, capabilities, serverTime } = useHub();
   const surfaceLabel = surface === "office" ? "Office Terminal" : "Farm Tablet";
+  const [now, setNow] = useState(() => (serverTime ? serverTime * 1000 : Date.now()));
+  useEffect(() => {
+    const receivedAt = Date.now();
+    const authoritativeAt = serverTime ? serverTime * 1000 : receivedAt;
+    const refresh = () => setNow(authoritativeAt + (Date.now() - receivedAt));
+    refresh();
+    const timer = window.setInterval(refresh, 30_000);
+    return () => window.clearInterval(timer);
+  }, [serverTime]);
+  const serverDate = new Intl.DateTimeFormat("en-GB", {
+    weekday: "long", day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
+  }).format(new Date(now));
 
   return (
     <header className="app-header">
@@ -37,8 +50,8 @@ export function AppHeader() {
           </NavLink>
         ))}
       </nav>
-      <time className="server-date" dateTime="2026-08-08">
-        Saturday, 8 Aug 2026
+      <time className="server-date" dateTime={new Date(now).toISOString()}>
+        {serverDate}
       </time>
     </header>
   );

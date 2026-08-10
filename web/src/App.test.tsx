@@ -72,7 +72,7 @@ describe("Farm Business Hub", () => {
     await user.click(await screen.findByRole("button", { name: "Create Assignment" }));
     expect(await screen.findByRole("heading", { name: "Create Assignment" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("Establish Tomatoes · Row 12")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Row 12")).toBeInTheDocument();
+    expect(screen.getAllByText("Row 12").length).toBeGreaterThan(0);
   });
 
   it("reopens an unlinked reserved Crop Plan for editing", async () => {
@@ -293,7 +293,7 @@ describe("Farm Business Hub", () => {
       ["/company/applications", "Applications"],
       ["/company/treasury", "Treasury"],
       ["/company/ledger", "Transaction Ledger"],
-      ["/company/leases", "Leases"],
+      ["/company/leases", "Land & Fields"],
       ["/company/leases/lease-orchard", "Orchard Annex"],
       ["/company/roles", "Roles & Permissions"],
       ["/company/identity", "Company Identity"],

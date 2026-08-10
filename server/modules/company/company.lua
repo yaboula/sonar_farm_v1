@@ -6,11 +6,22 @@ local cache = {}
 local CACHE_TTL = 30
 
 local PERMISSIONS = {
-    owner = { 'supplies.view', 'supplies.request', 'supplies.order', 'supplies.approve', 'supplies.view_ledger', 'warehouse.view', 'warehouse.withdraw', 'warehouse.return' },
-    manager = { 'supplies.view', 'supplies.request', 'supplies.order', 'supplies.approve', 'supplies.view_ledger', 'warehouse.view', 'warehouse.withdraw', 'warehouse.return' },
-    procurement = { 'supplies.view', 'supplies.request', 'supplies.order', 'supplies.view_ledger', 'warehouse.view', 'warehouse.withdraw', 'warehouse.return' },
-    supervisor = { 'supplies.view', 'supplies.request', 'warehouse.view', 'warehouse.withdraw', 'warehouse.return' },
-    worker = { 'supplies.view', 'supplies.request', 'warehouse.view', 'warehouse.withdraw', 'warehouse.return' },
+    owner = { 'supplies.view', 'supplies.request', 'supplies.order', 'supplies.approve', 'supplies.view_ledger', 'warehouse.view', 'warehouse.withdraw', 'warehouse.return',
+        'fields.view_portfolio', 'fields.view_assigned', 'fields.view_team', 'fields.view_economics', 'fields.view_materials', 'fields.view_history', 'fields.plan', 'fields.acquire', 'fields.route',
+        'work.view_own', 'work.view_team', 'work.create', 'work.review', 'contracts.browse', 'contracts.create', 'contracts.review',
+        'cargo.view_own', 'cargo.view_team', 'cargo.deposit', 'buyer_orders.view', 'buyer_orders.manage' },
+    manager = { 'supplies.view', 'supplies.request', 'supplies.order', 'supplies.approve', 'supplies.view_ledger', 'warehouse.view', 'warehouse.withdraw', 'warehouse.return',
+        'fields.view_portfolio', 'fields.view_assigned', 'fields.view_team', 'fields.view_economics', 'fields.view_materials', 'fields.view_history', 'fields.plan', 'fields.acquire', 'fields.route',
+        'work.view_own', 'work.view_team', 'work.create', 'work.review', 'contracts.browse', 'contracts.create', 'contracts.review',
+        'cargo.view_own', 'cargo.view_team', 'cargo.deposit', 'buyer_orders.view', 'buyer_orders.manage' },
+    procurement = { 'supplies.view', 'supplies.request', 'supplies.order', 'supplies.view_ledger', 'warehouse.view', 'warehouse.withdraw', 'warehouse.return',
+        'fields.view_portfolio', 'fields.view_materials', 'fields.route', 'work.view_own', 'cargo.view_own', 'cargo.deposit', 'buyer_orders.view' },
+    supervisor = { 'supplies.view', 'supplies.request', 'warehouse.view', 'warehouse.withdraw', 'warehouse.return',
+        'fields.view_portfolio', 'fields.view_assigned', 'fields.view_team', 'fields.view_materials', 'fields.view_history', 'fields.plan', 'fields.route',
+        'work.view_own', 'work.view_team', 'work.create', 'work.review', 'contracts.browse', 'contracts.create', 'contracts.review',
+        'cargo.view_own', 'cargo.view_team', 'cargo.deposit', 'buyer_orders.view' },
+    worker = { 'supplies.view', 'supplies.request', 'warehouse.view', 'warehouse.withdraw', 'warehouse.return',
+        'fields.view_assigned', 'fields.route', 'work.view_own', 'contracts.browse', 'cargo.view_own', 'cargo.deposit' },
 }
 
 local function encode(value) return json.encode(value) end
@@ -34,6 +45,20 @@ end
 
 function Company.Init()
     if not CompanyDatabase.Init() then return false end
+    if not Fields.Init() then return false end
+    -- Add newly introduced stable permissions without deleting custom policy entries.
+    for _, row in ipairs(MySQL.query.await('SELECT company_id,role_key,permissions FROM sf_company_roles') or {}) do
+        local defaults, current = PERMISSIONS[row.role_key], decode(row.permissions)
+        if defaults then
+            local seen, changed = {}, false
+            for _, permission in ipairs(current) do seen[permission] = true end
+            for _, permission in ipairs(defaults) do
+                if not seen[permission] then current[#current + 1], changed = permission, true end
+            end
+            if changed then MySQL.update.await('UPDATE sf_company_roles SET permissions=? WHERE company_id=? AND role_key=?',
+                { encode(current), row.company_id, row.role_key }) end
+        end
+    end
     local now = Sonar.Time.Now()
     for _, item in ipairs(Sonar.ItemCatalog.market) do
         local stock = Config.Supplies.SupplierStock[item.tier]
@@ -94,7 +119,15 @@ function Company.Bootstrap(source, companyName)
     local identifier = Bridge.GetIdentifier(source)
     if not identifier then return false, 'player_not_ready' end
     local existing = MySQL.single.await('SELECT id,name FROM sf_companies WHERE owner_identifier=? LIMIT 1', { identifier })
-    if existing then return true, existing.id end
+    if existing then
+        local holding = MySQL.scalar.await('SELECT field_id FROM sf_company_fields WHERE company_id=? LIMIT 1', { existing.id })
+        if holding then return true, existing.id end
+        local acquired, result = Lock.With('starter-field-bootstrap', function()
+            local _, starterQuery = Fields.StarterForBootstrap(existing.id, identifier)
+            return starterQuery and MySQL.transaction.await({ starterQuery }) == true
+        end)
+        return acquired and result == true, acquired and result == true and existing.id or 'no_starter_field'
+    end
     local membership = MySQL.single.await('SELECT company_id FROM sf_company_members WHERE identifier=? LIMIT 1', { identifier })
     if membership then return false, 'already_company_member' end
 
@@ -115,8 +148,14 @@ function Company.Bootstrap(source, companyName)
         local limit = role == 'procurement' and math.floor(Config.Supplies.ProcurementLimit * 100) or -1
         queries[#queries + 1] = { query = 'INSERT INTO sf_company_roles (company_id,role_key,permissions,transaction_limit_cents) VALUES (?,?,?,?)', values = { companyId, role, encode(permissions), limit } }
     end
-    local ok, result = pcall(function() return MySQL.transaction.await(queries) end)
-    if not ok or result ~= true then return false, 'database_error' end
+    local acquired, result = Lock.With('starter-field-bootstrap', function()
+        local starterFieldId, starterQuery = Fields.StarterForBootstrap(companyId, identifier)
+        if not starterFieldId then return { ok = false, reason = 'no_starter_field' } end
+        queries[#queries + 1] = starterQuery
+        local ok, committed = pcall(function() return MySQL.transaction.await(queries) end)
+        return { ok = ok and committed == true, reason = ok and committed == true and nil or 'database_error', fieldId = starterFieldId }
+    end)
+    if not acquired or not result or not result.ok then return false, result and result.reason or 'company_busy' end
     Company.Invalidate(identifier)
     return true, companyId
 end
@@ -142,7 +181,13 @@ function Company.RemoveMember(companyId, identifier)
             WHERE company_id=? AND identifier=? AND status IN ('pending','issued')]], { companyId, identifier })) or 0
         local recovering = tonumber(MySQL.scalar.await([[SELECT COUNT(*) FROM sf_supply_outbox
             WHERE company_id=? AND identifier=? AND status IN ('pending','prepared','inventory_done')]], { companyId, identifier })) or 0
-        if outstanding > 0 or recovering > 0 then return false end
+        local cargo = tonumber(MySQL.scalar.await([[SELECT COUNT(*) FROM sf_company_cargo
+            WHERE company_id=? AND custodian_identifier=? AND status IN ('prepared','carrying','partial_deposit','mismatch')]],
+            { companyId, identifier })) or 0
+        local work = tonumber(MySQL.scalar.await([[SELECT COUNT(*) FROM sf_work WHERE company_id=?
+            AND assignee_identifier=? AND status IN ('assigned','active','awaiting_review','releasing')]],
+            { companyId, identifier })) or 0
+        if outstanding > 0 or recovering > 0 or cargo > 0 or work > 0 then return false end
         local changed = MySQL.update.await("UPDATE sf_company_members SET status='removed' WHERE company_id=? AND identifier=? AND role_key<>'owner'", { companyId, identifier })
         Company.Invalidate(identifier)
         return tonumber(changed) == 1
@@ -196,9 +241,14 @@ end
 
 function Company.CanUseIssuedItem(source, metadata)
     local companyId, issueId = tostring(metadata.companyId or ''), tostring(metadata.issueId or '')
-    if not Company.IsActiveMember(source, companyId) or issueId == '' then return false end
+    local member = Company.GetMembership(source, true)
+    local temporary = not member and Fields and Fields.CanUseCompanyMaterial
+        and Fields.CanUseCompanyMaterial(source, companyId, metadata.itemId)
+    if (not member or member.company_id ~= companyId) and not temporary or issueId == '' then return false end
     if Supplies and Supplies.ReconcileOutbox then
-        Supplies.ReconcileOutbox(source, Company.GetMembership(source, true))
+        Supplies.ReconcileOutbox(source, member or temporary and {
+            company_id = companyId, identifier = Bridge.GetIdentifier(source), temporary_scope = true,
+        } or nil)
     else
         Company.ReconcileItemUse(source, companyId, issueId)
     end
@@ -215,7 +265,9 @@ function Company.PrepareItemUse(source, metadata, action, resolved, broken)
     local acquired, result = Lock.With('member-custody:' .. identifier, function()
         local member = Company.GetMembership(source, true)
         local companyId = tostring(metadata.companyId or '')
-        if not member or member.status ~= 'active' or member.company_id ~= companyId then
+        local temporary = not member and Fields and Fields.CanUseCompanyMaterial
+            and Fields.CanUseCompanyMaterial(source, companyId, metadata.itemId)
+        if (not member or member.status ~= 'active' or member.company_id ~= companyId) and not temporary then
             return { ok = false }
         end
         local issueStatus = MySQL.scalar.await([[SELECT status FROM sf_material_issues

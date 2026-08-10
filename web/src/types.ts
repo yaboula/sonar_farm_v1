@@ -92,6 +92,7 @@ export interface HubContextModel {
   capabilitiesRevision: number;
   viewState: ViewState;
   capabilities: HubCapabilities;
+  serverTime?: number;
   selectedKind?: SelectionKind;
   selectedId?: string;
 }
@@ -149,6 +150,9 @@ export type ActionIntent =
   | { type: "cropPlan.update"; planId: string; input: CropPlanInput }
   | { type: "cropPlan.cancel"; planId: string }
   | { type: "field.setRoute"; scope: FieldScopeRef }
+  | { type: "field.preparePurchase"; fieldId: string }
+  | { type: "field.purchase"; fieldId: string; operationId: string }
+  | { type: "cargo.deposit"; cargoId: string; quantity: number; operationId: string }
   | { type: "companyCargo.setRoute"; cargoId: string }
   | { type: "company.setRoute"; destination: "office" | "warehouse" | "registry" }
   | { type: "warehouse.prepareOrder"; reservationId: string }
@@ -290,6 +294,7 @@ export interface AssignmentDetail {
   blocker?: { title: string; detail: string; raisedAt: string };
   reviewerNote?: string;
   availableActions: AvailableAssignmentAction[];
+  eligibleAssignees?: Array<{ id: string; name: string; role: string }>;
   scopeRef?: FieldScopeRef;
   sourcePlanId?: string;
 }
@@ -537,6 +542,25 @@ export interface WorkQueueData {
   canCreateContract: boolean;
 }
 
+export type FarmingWorkAction = "plant" | "water" | "fertilize" | "weed" | "treat_pest" | "harvest";
+export interface WorkRequirementInput {
+  action: FarmingWorkAction;
+  rowIds: string[];
+  crop?: string;
+  itemTier?: "basic" | "plus" | "pro";
+  target: number;
+  thresholdKey?: "water" | "nutrients" | "weeds" | "pests" | "quality";
+  thresholdValue?: number;
+}
+
+export interface WorkCreateData {
+  nextReference: string;
+  serverNow: number;
+  fields: Array<{ id: string; name: string; description: string }>;
+  members: Array<{ id: string; name: string; role: string }>;
+  plans: Array<{ id: string; reference: string; fieldId: string; crop: string; rowIds: string[] }>;
+}
+
 export interface AssignmentCreateInput {
   title: string;
   objective: string;
@@ -546,8 +570,10 @@ export interface AssignmentCreateInput {
   assigneeId: string;
   supervisorId: string;
   deadline: string;
+  deadlineAt?: number;
   payout: number;
   requirement: string;
+  requirements?: WorkRequirementInput[];
   materialIds: string[];
   scopeRef?: FieldScopeRef;
   sourcePlanId?: string;
@@ -568,6 +594,7 @@ export interface BuyerOrderDetail {
   status: BuyerOrderStatus;
   statusLabel: string;
   deadline: string;
+  deadlineAt?: number;
   destination: string;
   payout: number;
   reservedQuantity: number;
@@ -626,6 +653,7 @@ export interface ContractCreateInput {
   deadline: string;
   reward: number;
   requirements: string;
+  structuredRequirements?: WorkRequirementInput[];
   failureRule: string;
   scopeRef?: FieldScopeRef;
   sourcePlanId?: string;
@@ -934,7 +962,7 @@ export type LedgerStatus = "completed" | "pending" | "escrowed" | "released" | "
 export interface LedgerEntry {
   id: string;
   idempotencyKey: string;
-  type: "purchase" | "assignment_pay" | "contract_escrow" | "buyer_order" | "lease" | "wholesale" | "rename" | "owner_contribution" | "business_sale";
+  type: "purchase" | "field_purchase" | "assignment_pay" | "contract_escrow" | "buyer_order" | "lease" | "wholesale" | "rename" | "owner_contribution" | "business_sale";
   amount: number;
   direction: "credit" | "debit" | "reserve" | "release";
   actorId: string;
@@ -961,7 +989,7 @@ export interface TreasurySnapshot {
   availableActions: Array<"ledger" | "contribute">;
 }
 
-export type LeaseStatus = "starter" | "available" | "active" | "payment_due" | "grace" | "expired" | "ended";
+export type LeaseStatus = "starter" | "purchase" | "owned" | "available" | "active" | "payment_due" | "grace" | "expired" | "ended";
 export interface CompanyLease {
   id: string;
   fieldId: string;
@@ -969,6 +997,7 @@ export interface CompanyLease {
   location: string;
   status: LeaseStatus;
   recurringPrice: number;
+  purchasePrice?: number;
   billing: string;
   nextPayment?: string;
   graceDeadline?: string;
@@ -976,8 +1005,12 @@ export interface CompanyLease {
   allowedCrops: string[];
   activeCrops: string;
   linkedWork: string[];
+  ownedByCompany?: boolean;
+  ownerName?: string;
+  purchasePrepared?: boolean;
+  purchasePreparedBy?: string;
   restriction?: string;
-  availableActions: Array<"start" | "pay" | "end" | "open_field">;
+  availableActions: Array<"start" | "pay" | "end" | "prepare_purchase" | "purchase" | "open_field">;
 }
 
 export interface RolePolicy {

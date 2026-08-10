@@ -58,6 +58,16 @@ if IsDuplicityVersion() then
         return player.PlayerData.name or ('Player %s'):format(source)
     end
 
+    function adapter.CreditMoney(identifier, account, amount, reason, operationId)
+        local player = QBCore.Functions.GetPlayerByCitizenId(identifier)
+        if not player and QBCore.Functions.GetOfflinePlayerByCitizenId then
+            player = QBCore.Functions.GetOfflinePlayerByCitizenId(identifier)
+        end
+        if not player or not player.Functions or not player.Functions.AddMoney then return false end
+        local auditReason = ('%s [%s]'):format(tostring(reason or 'Sonar Farm'), tostring(operationId or 'no-operation'))
+        return player.Functions.AddMoney(account or 'bank', tonumber(amount) or 0, auditReason) == true
+    end
+
     --- Notify a client from the server via ox_lib.
     ---@param source number
     ---@param message string

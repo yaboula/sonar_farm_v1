@@ -60,8 +60,19 @@ export class NuiHubAdapter implements HubAdapter {
     }
   }
 
-  subscribeField(_fieldId: string, _afterSequence: number, _context: HubContextModel, _listener: FieldDeltaListener) {
-    return () => undefined;
+  subscribeField(fieldId: string, afterSequence: number, _context: HubContextModel, listener: FieldDeltaListener) {
+    let active = true;
+    const onMessage = (event: MessageEvent) => {
+      const message = event.data as { type?: string; payload?: unknown } | undefined;
+      if (active && message?.type === "hub:fieldDelta") listener(message.payload as Parameters<FieldDeltaListener>[0]);
+    };
+    window.addEventListener("message", onMessage);
+    void this.request<unknown>("hub:subscribeField", { fieldId, afterSequence }).catch(() => undefined);
+    return () => {
+      active = false;
+      window.removeEventListener("message", onMessage);
+      void this.request<unknown>("hub:unsubscribeField", { fieldId }).catch(() => undefined);
+    };
   }
 
   async close() { await this.request<unknown>("hub:close", {}); }

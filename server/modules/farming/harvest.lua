@@ -46,20 +46,23 @@ lib.callback.register(CALLBACKS.HARVEST, function(source, payload)
         if not def then return reject(REJECT.UNKNOWN_CROP) end
 
         local condition = Physiology.Apply(record)
+        local permission = Validation.CanHarvest(source, record)
+        local fieldAccess = Fields.ResolveCropAccess(source, record, ACTIONS.HARVEST)
+        if not fieldAccess.ok then return reject(fieldAccess.reason) end
+        if fieldAccess.legacy and not permission.ok then return reject(permission.reason) end
+        if not fieldAccess.legacy then permission = { ok = true, theft = false } end
 
-        -- A dead crop yields nothing; clear it so the plot is usable again.
+        -- Clearing a dead Company crop is still physical Field work and must
+        -- pass the same authoritative Harvest scope as a productive harvest.
         if condition.state == CROP_STATE.DEAD then
             State.Remove(record.id)
             Sync.OnCropRemoved(record.id, record.cell)
+            Fields.RecordOperation(source, record, ACTIONS.HARVEST, fieldAccess,
+                { deadCropCleared = true, requirementVerifiedOverride = false })
             return reject(REJECT.CROP_DEAD)
         end
 
-        if condition.progress < 1 then
-            return reject(REJECT.CROP_NOT_MATURE)
-        end
-
-        local permission = Validation.CanHarvest(source, record)
-        if not permission.ok then return reject(permission.reason) end
+        if condition.progress < 1 then return reject(REJECT.CROP_NOT_MATURE) end
 
         local advanced = Sonar.Conditions.IsAdvancedCareEnabled()
         local score = Quality.Request(source, ACTIONS.HARVEST, record)
@@ -79,13 +82,22 @@ lib.callback.register(CALLBACKS.HARVEST, function(source, payload)
             return reject(REJECT.INVENTORY_FULL)
         end
 
+        local prepared, prepareReason = Fields.PrepareHarvestCargo(source, record, units, metadata, fieldAccess)
+        if prepareReason then return reject(prepareReason) end
+        local deliveredMetadata = prepared and prepared.metadata or metadata
+
         -- Deliver first, remove second: a failed delivery must not destroy the crop.
-        if not Bridge.Inventory.AddItem(source, def.productItem, units, metadata) then
+        if not Bridge.Inventory.AddItem(source, def.productItem, units, deliveredMetadata) then
+            Fields.CancelHarvestCargo(prepared)
             return reject(REJECT.INVENTORY_FULL)
         end
 
         State.Remove(record.id)
         Sync.OnCropRemoved(record.id, record.cell)
+        Fields.FinalizeHarvestCargo(prepared)
+        Fields.RecordOperation(source, record, ACTIONS.HARVEST, fieldAccess,
+            { itemId = def.productItem, units = units, quality = quality, production = productionScore,
+                cargoId = prepared and prepared.cargoId or nil })
 
         Logger.Info(('Harvested %s x%d (quality %.1f, %s).')
             :format(record.crop_type, units, quality, metadata.tier), 'farming', {

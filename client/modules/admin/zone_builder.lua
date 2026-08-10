@@ -100,7 +100,7 @@ local function showInstructions()
     end
 end
 
-local function exportToClipboard(zoneKey, label, allowedCrops)
+local function saveFieldDraft(zoneKey, label, allowedCrops, purchasePrice, starterEligible)
     local cropsStr = ""
     if allowedCrops and #allowedCrops > 0 then
         local parts = {}
@@ -136,7 +136,20 @@ local function exportToClipboard(zoneKey, label, allowedCrops)
     lib.setClipboard(output)
     print("\n^2[SONAR FARM] GENERATED ZONE CONFIGURATION:^0")
     print(output)
-    Bridge.Notify("Zone config copied to clipboard!", "success")
+    local response = lib.callback.await(Sonar.Constants.CALLBACKS.FIELD_DRAFT_SAVE, false, {
+        id = zoneKey, legacyZone = zoneKey, name = label, location = label,
+        orientation = grid.heading, starterEligible = starterEligible == true,
+        starterPriority = 100, purchasePrice = tonumber(purchasePrice) or 0, catalogVisible = true,
+        allowedCrops = allowedCrops or {}, access = { x = grid.origin.x, y = grid.origin.y, z = grid.origin.z },
+        grid = { origin = { x = grid.origin.x, y = grid.origin.y, z = grid.origin.z },
+            rows = grid.rows, cols = grid.cols, spacing = { x = grid.spacing.x, y = grid.spacing.y }, heading = grid.heading },
+        blip = { enabled = true, sprite = 496, color = 25, scale = 0.8 },
+    })
+    if response and response.ok then
+        Bridge.Notify(('Field draft saved. Revision: %s'):format(response.revisionId), 'success')
+    else
+        Bridge.Notify(('Field draft rejected: %s. A recovery copy is in the clipboard.'):format(response and response.reason or 'no_response'), 'error')
+    end
 end
 
 local function finalizeZone()
@@ -152,7 +165,9 @@ local function finalizeZone()
     local input = lib.inputDialog('Save Zone Configuration', {
         { type = 'input', label = 'Zone Key', placeholder = 'e.g. grapeseed_new', required = true },
         { type = 'input', label = 'Display Label', placeholder = 'e.g. Grapeseed Fields', required = true },
-        { type = 'multi-select', label = 'Allowed Crops (Empty = All)', options = cropOptions }
+        { type = 'multi-select', label = 'Allowed Crops (Empty = All)', options = cropOptions },
+        { type = 'number', label = 'Permanent Purchase Price', default = 40000, min = 0, required = true },
+        { type = 'checkbox', label = 'Eligible as Starter Field', checked = false },
     })
 
     if not input or not input[1] or not input[2] then
@@ -160,7 +175,7 @@ local function finalizeZone()
         return
     end
 
-    exportToClipboard(input[1], input[2], input[3])
+    saveFieldDraft(input[1], input[2], input[3], input[4], input[5])
 end
 
 local function startEditLoop()
@@ -241,16 +256,16 @@ local function startEditLoop()
                     -- Hide UI temporarily while input dialog is active
                     lib.hideTextUI()
                     local input = lib.inputDialog('Manual Grid Setup', {
-                        { type = 'number', label = 'Rows', default = grid.rows, required = true, min = 1 },
-                        { type = 'number', label = 'Cols', default = grid.cols, required = true, min = 1 },
+                        { type = 'number', label = 'Rows', default = grid.rows, required = true, min = 1, max = 20 },
+                        { type = 'number', label = 'Cols', default = grid.cols, required = true, min = 2, max = 20 },
                         { type = 'number', label = 'Spacing X', default = grid.spacing.x, required = true, min = 0.5, step = 0.1 },
                         { type = 'number', label = 'Spacing Y', default = grid.spacing.y, required = true, min = 0.5, step = 0.1 },
                         { type = 'number', label = 'Heading (degrees)', default = grid.heading, required = true, step = 0.1 }
                     })
 
                     if input then
-                        grid.rows = math.max(1, math.floor(input[1]))
-                        grid.cols = math.max(1, math.floor(input[2]))
+                        grid.rows = math.min(20, math.max(1, math.floor(input[1])))
+                        grid.cols = math.min(20, math.max(2, math.floor(input[2])))
                         grid.spacing.x = input[3]
                         grid.spacing.y = input[4]
                         grid.heading = input[5] % 360.0
@@ -261,10 +276,10 @@ local function startEditLoop()
                 end
 
                 -- 3. Arrow Keys
-                if IsControlJustPressed(0, 172) then grid.rows = grid.rows + rowColStep; changed = true end
+                if IsControlJustPressed(0, 172) then grid.rows = math.min(20, grid.rows + rowColStep); changed = true end
                 if IsControlJustPressed(0, 173) then grid.rows = math.max(1, grid.rows - rowColStep); changed = true end
-                if IsControlJustPressed(0, 175) then grid.cols = grid.cols + rowColStep; changed = true end
-                if IsControlJustPressed(0, 174) then grid.cols = math.max(1, grid.cols - rowColStep); changed = true end
+                if IsControlJustPressed(0, 175) then grid.cols = math.min(20, grid.cols + rowColStep); changed = true end
+                if IsControlJustPressed(0, 174) then grid.cols = math.max(2, grid.cols - rowColStep); changed = true end
 
                 -- 4. Scroll Wheel (with ALT for Y spacing)
                 if IsControlJustPressed(0, 241) or IsDisabledControlJustPressed(0, 241) then
@@ -318,7 +333,7 @@ RegisterCommand('farm_builder', function()
     grid = {
         origin = nil,
         rows = 1,
-        cols = 1,
+        cols = 2,
         spacing = { x = 2.0, y = 2.0 },
         heading = 0.0
     }

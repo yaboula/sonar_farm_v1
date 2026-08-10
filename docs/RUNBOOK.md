@@ -38,14 +38,23 @@ set mysql_connection_string "<configured outside this repository>"
 
 ---
 
-## 2. Base de datos (Etapa 2)
+## 2. Base de datos y Company Fields
 
-El esquema vive en [`database/install.sql`](../database/install.sql) y crea la tabla `farming_crops`.
+El esquema base vive en [`database/install.sql`](../database/install.sql) y crea
+`farming_crops`. Los módulos Company, Supplies y Fields ejecutan además su DDL
+idempotente durante el arranque. En `0.4.0` se crean `sf_fields`, revisiones,
+Rows, Slots, propiedad, Crop Plans, Work, Cargo, lotes, Buyer Orders y outbox.
+Un fallo en cualquiera de esas tablas deja el runtime en `FAILED`; nunca arranca
+con un catálogo parcial.
 
 Hay dos formas de instalar el esquema (ambas soportadas):
 
 1. **Auto-creacion (por defecto):** con `Config.Database.AutoCreateSchema = true`, el recurso ejecuta el DDL al arrancar. Es idempotente (`CREATE TABLE IF NOT EXISTS`), asi que no daña datos existentes.
 2. **Import manual:** pon `Config.Database.AutoCreateSchema = false` e importa `database/install.sql` en tu base de datos antes de iniciar el recurso.
+
+`Config.Database.AutoCreateSchema` controla el esquema agrícola base. Los
+esquemas empresariales se validan/crean siempre porque sus tablas son una
+dependencia dura cuando `Fields` o `Supplies` están activos.
 
 El runtime recorre `BOOTING → READY`. Un fallo de Bridge, validación de config,
 migración o lectura inicial lo deja en `FAILED`; no acepta acciones ni

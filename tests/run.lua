@@ -59,6 +59,7 @@ dofile('config/config.lua')
 dofile('config/crops.lua')
 dofile('config/zones.lua')
 dofile('config/minigames.lua')
+dofile('data/fields.lua')
 dofile('shared/item_catalog.lua')
 dofile('shared/constants.lua')
 dofile('shared/utils.lua')
@@ -69,6 +70,7 @@ dofile('shared/growth.lua')
 dofile('shared/physiology.lua')
 dofile('shared/inspection.lua')
 dofile('shared/zones.lua')
+dofile('shared/fields.lua')
 dofile('shared/config_validation.lua')
 dofile('server/modules/minigames/tomato_plant_scoring.lua')
 dofile('server/modules/inventory/items.lua')
@@ -76,6 +78,62 @@ dofile('server/modules/inventory/items.lua')
 test('production config validates', function()
     local errors = Sonar.ConfigValidation.Validate()
     equal(#errors, 0, table.concat(errors, '; '))
+end)
+
+test('Field seed catalogue compiles stable versioned topology', function()
+    local first, errors = Sonar.Fields.CompileSeeds()
+    equal(#errors, 0, table.concat(errors, '; '))
+    equal(#first, 3, 'three canonical Fields expected')
+    local expected = { grapeseed_east = 40, grapeseed_south = 24, zone1 = 24 }
+    local ids = {}
+    for _, field in ipairs(first) do
+        equal(#field.slots, expected[field.id], field.id .. ' slot count')
+        assert(#field.rows >= 1 and #field.rows <= 20, 'row bounds')
+        for _, slot in ipairs(field.slots) do
+            assert(not ids[slot.id], 'stable Slot ids must be globally unique')
+            ids[slot.id] = true
+            assert(slot.position.x >= 0 and slot.position.x <= 1, 'normalized x')
+            assert(slot.position.y >= 0 and slot.position.y <= 1, 'normalized y')
+        end
+        local again = assert(Sonar.Fields.Compile((function()
+            for _, seed in ipairs(Config.FieldSeeds) do if seed.id == field.id then return seed end end
+        end)()))
+        equal(again.checksum, field.checksum, 'topology checksum must be deterministic')
+    end
+end)
+
+test('Field topology validator rejects unsafe geometry and cross-Field overlap', function()
+    local invalid = {
+        id = 'invalid', name = 'Invalid', access = { x = 0, y = 0, z = 0 },
+        allowedCrops = {}, rows = { { slots = { { x = 0, y = 0, z = 0 } } } },
+    }
+    local compiled, errors = Sonar.Fields.Compile(invalid)
+    assert(not compiled and #errors > 0, 'a one-Slot Row must be rejected')
+
+    local original = Config.FieldSeeds
+    local function seed(id)
+        return { id = id, name = id, access = { x = 0, y = 0, z = 0 }, allowedCrops = {},
+            rows = { { slots = { { x = 10, y = 10, z = 1 }, { x = 12, y = 10, z = 1 } } } } }
+    end
+    Config.FieldSeeds = { seed('overlap_a'), seed('overlap_b') }
+    local _, overlapErrors = Sonar.Fields.CompileSeeds()
+    Config.FieldSeeds = original
+    assert(#overlapErrors > 0 and table.concat(overlapErrors, '; '):find('overlaps', 1, true),
+        'cross-Field overlap must be rejected')
+end)
+
+test('0.4 runtime keeps Fields independent and streams topology on demand', function()
+    local function read(path)
+        local file = assert(io.open(path, 'rb')); local value = file:read('*a'); file:close(); return value
+    end
+    local hub = read('server/modules/hub/runtime.lua')
+    local slots = read('client/modules/zones/slots.lua')
+    local schema = read('server/modules/fields/database.lua')
+    assert(hub:find("Config.Features.Fields", 1, true), 'Hub must expose Fields independently')
+    assert(hub:find("Fields.Subscribe", 1, true), 'Field Detail must use an authoritative subscription')
+    assert(slots:find('function Slots.ReplaceFields', 1, true), 'nearby topology must replace Slot targets')
+    assert(schema:find('sf_field_revisions', 1, true) and schema:find('sf_field_outbox', 1, true),
+        'versioned topology and recovery outbox tables are required')
 end)
 
 test('invalid operational config is rejected', function()

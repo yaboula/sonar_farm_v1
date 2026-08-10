@@ -476,6 +476,58 @@ local function validateSupplies(errors)
     end
 end
 
+local function validateFields(errors)
+    local cfg = Config.Fields
+    if type(cfg) ~= 'table' then errors[#errors + 1] = 'Config.Fields must be a table.'; return end
+    nonEmptyString(errors, 'Config.Fields.Ace', cfg.Ace)
+    for _, key in ipairs({ 'InteractionDistance', 'DetailRefreshSeconds', 'MaxEventsPerDetail',
+        'MinimumSlotSpacing', 'PurchaseDraftTtlSeconds', 'BuyerOrderWorkerSeconds' }) do
+        positive(errors, 'Config.Fields.' .. key, cfg[key], false)
+    end
+    local fields, compileErrors = Sonar.Fields.CompileSeeds()
+    for _, message in ipairs(compileErrors) do errors[#errors + 1] = 'Field catalogue: ' .. message end
+    local ids, coordinates = {}, {}
+    for _, field in ipairs(fields) do
+        if ids[field.id] then errors[#errors + 1] = 'Duplicate Field id ' .. field.id end
+        ids[field.id] = true
+        for _, slot in ipairs(field.slots) do
+            local key = ('%.2f:%.2f:%.2f'):format(slot.x, slot.y, slot.z)
+            if coordinates[key] then errors[#errors + 1] = ('Fields %s and %s overlap at %s'):format(coordinates[key], field.id, key) end
+            coordinates[key] = field.id
+        end
+    end
+    if Config.Features.CompanyFieldAuthority and not (Config.Features.Fields and Config.Features.Work and Config.Features.CompanyCargo) then
+        errors[#errors + 1] = 'CompanyFieldAuthority requires Fields, Work and CompanyCargo.'
+    end
+    if Config.Features.PublicContracts and not (Config.Features.Fields and Config.Features.Work and Config.Features.CompanyCargo) then
+        errors[#errors + 1] = 'PublicContracts requires Fields, Work and CompanyCargo.'
+    end
+    if Config.Features.BuyerOrders and not (Config.Features.Fields and Config.Features.CompanyCargo) then
+        errors[#errors + 1] = 'BuyerOrders requires Fields and CompanyCargo.'
+    end
+    local templateIds = {}
+    for index, template in ipairs(cfg.BuyerOrderTemplates or {}) do
+        local path = ('Config.Fields.BuyerOrderTemplates[%d]'):format(index)
+        nonEmptyString(errors, path .. '.id', template.id)
+        nonEmptyString(errors, path .. '.buyer', template.buyer)
+        nonEmptyString(errors, path .. '.product', template.product)
+        if templateIds[template.id] then errors[#errors + 1] = path .. '.id must be unique.' end
+        templateIds[template.id] = true
+        local item = Sonar.ItemCatalog.byId[template.product]
+        if not item or item.category ~= 'Produce' then errors[#errors + 1] = path .. '.product must be a harvested product.' end
+        for _, key in ipairs({ 'quantity', 'intervalSeconds', 'deadlineSeconds', 'payout' }) do
+            positive(errors, path .. '.' .. key, template[key], false)
+        end
+        if not finite(template.minimumQuality) or template.minimumQuality < 0 or template.minimumQuality > 100 then
+            errors[#errors + 1] = path .. '.minimumQuality must be between 0 and 100.'
+        end
+        local coords = template.destination and template.destination.coords
+        if type(coords) ~= 'table' and type(coords) ~= 'vector3' then
+            errors[#errors + 1] = path .. '.destination.coords must be configured.'
+        end
+    end
+end
+
 function ConfigValidation.Validate()
     local errors, warnings = {}, {}
 
@@ -486,6 +538,7 @@ function ConfigValidation.Validate()
     validateSection(errors, 'AdvancedCare', validateAdvancedCare)
     validateSection(errors, 'Inspection', validateInspection)
     validateSection(errors, 'Supplies', validateSupplies)
+    validateSection(errors, 'Fields', validateFields)
 
     nonEmptyString(errors, 'Config.Admin.Ace', Config.Admin and Config.Admin.Ace)
     positive(errors, 'Config.SaveInterval', Config.SaveInterval, false)

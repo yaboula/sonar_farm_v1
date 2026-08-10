@@ -62,8 +62,13 @@ lib.callback.register(CALLBACKS.PLANT, function(source, payload)
         if not slotCheck.ok then return reject(slotCheck.reason) end
         local slot = slotCheck.slot
 
-        local limit = Validation.CropLimit(source)
-        if not limit.ok then return reject(limit.reason) end
+        local fieldAccess = Fields.ResolvePlantAccess(source, cropType, zoneKey, slotIndex)
+        if not fieldAccess.ok then return reject(fieldAccess.reason) end
+
+        if fieldAccess.legacy then
+            local limit = Validation.CropLimit(source)
+            if not limit.ok then return reject(limit.reason) end
+        end
 
         local seedCheck = Validation.GetSeedItem(source, def)
         if not seedCheck.ok then return reject(seedCheck.reason) end
@@ -79,9 +84,28 @@ lib.callback.register(CALLBACKS.PLANT, function(source, payload)
         local now = Sonar.Time.Now()
 
         -- Position and heading come from the slot definition, never the player.
+        local cropData = Sonar.CropClock.NewData(cropType, {
+            water = 100,
+            health = initialHealth(score),
+            spoilage = 0,
+            lastCare = now,
+            careCount = 0,
+            plantScore = score,
+        })
+        if not fieldAccess.legacy then
+            cropData.fieldId = fieldAccess.field.id
+            cropData.topologyRevision = fieldAccess.field.revisionId
+            cropData.rowId = fieldAccess.slot.rowId
+            cropData.slotId = fieldAccess.slot.id
+            cropData.companyId = fieldAccess.companyId
+            cropData.planId = fieldAccess.planId
+            cropData.workType = fieldAccess.work.kind
+            cropData.workId = fieldAccess.work.id
+            cropData.plantedBy = runtime.identifier
+        end
         local cropId, record = State.Add({
             crop_type = cropType,
-            owner = runtime.identifier,
+            owner = fieldAccess.legacy and runtime.identifier or fieldAccess.companyId,
             zone = slot.zone,
             slot = slot.index,
             pos_x = slot.x,
@@ -90,15 +114,14 @@ lib.callback.register(CALLBACKS.PLANT, function(source, payload)
             heading = slot.heading,
             planted_at = now,
             growth_time = def.growthTime,
-            data = Sonar.CropClock.NewData(cropType, {
-                water = 100,
-                health = initialHealth(score),
-                spoilage = 0,
-                lastCare = now,
-                careCount = 0,
-                plantScore = score,
-            }),
+            data = cropData,
         })
+
+        if not Fields.RecordOperation(source, record, ACTIONS.PLANT, fieldAccess, { itemId = seedItem, score = score }) then
+            State.Remove(record.id)
+            Bridge.Inventory.AddItem(source, seedItem, 1)
+            return reject(REJECT.INTERNAL_ERROR)
+        end
 
         Sync.OnCropChanged(record)
 

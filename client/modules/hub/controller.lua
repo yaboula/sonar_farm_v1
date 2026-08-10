@@ -20,7 +20,7 @@ function Hub.Open(surface, presence)
     if Inspection and Inspection.IsActive() then Inspection.Close('hub_open') end
     local response = lib.callback.await(CALLBACKS.HUB_OPEN, false, { surface = surface, presence = presence })
     if not response or not response.ok then
-        return Bridge.Notify(response and response.reason == 'unavailable' and 'Company Supplies is not enabled.' or 'The Business Hub is unavailable.', 'error')
+        return Bridge.Notify(response and response.reason == 'permission_denied' and 'No Company or Contract access is available.' or 'The Business Hub is unavailable.', 'error')
     end
     active = response.data
     SetNuiFocus(true, true)
@@ -44,13 +44,30 @@ end)
 RegisterNUICallback('hub:dispatch', function(data, callback)
     if not active then return reply(callback, { ok = false, reason = 'invalid_session' }) end
     local response = lib.callback.await(CALLBACKS.HUB_DISPATCH, false, { nonce = active.nonce, intent = data and data.intent })
+    if response and response.route then SetNewWaypoint(response.route.x + 0.0, response.route.y + 0.0) end
     reply(callback, response)
     if response and response.closeSurface then Hub.Close() end
 end)
 
+RegisterNUICallback('hub:subscribeField', function(data, callback)
+    if not active then return reply(callback, { ok = false, reason = 'invalid_session' }) end
+    reply(callback, lib.callback.await(CALLBACKS.HUB_SUBSCRIBE_FIELD, false, {
+        nonce = active.nonce, fieldId = data and data.fieldId, afterSequence = data and data.afterSequence,
+    }))
+end)
+
+RegisterNUICallback('hub:unsubscribeField', function(_, callback)
+    if active then lib.callback.await(CALLBACKS.HUB_SUBSCRIBE_FIELD, false, { nonce = active.nonce, fieldId = '' }) end
+    reply(callback, { ok = true })
+end)
+
+RegisterNetEvent(Sonar.Constants.EVENTS.FIELD_DELTA, function(delta)
+    if active then SendNUIMessage({ type = 'hub:fieldDelta', payload = delta }) end
+end)
+
 RegisterNUICallback('hub:close', function(_, callback) reply(callback); Hub.Close() end)
 
-if Config.Features.Supplies then
+if Config.Features.Supplies or Config.Features.Fields then
     RegisterCommand(Config.Supplies.TabletCommand, function() Hub.Open('tablet', 'remote') end, false)
     RegisterKeyMapping(Config.Supplies.TabletCommand, 'Open Sonar Farm Tablet', 'keyboard', Config.Supplies.TabletKey)
 

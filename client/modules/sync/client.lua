@@ -79,6 +79,7 @@ local function requestSubscription()
     end
 
     Crops.ReplaceAll(response.crops)
+    Slots.ReplaceFields(response.fields or {})
     available = true
 
     -- Re-apply anything that happened during the round-trip.
@@ -149,6 +150,7 @@ RegisterNetEvent(EVENTS.SYNC_RESET, function()
     currentCell = nil
     available = false
     Crops.Reset()
+    Slots.ClearDynamic()
     if Inspection then Inspection.OnSyncReset() end
 end)
 

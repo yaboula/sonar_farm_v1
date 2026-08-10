@@ -101,6 +101,14 @@ function Sync.RenderPayload(record, identifier)
         cropType = record.crop_type,
         zone = record.zone,
         slot = record.slot,
+        fieldId = data.fieldId,
+        topologyRevision = data.topologyRevision,
+        rowId = data.rowId,
+        slotId = data.slotId,
+        companyId = data.companyId,
+        planId = data.planId,
+        workType = data.workType,
+        workId = data.workId,
         cell = record.cell,
         x = record.pos_x,
         y = record.pos_y,
@@ -115,7 +123,7 @@ function Sync.RenderPayload(record, identifier)
         simulationVersion = Sonar.CropClock.Version(record),
         growthAdjustmentRatio = data.growthAdjustmentRatio,
         maturedAt = data.maturedAt,
-        isMine = (record.owner == nil) or (record.owner == identifier),
+        isMine = (record.owner == nil) or (record.owner == identifier) or (data.plantedBy == identifier),
     }
     if Sonar.Conditions.IsAdvancedCareEnabled() then
         if not Sonar.CropClock.IsV2(record) then
@@ -306,6 +314,7 @@ lib.callback.register(CALLBACKS.SUBSCRIBE, function(source)
         ok = true,
         cells = cellKeys,
         crops = crops,
+        fields = Fields.IsAuthorityEnabled() and Fields.TopologiesForCells(cellKeys) or nil,
         serverTime = Sonar.Time.Now(),
     }
 end)

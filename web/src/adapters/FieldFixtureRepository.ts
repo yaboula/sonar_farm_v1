@@ -198,6 +198,19 @@ export class FieldFixtureRepository {
     return safe;
   }
 
+  loadAvailablePlans(context: HubContextModel) {
+    const plans: Array<{ id: string; reference: string; fieldId: string; crop: string; rowIds: string[] }> = [];
+    for (const field of this.fields) {
+      const detail = this.loadField(field.id, context);
+      if (!detail || detail === "restricted") continue;
+      for (const plan of detail.cropPlans) {
+        if (plan.status !== "reserved" || plan.linkedAssignmentId || plan.linkedContractId) continue;
+        plans.push({ id: plan.id, reference: plan.reference, fieldId: field.id, crop: plan.crop, rowIds: [...plan.rowIds] });
+      }
+    }
+    return plans;
+  }
+
   createPlan(input: CropPlanInput, context: HubContextModel): IntentResult {
     if (!context.capabilities.createCropPlans) return { ok: false, message: "Crop Plan creation is not permitted." };
     const field = this.fields.find((item) => item.id === input.fieldId);

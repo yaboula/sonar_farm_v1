@@ -4,7 +4,29 @@ Todos los cambios relevantes de este proyecto se documentan en este archivo.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/) y el proyecto se adhiere a [Versionado Semantico](https://semver.org/lang/es/).
 
-## [Unreleased]
+## [0.4.0] - 2026-08-10
+
+### Added — Company Fields, Work y Land Runtime
+
+- Catálogo versionado de Fields importado idempotentemente a MySQL, con IDs
+  estables para Field, Row y Slot, checksums, revisiones draft y activación segura.
+- Propiedad permanente de Fields, Starter Field atómico durante el bootstrap,
+  preparación de compra por Manager y confirmación física por Owner.
+- Crop Plans con reservas exclusivas de Rows, Assignments y Public Contracts con
+  requisitos estructurados, escrow, progreso por evento y revisión pagada.
+- Company Cargo recuperable, lotes agrícolas del Warehouse y Buyer Orders con
+  reserva exacta por calidad, vencimiento y crédito único a Treasury.
+- Suscripción NUI por Field y streaming espacial de topologías cercanas sin
+  registrar todos los targets del mapa permanentemente.
+
+### Security and rollout
+
+- Worker y Contractor reciben solamente los Fields, Rows y acciones cubiertos
+  por Work activo; Route, plantación, cuidado, cosecha y depósito se revalidan
+  en servidor.
+- `Fields` y `Land & Fields` se activan inicialmente en modo read-only. Work,
+  Company authority, Cargo, Public Contracts y Buyer Orders mantienen flags
+  independientes y apagados por defecto.
 
 ### Added — Simulación Agrícola Proporcional al Ciclo V2
 

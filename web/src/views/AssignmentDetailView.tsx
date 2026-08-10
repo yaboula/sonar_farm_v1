@@ -25,7 +25,6 @@ import {
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { FarmSelect } from "../components/FarmSelect";
 import { StatePanel } from "../components/StatePanel";
-import { ELIGIBLE_ASSIGNEES } from "../data/assignmentFixtures";
 import { useHub } from "../store/HubContext";
 import type {
   ActionIntent,
@@ -134,7 +133,7 @@ export function AssignmentDetailView() {
   const [notice, setNotice] = useState<string>();
   const [dialog, setDialog] = useState<DialogKind>();
   const [notes, setNotes] = useState("");
-  const [assigneeId, setAssigneeId] = useState("staff-noah");
+  const [assigneeId, setAssigneeId] = useState("");
   const [controlsOpen, setControlsOpen] = useState(false);
   const [handoff, setHandoff] = useState<{ title: string; detail: string }>();
 
@@ -162,6 +161,8 @@ export function AssignmentDetailView() {
   }, [assignmentId, requestContext, hub.adapter]);
 
   const assignment = model?.data;
+  const eligibleAssignees = assignment?.eligibleAssignees ?? (assignment ? [assignment.assignee] : []);
+  const selectedAssigneeId = assigneeId || assignment?.assignee.id || "";
   const totals = useMemo(() => {
     if (!assignment) return { current: 0, target: 0, percent: 0 };
     const current = assignment.requirements.reduce(
@@ -441,15 +442,15 @@ export function AssignmentDetailView() {
           eyebrow="Assignment controls"
           title="Reassign this work?"
           onClose={closeDialog}
-          footer={<><button type="button" onClick={closeDialog}>Keep assignee</button><button type="button" className="confirm" disabled={pending || assigneeId === assignment.assignee.id} onClick={() => completeDialogAction({ type: "assignment.reassign", assignmentId, assigneeId })}>Confirm Reassignment</button></>}
+          footer={<><button type="button" onClick={closeDialog}>Keep assignee</button><button type="button" className="confirm" disabled={pending || selectedAssigneeId === assignment.assignee.id} onClick={() => completeDialogAction({ type: "assignment.reassign", assignmentId, assigneeId: selectedAssigneeId })}>Confirm Reassignment</button></>}
         >
           <p>Verified progress, deadline and reserved pay stay attached to the Assignment.</p>
           <FarmSelect
             autoFocus
             className="dialog-field"
             label="Eligible Worker"
-            value={assigneeId}
-            options={ELIGIBLE_ASSIGNEES.map((worker) => ({ value: worker.id, label: worker.name }))}
+            value={selectedAssigneeId}
+            options={eligibleAssignees.map((worker) => ({ value: worker.id, label: worker.name }))}
             onChange={setAssigneeId}
           />
         </DetailDialog>

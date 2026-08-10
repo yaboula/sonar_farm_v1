@@ -78,7 +78,7 @@ CreateThread(function()
     end
 
     local companyReady = Company.Init()
-    if not companyReady and Supplies.IsEnabled() then
+    if not companyReady and (Supplies.IsEnabled() or Fields.IsEnabled()) then
         Runtime.SetStatus(Runtime.STATUS.FAILED, 'company_database')
         Logger.Warn('Company persistence failed while Supplies is enabled.', 'boot')
         return
@@ -117,6 +117,16 @@ CreateThread(function()
                 Wait(math.max(5, Config.Supplies.DeliveryWorkerSeconds) * 1000)
                 Lock.With('supplier-order', function() Supplies.Restock() end)
                 Supplies.ProcessDue()
+            end
+        end)
+    end
+    if companyReady and Fields.IsEnabled() then
+        CreateThread(function()
+            while true do
+                Wait(math.max(10, Config.Fields.BuyerOrderWorkerSeconds) * 1000)
+                Fields.ProcessOutbox()
+                Fields.ExpireBuyerOrders()
+                Fields.GenerateBuyerOrders()
             end
         end)
     end

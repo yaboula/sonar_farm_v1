@@ -51,6 +51,35 @@ triviales.
 
 ## 2. Callbacks
 
+### Business Hub y Fields `0.4.0`
+
+El shell utiliza cuatro callbacks genéricos. Todos exigen un nonce ligado a
+`source`, superficie, presencia y TTL:
+
+- `sonar_farm:hub:open`: abre Office, Warehouse o Tablet y devuelve capacidades.
+- `sonar_farm:hub:load`: carga Fields, Field Detail, Land, Work, Cargo o Buyer Orders.
+- `sonar_farm:hub:dispatch`: envía una intención; nunca acepta efectos agronómicos ni
+  coordenadas decididas por el cliente.
+- `sonar_farm:hub:close`: invalida sesión y suscripción.
+
+Field Detail activa una sola suscripción mediante
+`sonar_farm:hub:subscribeField`. Los
+deltas contienen `fieldId`, `topologyRevision` y `sequence`; un salto obliga al
+frontend a recargar la snapshot completa.
+
+Intenciones autoritativas nuevas:
+
+- `cropPlan.create|update|cancel`
+- `assignment.create|accept|submit|approve|requestCorrection|cancel`
+- `contract.create|accept|transition`
+- `field.preparePurchase|purchase|setRoute`
+- `cargo.deposit`
+- `buyerOrder.transition`
+
+El cliente envía IDs estables y datos de formulario. Membresía, propiedad,
+Rows, Work, distancia, Treasury, calidad, stock y resultados se resuelven otra
+vez en servidor.
+
 ### `sonar_farm:inspect`
 
 Abre la snapshot autoritativa que alimenta el Crop Inspection Pulse Rail. El

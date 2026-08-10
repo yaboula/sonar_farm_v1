@@ -16,6 +16,7 @@ State.crops = State.crops or {}     -- [id] = record
 State.cells = State.cells or {}     -- [cellKey] = { [id] = true }  (spatial index)
 State.owners = State.owners or {}   -- [identifier] = { [id] = true }  (owner index)
 State.slots = State.slots or {}     -- ["zone:slot"] = id  (occupancy index)
+State.stableSlots = State.stableSlots or {} -- [stable slotId] = id
 State.dirty = State.dirty or {}     -- [id] = true  (pending upsert)
 State.deleted = State.deleted or {} -- [id] = true  (pending delete)
 State.loaded = false
@@ -145,6 +146,14 @@ local function slotAdd(record)
     end
 
     State.slots[key] = record.id
+    local stableId = record.data and record.data.slotId
+    if stableId then
+        local stableOccupant = State.stableSlots[stableId]
+        if stableOccupant and stableOccupant ~= record.id then
+            error(('Stable slot %s is held by crops %s and %s'):format(stableId, stableOccupant, record.id))
+        end
+        State.stableSlots[stableId] = record.id
+    end
 end
 
 local function slotRemove(record)
@@ -152,6 +161,8 @@ local function slotRemove(record)
     if key and State.slots[key] == record.id then
         State.slots[key] = nil
     end
+    local stableId = record.data and record.data.slotId
+    if stableId and State.stableSlots[stableId] == record.id then State.stableSlots[stableId] = nil end
 end
 
 --- Id of the crop occupying a slot, if any.
@@ -161,6 +172,10 @@ end
 function State.SlotOccupant(zone, slot)
     local key = State.SlotKey(zone, slot)
     return key and State.slots[key] or nil
+end
+
+function State.StableSlotOccupant(slotId)
+    return slotId and State.stableSlots[slotId] or nil
 end
 
 --- Occupied and total slot counts for a zone (total comes from config, so it is
@@ -390,6 +405,7 @@ function State.LoadAll()
     State.cells = {}
     State.owners = {}
     State.slots = {}
+    State.stableSlots = {}
     State.dirty = {}
     State.deleted = {}
     State.loaded = false

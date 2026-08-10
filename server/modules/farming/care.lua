@@ -31,12 +31,14 @@ lib.callback.register(CALLBACKS.CARE_OPTIONS, function(source, payload)
     local distance = Validation.Distance(source, vec3(record.pos_x, record.pos_y, record.pos_z))
     if not distance.ok then return reject(distance.reason) end
     local permission = Validation.CanCare(source, record)
-    if not permission.ok then return reject(permission.reason) end
     local action = payload.action
     if action ~= ACTIONS.WATER and action ~= ACTIONS.FERTILIZE
         and action ~= ACTIONS.WEED and action ~= ACTIONS.TREAT_PEST then
         return reject(REJECT.INVALID_ITEM)
     end
+    local fieldAccess = Fields.ResolveCropAccess(source, record, action)
+    if not fieldAccess.ok then return reject(fieldAccess.reason) end
+    if fieldAccess.legacy and not permission.ok then return reject(permission.reason) end
     if action ~= ACTIONS.WATER then
         local conditionName = action == ACTIONS.FERTILIZE and 'nutrients'
             or action == ACTIONS.WEED and 'weeds' or 'pests'
@@ -72,7 +74,9 @@ lib.callback.register(CALLBACKS.WATER, function(source, payload)
         if not distance.ok then return reject(distance.reason) end
 
         local permission = Validation.CanCare(source, record)
-        if not permission.ok then return reject(permission.reason) end
+        local fieldAccess = Fields.ResolveCropAccess(source, record, ACTIONS.WATER)
+        if not fieldAccess.ok then return reject(fieldAccess.reason) end
+        if fieldAccess.legacy and not permission.ok then return reject(permission.reason) end
 
         -- Bring the crop up to date before deciding whether it needs water.
         local condition = Physiology.Apply(record)
@@ -101,6 +105,10 @@ lib.callback.register(CALLBACKS.WATER, function(source, payload)
         Items.RecordCompanyUse(source, selected, ACTIONS.WATER, broken)
 
         local updated = State.Get(record.id)
+        Fields.RecordOperation(source, record, ACTIONS.WATER, fieldAccess,
+            { itemId = selected.definition.id, score = score, toolBroken = broken,
+                water = updated and updated.data.water or condition.water })
+
         Sync.OnCropChanged(updated or record)
 
         TriggerEvent(PUBLIC.CROP_WATERED, {

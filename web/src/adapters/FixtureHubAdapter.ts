@@ -1,4 +1,4 @@
-import { cloneAssignmentFixtures } from "../data/assignmentFixtures";
+import { cloneAssignmentFixtures, ELIGIBLE_ASSIGNEES } from "../data/assignmentFixtures";
 import { cloneWorkSupplyFixtures } from "../data/workSupplyFixtures";
 import { FieldFixtureRepository } from "./FieldFixtureRepository";
 import { CompanyFixtureRepository } from "./CompanyFixtureRepository";
@@ -241,7 +241,16 @@ export class FixtureHubAdapter implements HubAdapter {
 
     if (request.kind === "assignmentCreate") {
       return context.capabilities.createAssignments
-        ? { request, state: "ready", data: { nextReference: `ASG-${this.assignmentSequence}` } as TData }
+        ? { request, state: "ready", data: {
+            nextReference: `ASG-${this.assignmentSequence}`,
+            serverNow: Math.floor(Date.now() / 1000),
+            fields: [],
+            members: [
+              { id: "staff-noah", name: "Noah Reed", role: "Worker" },
+              { id: "staff-sofia", name: "Sofia Bennett", role: "Worker" },
+            ],
+            plans: this.fields.loadAvailablePlans(context),
+          } as TData }
         : { request, state: "restricted", data: null };
     }
 
@@ -251,6 +260,7 @@ export class FixtureHubAdapter implements HubAdapter {
       if (!canReadAssignment(context.role, assignment)) return { request, state: "restricted", data: null };
       const safeAssignment = structuredClone(assignment);
       safeAssignment.availableActions = actionsForRole(context.role, safeAssignment);
+      safeAssignment.eligibleAssignees = ELIGIBLE_ASSIGNEES.map((worker) => ({ ...worker, role: "Worker" }));
       return { request, state: "ready", data: safeAssignment as TData };
     }
 
@@ -262,7 +272,13 @@ export class FixtureHubAdapter implements HubAdapter {
 
     if (request.kind === "contractCreate") {
       return context.capabilities.managePublicContracts
-        ? { request, state: "ready", data: { nextReference: `PC-${String(this.contractSequence).padStart(3, "0")}` } as TData }
+        ? { request, state: "ready", data: {
+            nextReference: `PC-${String(this.contractSequence).padStart(3, "0")}`,
+            serverNow: Math.floor(Date.now() / 1000),
+            fields: [],
+            members: [],
+            plans: this.fields.loadAvailablePlans(context),
+          } as TData }
         : { request, state: "restricted", data: null };
     }
 
@@ -389,6 +405,7 @@ export class FixtureHubAdapter implements HubAdapter {
     if (intent.type === "cropPlan.update") return this.fields.updatePlan(intent.planId, intent.input, context);
     if (intent.type === "cropPlan.cancel") return this.fields.cancelPlan(intent.planId, context);
     if (intent.type === "field.setRoute") return this.fields.setRoute(intent.scope, context);
+    if (intent.type === "field.preparePurchase") return { ok: true, changed: true, message: "Field purchase prepared for Owner confirmation." };
     if (intent.type === "companyCargo.setRoute") return this.company.setCargoRoute(intent.cargoId, context);
     if (intent.type === "company.setRoute") return this.company.setRoute(intent.destination);
     if (intent.type === "warehouse.withdraw") return this.company.withdraw(intent.itemId, intent.quantity, context);

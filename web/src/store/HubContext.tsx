@@ -9,6 +9,7 @@ import {
 import { ACTOR_BY_ROLE } from "../data/fixtures";
 import { fixtureHubAdapter } from "../adapters/FixtureHubAdapter";
 import { hubAdapter, runtimeIsNui } from "../adapters/hubAdapter";
+import { EMPTY_HUB_CAPABILITIES } from "../hubPresentation";
 import type {
   FarmRole,
   HubContextModel,
@@ -57,12 +58,13 @@ const previewState: HubContextModel = {
 
 const initialState: HubContextModel = runtimeIsNui
   ? { ...previewState, actorId: "", role: "worker", surface: "tablet", presence: "remote", viewState: "loading",
-      capabilities: { ...fixtureHubAdapter.resolveCapabilities("visitor", "tablet"), routes: ["supplies", "company"] } }
+      capabilities: EMPTY_HUB_CAPABILITIES }
   : previewState;
 
 function reducer(state: HubContextModel, action: Action): HubContextModel {
   if (action.type === "hydrate") return action.value;
   if (action.type === "role") {
+    if (runtimeIsNui) return { ...state, role: action.value };
     return {
       ...state,
       role: action.value,
@@ -74,6 +76,7 @@ function reducer(state: HubContextModel, action: Action): HubContextModel {
   }
 
   if (action.type === "transitionRole") {
+    if (runtimeIsNui) return { ...state, role: action.value };
     return {
       ...state,
       role: action.value,
@@ -84,6 +87,7 @@ function reducer(state: HubContextModel, action: Action): HubContextModel {
   }
 
   if (action.type === "surface") {
+    if (runtimeIsNui) return state;
     return {
       ...state,
       surface: action.value,
@@ -94,7 +98,9 @@ function reducer(state: HubContextModel, action: Action): HubContextModel {
 
   if (action.type === "presence") return { ...state, presence: action.value };
 
-  if (action.type === "capabilities") return { ...state, capabilitiesRevision: action.revision ?? state.capabilitiesRevision + 1, capabilities: fixtureHubAdapter.resolveCapabilities(state.role, state.surface) };
+  if (action.type === "capabilities") return runtimeIsNui
+    ? { ...state, capabilitiesRevision: action.revision ?? state.capabilitiesRevision + 1 }
+    : { ...state, capabilitiesRevision: action.revision ?? state.capabilitiesRevision + 1, capabilities: fixtureHubAdapter.resolveCapabilities(state.role, state.surface) };
 
   if (action.type === "viewState") {
     return { ...state, viewState: action.value };
